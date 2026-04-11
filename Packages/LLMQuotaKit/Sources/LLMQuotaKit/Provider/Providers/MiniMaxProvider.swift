@@ -1,64 +1,79 @@
 import Foundation
 
 /// MiniMax Provider
-/// API: GET https://api.minimax.chat/v1/users/self 或 POST /v1/group/get
-/// Header: Authorization: Bearer {api_key}
+/// Base URL: https://api.minimaxi.com/v1 (OpenAI 兼容)
+/// Token Plan 订阅制，按请求/5小时滚动重置，无公开余额 API
+/// 控制台: https://platform.minimaxi.com/user-center/basic-information
 public struct MiniMaxProvider: QuotaProvider, Sendable {
     public let type: ProviderType = .minimax
     public let displayName = "MiniMax"
     public let iconName = "logo-minimax"
-    public let defaultBaseURL = "https://api.minimax.chat"
-    public let quotaUnit: QuotaUnit = .tokens
+    public let defaultBaseURL = "https://api.minimaxi.com/v1"
+    public let quotaUnit: QuotaUnit = .requests
 
     private let network = NetworkClient()
 
     public init() {}
 
     public func validateKey(_ key: String, baseURL: String?) async throws -> Bool {
-        let url = (baseURL ?? defaultBaseURL) + "/v1/users/self"
+        // 通过轻量请求验证 Key：发送一个极小的 chat 请求
+        // 余额不足时返回 429，但说明 Key 有效
+        let url = (baseURL ?? defaultBaseURL) + "/chat/completions"
+        let body = """
+        {"model":"MiniMax-M2.5","messages":[{"role":"user","content":"."}],"max_tokens":1}
+        """
         let (_, response) = try await network.request(
             url: url,
-            headers: ["Authorization": "Bearer \(key)"]
+            method: "POST",
+            headers: ["Authorization": "Bearer \(key)"],
+            body: Data(body.utf8)
         )
-        return response.statusCode == 200
+        // 200=正常, 429=余额不足但Key有效, 401=Key无效
+        return response.statusCode != 401
     }
 
     public func fetchQuota(key: String, baseURL: String?) async throws -> QuotaInfo {
-        let url = (baseURL ?? defaultBaseURL) + "/v1/users/self"
+        // 验证 Key 有效
+        let url = (baseURL ?? defaultBaseURL) + "/chat/completions"
+        let body = """
+        {"model":"MiniMax-M2.5","messages":[{"role":"user","content":"."}],"max_tokens":1}
+        """
         let (data, response) = try await network.request(
             url: url,
-            headers: ["Authorization": "Bearer \(key)"]
+            method: "POST",
+            headers: ["Authorization": "Bearer \(key)"],
+            body: Data(body.utf8)
         )
 
-        guard response.statusCode == 200 else {
-            throw network.errorFromResponse(statusCode: response.statusCode, data: data)
+        // 401 = Key 无效
+        if response.statusCode == 401 {
+            throw QuotaError.invalidKey
         }
 
-        let user = try network.decodeJSON(UserResponse.self, from: data)
-        let total = user.subsidyBalance ?? user.totalBalance
-        let used = user.totalUsed ?? 0
-        let ratio = total > 0 ? used / total : 0
+        // 429 = 余额不足但 Key 有效
+        if response.statusCode == 429 {
+            return QuotaInfo(
+                provider: .minimax,
+                keyIdentifier: NetworkClient.maskKey(key),
+                totalQuota: nil,
+                usedQuota: nil,
+                remainingQuota: 0,
+                unit: .requests,
+                usageRatio: 1.0,
+                error: .unknown("MiniMax 余额不足，请在控制台查看: platform.minimaxi.com")
+            )
+        }
 
+        // 200 = Key 有效且有余额，但无法获取具体剩余额度
         return QuotaInfo(
             provider: .minimax,
             keyIdentifier: NetworkClient.maskKey(key),
-            totalQuota: total,
-            usedQuota: used,
-            remainingQuota: total - used,
-            unit: .tokens,
-            usageRatio: ratio
+            totalQuota: nil,
+            usedQuota: nil,
+            remainingQuota: nil,
+            unit: .requests,
+            usageRatio: 0,
+            error: .unknown("MiniMax Token Plan 订阅制，额度在控制台查看: platform.minimaxi.com")
         )
-    }
-
-    private struct UserResponse: Decodable {
-        let totalBalance: Double?
-        let subsidyBalance: Double?
-        let totalUsed: Double?
-
-        enum CodingKeys: String, CodingKey {
-            case totalBalance = "total_balance"
-            case subsidyBalance = "subsidy_balance"
-            case totalUsed = "total_used"
-        }
     }
 }
