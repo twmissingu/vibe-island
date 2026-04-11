@@ -95,9 +95,13 @@ final class QuotaViewModel {
     // MARK: - Provider Factory
 
     private func makeProvider(for type: ProviderType) -> any QuotaProvider {
-        // TODO: Phase 2 - 返回真实 Provider
-        // PlaceholderProvider for Demo mode
-        PlaceholderProvider(type: type)
+        switch type {
+        case .mimo: MiMoProvider()
+        case .kimi: KimiProvider()
+        case .minimax: MiniMaxProvider()
+        case .zai: ZaiProvider()
+        case .ark: ArkProvider()
+        }
     }
 }
 
