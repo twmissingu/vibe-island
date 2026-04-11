@@ -1,23 +1,31 @@
 import Foundation
 
 /// 小米 MIMO Provider
-/// Base URL: https://token-plan-cn.xiaomimimo.com/v1
-/// MIMO 使用 Token Plan 订阅制，无公开余额查询 API
-/// 通过 /v1/models 验证 Key 有效性
-/// 余额需在控制台查看：https://platform.xiaomimimo.com/#/console/plan-manage
+/// 两种 Key 类型，自动识别：
+/// - tp- 前缀: Token Plan，Base URL: token-plan-cn.xiaomimimo.com/v1
+/// - sk- 前缀: 标准 API，Base URL: api.xiaomimimo.com/v1
+/// 无公开余额查询 API，余额需在控制台查看
 public struct MiMoProvider: QuotaProvider, Sendable {
     public let type: ProviderType = .mimo
     public let displayName = "小米 MIMO"
     public let iconName = "logo-mimo"
-    public let defaultBaseURL = "https://token-plan-cn.xiaomimimo.com/v1"
+    public let defaultBaseURL = "https://api.xiaomimimo.com/v1"
     public let quotaUnit: QuotaUnit = .tokens
 
     private let network = NetworkClient()
 
     public init() {}
 
+    /// 根据 Key 前缀自动选择 Base URL
+    private func resolveBaseURL(_ key: String, customBase: String?) -> String {
+        if let custom = customBase { return custom }
+        if key.hasPrefix("tp-") { return "https://token-plan-cn.xiaomimimo.com/v1" }
+        return defaultBaseURL
+    }
+
     public func validateKey(_ key: String, baseURL: String?) async throws -> Bool {
-        let url = (baseURL ?? defaultBaseURL) + "/models"
+        let base = resolveBaseURL(key, customBase: baseURL)
+        let url = base + "/models"
         let (_, response) = try await network.request(
             url: url,
             headers: ["Authorization": "Bearer \(key)"]
@@ -26,9 +34,7 @@ public struct MiMoProvider: QuotaProvider, Sendable {
     }
 
     public func fetchQuota(key: String, baseURL: String?) async throws -> QuotaInfo {
-        let base = baseURL ?? defaultBaseURL
-
-        // 验证 Key 有效
+        let base = resolveBaseURL(key, customBase: baseURL)
         let url = base + "/models"
         let (data, response) = try await network.request(
             url: url,
@@ -39,8 +45,8 @@ public struct MiMoProvider: QuotaProvider, Sendable {
             throw network.errorFromResponse(statusCode: response.statusCode, data: data)
         }
 
-        // MIMO Token Plan 订阅制无公开余额 API
-        // 返回 Key 有效状态，余额需在控制台查看
+        // MIMO 无公开余额 API，返回 Key 有效状态
+        let planType = key.hasPrefix("tp-") ? "Token Plan" : "按量计费"
         return QuotaInfo(
             provider: .mimo,
             keyIdentifier: NetworkClient.maskKey(key),
@@ -49,7 +55,7 @@ public struct MiMoProvider: QuotaProvider, Sendable {
             remainingQuota: nil,
             unit: .tokens,
             usageRatio: 0,
-            error: .unknown("MIMO Token Plan 订阅制，请在控制台查看用量: platform.xiaomimimo.com")
+            error: .unknown("MIMO \(planType)，余额在控制台查看: platform.xiaomimimo.com")
         )
     }
 }
