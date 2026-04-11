@@ -1,0 +1,85 @@
+name: LLMQuotaIsland
+
+options:
+  bundleIdPrefix: com.twmissingu
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+packages:
+  LLMQuotaKit:
+    path: Packages/LLMQuotaKit
+
+configs:
+  Debug: debug
+  Release: release
+
+schemes:
+  LLMQuotaIsland:
+    build:
+      targets:
+        LLMQuotaIsland: all
+        LLMQuotaWidget: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+
+targets:
+  LLMQuotaIsland:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Sources/LLMQuotaIsland
+    resources:
+      - path: Sources/LLMQuotaIsland/Resources
+    dependencies:
+      - package: LLMQuotaKit
+      - target: LLMQuotaWidget
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.twmissingu.LLMQuotaIsland
+        SWIFT_VERSION: "6.0"
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_HARDENED_RUNTIME: YES
+        INFOPLIST_FILE: Sources/LLMQuotaIsland/App/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        LSUIElement: true
+    postBuildScripts:
+      - name: Set Build Number from Git
+        script: |
+          BUILD=$(git -C "$SRCROOT" rev-list --count HEAD 2>/dev/null || echo 1)
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "${BUILT_PRODUCTS_DIR}/${INFOPLIST_PATH}" 2>/dev/null || true
+
+  LLMQuotaWidget:
+    type: app-extension
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Widget
+    dependencies:
+      - package: LLMQuotaKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.twmissingu.LLMQuotaIsland.Widget
+        SWIFT_VERSION: "6.0"
+        CODE_SIGN_STYLE: Automatic
+        INFOPLIST_FILE: Widget/Info.plist
+
+  LLMQuotaKit:
+    type: framework
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Packages/LLMQuotaKit/Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.twmissingu.LLMQuotaKit
+        SWIFT_VERSION: "6.0"
