@@ -1,14 +1,15 @@
 import Foundation
 
 /// 小米 MIMO Provider
-/// MIMO API 兼容 OpenAI 格式
-/// 余额接口：尝试 OpenAI 标准 billing 接口
-/// 需要用户用真实 Key 验证具体端点
+/// Base URL: https://token-plan-cn.xiaomimimo.com/v1
+/// MIMO 使用 Token Plan 订阅制，无公开余额查询 API
+/// 通过 /v1/models 验证 Key 有效性
+/// 余额需在控制台查看：https://platform.xiaomimimo.com/#/console/plan-manage
 public struct MiMoProvider: QuotaProvider, Sendable {
     public let type: ProviderType = .mimo
     public let displayName = "小米 MIMO"
     public let iconName = "logo-mimo"
-    public let defaultBaseURL = "https://api.mimo.xiaomi.com"
+    public let defaultBaseURL = "https://token-plan-cn.xiaomimimo.com/v1"
     public let quotaUnit: QuotaUnit = .tokens
 
     private let network = NetworkClient()
@@ -16,8 +17,7 @@ public struct MiMoProvider: QuotaProvider, Sendable {
     public init() {}
 
     public func validateKey(_ key: String, baseURL: String?) async throws -> Bool {
-        // 尝试 OpenAI 兼容的 models 接口验证 Key
-        let url = (baseURL ?? defaultBaseURL) + "/v1/models"
+        let url = (baseURL ?? defaultBaseURL) + "/models"
         let (_, response) = try await network.request(
             url: url,
             headers: ["Authorization": "Bearer \(key)"]
@@ -28,25 +28,19 @@ public struct MiMoProvider: QuotaProvider, Sendable {
     public func fetchQuota(key: String, baseURL: String?) async throws -> QuotaInfo {
         let base = baseURL ?? defaultBaseURL
 
-        // 尝试 OpenAI 兼容的 billing 接口
-        let endpoints = [
-            "/v1/dashboard/billing/subscription",
-            "/v1/dashboard/billing/credit_grants",
-        ]
+        // 验证 Key 有效
+        let url = base + "/models"
+        let (data, response) = try await network.request(
+            url: url,
+            headers: ["Authorization": "Bearer \(key)"]
+        )
 
-        for endpoint in endpoints {
-            let url = base + endpoint
-            let (data, response) = try await network.request(
-                url: url,
-                headers: ["Authorization": "Bearer \(key)"]
-            )
-
-            if response.statusCode == 200 {
-                return try parseBillingResponse(data: data, key: key)
-            }
+        guard response.statusCode == 200 else {
+            throw network.errorFromResponse(statusCode: response.statusCode, data: data)
         }
 
-        // 如果 billing 接口不可用，返回 Key 有效但余额未知
+        // MIMO Token Plan 订阅制无公开余额 API
+        // 返回 Key 有效状态，余额需在控制台查看
         return QuotaInfo(
             provider: .mimo,
             keyIdentifier: NetworkClient.maskKey(key),
@@ -55,46 +49,7 @@ public struct MiMoProvider: QuotaProvider, Sendable {
             remainingQuota: nil,
             unit: .tokens,
             usageRatio: 0,
-            error: .unknown("MIMO 余额接口待验证，请提供 Key 后确认")
+            error: .unknown("MIMO Token Plan 订阅制，请在控制台查看用量: platform.xiaomimimo.com")
         )
-    }
-
-    private func parseBillingResponse(data: Data, key: String) throws -> QuotaInfo {
-        // 尝试解析 OpenAI 格式的 billing 响应
-        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            // credit_grants 格式
-            if let totalGranted = json["total_granted"] as? Double,
-               let totalUsed = json["total_used"] as? Double {
-                let remaining = totalGranted - totalUsed
-                let ratio = totalGranted > 0 ? totalUsed / totalGranted : 0
-                return QuotaInfo(
-                    provider: .mimo,
-                    keyIdentifier: NetworkClient.maskKey(key),
-                    totalQuota: totalGranted,
-                    usedQuota: totalUsed,
-                    remainingQuota: remaining,
-                    unit: .yuan,
-                    usageRatio: ratio
-                )
-            }
-
-            // subscription 格式
-            if let hardLimit = json["hard_limit"] as? Double,
-               let softLimit = json["soft_limit"] as? Double {
-                let used = hardLimit - softLimit
-                let ratio = hardLimit > 0 ? used / hardLimit : 0
-                return QuotaInfo(
-                    provider: .mimo,
-                    keyIdentifier: NetworkClient.maskKey(key),
-                    totalQuota: hardLimit,
-                    usedQuota: used,
-                    remainingQuota: softLimit,
-                    unit: .yuan,
-                    usageRatio: ratio
-                )
-            }
-        }
-
-        throw QuotaError.unknown("无法解析 MIMO 余额响应")
     }
 }
