@@ -2,7 +2,7 @@ import SwiftUI
 import LLMQuotaKit
 
 struct ExpandedIslandView: View {
-    @Environment(QuotaViewModel.self) private var viewModel
+    @Environment(StateManager.self) private var viewModel
 
     var body: some View {
         VStack(spacing: 8) {

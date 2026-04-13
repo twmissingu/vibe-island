@@ -1,7 +1,7 @@
 import Foundation
 
 public final class SharedDefaults: Sendable {
-    private static let suiteName = "group.com.twmissingu.LLMQuotaIsland"
+    private static let suiteName = "group.com.twmissingu.VibeIsland"
     private static let quotaKey = "cachedQuotas"
     private static let settingsKey = "appSettings"
     private static let enrolledKey = "enrolledProviders"

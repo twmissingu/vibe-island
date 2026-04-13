@@ -2,7 +2,7 @@ import SwiftUI
 import LLMQuotaKit
 
 struct SettingsView: View {
-    @Environment(QuotaViewModel.self) private var viewModel
+    @Environment(StateManager.self) private var viewModel
     @State private var showAddKey = false
     @State private var newKeyType: ProviderType = .mimo
     @State private var newKeyValue = ""

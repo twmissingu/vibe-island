@@ -1,4 +1,4 @@
-name: LLMQuotaIsland
+name: VibeIsland
 
 options:
   bundleIdPrefix: com.twmissingu
@@ -20,36 +20,36 @@ configs:
   Release: release
 
 schemes:
-  LLMQuotaIsland:
+  VibeIsland:
     build:
       targets:
-        LLMQuotaIsland: all
-        LLMQuotaWidget: all
+        VibeIsland: all
+        VibeWidget: all
     run:
       config: Debug
     test:
       config: Debug
 
 targets:
-  LLMQuotaIsland:
+  VibeIsland:
     type: application
     platform: macOS
     deploymentTarget: "14.0"
     sources:
-      - path: Sources/LLMQuotaIsland
+      - path: Sources/VibeIsland
     resources:
-      - path: Sources/LLMQuotaIsland/Resources
+      - path: Sources/VibeIsland/Resources
     dependencies:
       - package: LLMQuotaKit
-      - target: LLMQuotaWidget
+      - target: VibeWidget
         embed: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.twmissingu.LLMQuotaIsland
+        PRODUCT_BUNDLE_IDENTIFIER: com.twmissingu.VibeIsland
         SWIFT_VERSION: "6.0"
         CODE_SIGN_STYLE: Automatic
         ENABLE_HARDENED_RUNTIME: YES
-        INFOPLIST_FILE: Sources/LLMQuotaIsland/App/Info.plist
+        INFOPLIST_FILE: Sources/VibeIsland/App/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         LSUIElement: true
     postBuildScripts:
@@ -58,7 +58,7 @@ targets:
           BUILD=$(git -C "$SRCROOT" rev-list --count HEAD 2>/dev/null || echo 1)
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "${BUILT_PRODUCTS_DIR}/${INFOPLIST_PATH}" 2>/dev/null || true
 
-  LLMQuotaWidget:
+  VibeWidget:
     type: app-extension
     platform: macOS
     deploymentTarget: "14.0"
@@ -68,7 +68,7 @@ targets:
       - package: LLMQuotaKit
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.twmissingu.LLMQuotaIsland.Widget
+        PRODUCT_BUNDLE_IDENTIFIER: com.twmissingu.VibeIsland.Widget
         SWIFT_VERSION: "6.0"
         CODE_SIGN_STYLE: Automatic
         INFOPLIST_FILE: Widget/Info.plist

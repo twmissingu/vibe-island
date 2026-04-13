@@ -4,7 +4,7 @@ import LLMQuotaKit
 
 @MainActor
 @Observable
-final class QuotaViewModel {
+final class StateManager {
     var quotas: [QuotaInfo] = []
     var settings: AppSettings
     var islandState: IslandState = .compact

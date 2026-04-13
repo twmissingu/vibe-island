@@ -2,7 +2,7 @@ import SwiftUI
 import LLMQuotaKit
 
 struct IslandView: View {
-    @Environment(QuotaViewModel.self) private var viewModel
+    @Environment(StateManager.self) private var viewModel
 
     var body: some View {
         Group {
@@ -22,7 +22,7 @@ struct IslandView: View {
 // MARK: - Compact
 
 struct CompactIslandView: View {
-    @Environment(QuotaViewModel.self) private var viewModel
+    @Environment(StateManager.self) private var viewModel
 
     private var primaryQuota: QuotaInfo? {
         viewModel.quotas

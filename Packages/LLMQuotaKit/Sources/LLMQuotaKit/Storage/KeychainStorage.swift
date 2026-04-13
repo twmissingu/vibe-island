@@ -2,7 +2,7 @@ import Foundation
 import Security
 
 public final class KeychainStorage: Sendable {
-    private let service = "com.twmissingu.LLMQuotaIsland"
+    private let service = "com.twmissingu.VibeIsland"
 
     public init() {}
 

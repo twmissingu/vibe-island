@@ -1,8 +1,8 @@
 import SwiftUI
 
 @main
-struct LLMQuotaIslandApp: App {
-    @State private var viewModel = QuotaViewModel()
+struct VibeIslandApp: App {
+    @State private var stateManager = StateManager()
     @State private var panel: DynamicIslandPanel?
 
     var body: some Scene {
@@ -11,7 +11,7 @@ struct LLMQuotaIslandApp: App {
                 .frame(width: 0, height: 0)
                 .onAppear {
                     setupPanel()
-                    viewModel.startPolling()
+                    stateManager.startMonitoring()
                 }
         }
         .windowStyle(.hiddenTitleBar)
@@ -19,13 +19,13 @@ struct LLMQuotaIslandApp: App {
 
         Settings {
             SettingsView()
-                .environment(viewModel)
+                .environment(stateManager)
         }
     }
 
     private func setupPanel() {
         let islandView = IslandView()
-            .environment(viewModel)
+            .environment(stateManager)
 
         let newPanel = DynamicIslandPanel(contentView: islandView)
         newPanel.orderFront(nil)
