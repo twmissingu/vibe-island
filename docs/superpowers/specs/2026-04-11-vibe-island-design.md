@@ -191,7 +191,71 @@ compacting  → 背包（上下文在压缩）
 sleeping    → zzz（会话结束/空闲）
 ```
 
-**进化系统**：基于 coding 时长积累 XP，宠物可进化出新外观（相比 claude-buddy 的 gacha 抽卡，进化系统更有持续激励感）。
+#### XP 解锁系统（已实现）
+
+**获取前提**：每款宠物需要通过累计 **vibe coding 时长**来解锁。
+
+| 宠物 | 解锁所需时长 | 说明 |
+|------|------------|------|
+| 🐱 猫咪 | 0 分钟 | 初始可用 |
+| 🐶 小狗 | 30 分钟 | 累计编码 30 分钟解锁 |
+| 🐰 兔子 | 60 分钟 | 累计编码 1 小时解锁 |
+| 🦊 狐狸 | 120 分钟 | 累计编码 2 小时解锁 |
+| 🐧 企鹅 | 240 分钟 | 累计编码 4 小时解锁 |
+| 🤖 机器人 | 480 分钟 | 累计编码 8 小时解锁 |
+| 👻 幽灵 | 960 分钟 | 累计编码 16 小时解锁 |
+| 🐉 小龙 | 1920 分钟 | 累计编码 32 小时解锁 |
+
+**编码时长追踪原理**：
+
+1. **监听会话状态变化** — 通过 `SessionManager.updateSession()` 获取会话状态
+2. **仅累计"活跃编码"状态** — 仅当会话处于 `thinking`、`coding`、`waitingPermission` 时累计时长
+3. **不累计非编码状态** — `idle`、`waiting`、`completed`、`error`、`compacting` 不计入
+4. **定时更新（每 30 秒）** — 计算时间间隔并累加到今日/本周/总计时长
+5. **跨天/跨周自动重置** — 今日时长每天 00:00 重置，本周时长每周一重置
+6. **持久化存储** — 每 30 秒写入 UserDefaults，防止数据丢失
+
+**实现文件**：
+- `Sources/VibeIsland/Services/CodingTimeTracker.swift` — 编码时长追踪器
+- `Sources/VibeIsland/Pet/PetProgressManager.swift` — 宠物解锁进度管理
+
+**统计维度**：
+
+| 维度 | 属性 | 说明 |
+|------|------|------|
+| 今日 | `todayCodingMinutes` | 今天累计的编码时长 |
+| 本周 | `weekCodingMinutes` | 本周一至今的编码时长 |
+| 总计 | `totalCodingMinutes` | 历史累计编码时长（用于宠物解锁） |
+
+**持久化键值**：
+- `vibe-island.coding-minutes` — 累计总时长（分钟）
+- `vibe-island.selected-pet` — 当前选中的宠物
+- `vibe-island.pet-enabled` — 宠物是否启用
+
+**数据流**：
+
+```
+Claude Code / OpenCode 触发事件
+    ↓
+HookHandler 写入 session 文件
+    ↓
+SessionFileWatcher 检测文件变化
+    ↓
+SessionManager.updateSession() 更新会话状态
+    ↓
+CodingTimeTracker.handleSessionStateChange() 记录状态变化
+    ↓
+每 30 秒 tick() 累计时长
+    ↓
+PetProgressManager.addCodingMinutes() 检查宠物解锁
+    ↓
+持久化到 UserDefaults
+```
+
+**解锁通知**：当达到新宠物解锁阈值时，日志输出：
+```
+🎉 新宠物解锁: 小狗
+```
 
 ---
 
@@ -348,79 +412,82 @@ echo "✅ OpenCode 监控插件已安装"
 
 ### 4.3 数据模型
 
+> **注意**：以下代码块描述的是设计时的数据模型预期。实际代码实现有若干差异，详见 **第 8 章 当前实现状态**。
+
 ```swift
 // 会话事件（从 Hook 接收）
+// 实际实现：SessionEventName (14种) + SessionEvent
+// 差异：无 tool 字段，使用 Session.source 区分工具来源
 struct SessionEvent: Codable, Sendable {
-    let tool: ToolType           // .claudeCode, .openCode, .codex
-    let eventType: HookEventType // 12种事件类型
-    let sessionID: String?
-    let timestamp: Date
-    let payload: [String: String]? // 额外数据
+    let sessionId: String          // 会话唯一标识
+    let cwd: String                // 当前工作目录
+    let hookEventName: SessionEventName  // 14种事件类型
+    let source: String?            // 来源标识
+    let sessionName: String?       // 会话名称
+    let prompt: String?            // 用户提示
+    let toolName: String?          // 工具名
+    let toolInput: [String: String]?
+    let notificationType: NotificationType?
+    let agentId: String?           // 子代理 ID
+    // ... 更多可选字段
+    let receivedAt: Date           // 接收时间（自动填充）
 }
 
-// 工具类型
-enum ToolType: String, Codable, CaseIterable {
-    case claudeCode = "claude-code"
-    case openCode = "open-code"
-    case codex
-}
-
-// Hook 事件类型（12 种）
-enum HookEventType: String, Codable {
+// 事件名称（实际 14 种，比设计多 2 种）
+enum SessionEventName: String, Codable, Sendable, CaseIterable {
     case sessionStart, sessionEnd
     case userPromptSubmit
     case preToolUse, postToolUse, postToolUseFailure
     case permissionRequest
     case notification
     case stop
-    case preCompact
+    case preCompact, postCompact      // postCompact 为额外增加
     case subagentStart, subagentStop
+    case sessionError                 // sessionError 为额外增加
 }
 
-// 岛屿状态（UI 驱动，5 种）
-// 注意：这是 SessionState（7 种 AI 状态）到 IslandStatus 的映射
-enum IslandStatus: String, Codable {
-    case idle        // ⚪ 白色，空闲（对应：idle, sleeping）
-    case running     // 🟢 绿色，正常运行（对应：thinking, coding, completed）
-    case waiting     // 🟡 黄色闪烁，需要审批（对应：waiting）
-    case error       // 🔴 红色，出错（对应：error）
-    case compacting  // 🟠 橙色，上下文压缩（对应：compacting）
+// 工具来源（替代原 ToolType）
+enum ToolSource: String, Codable, Equatable, Sendable {
+    case claudeCode = "claude_code"
+    case openCode = "opencode"
+    case codex = "codex"
 }
 
-// 会话状态（AI 内部状态，7 种）
-enum SessionState: String, Codable {
-    case idle        // 空闲，等待输入
-    case thinking    // 思考中，处理 prompt
-    case coding      // 编码中，调用工具
-    case waiting     // 等待用户审批
-    case completed   // 任务完成
-    case error       // 出错/中止
-    case compacting  // 上下文压缩中
+// 会话状态（实际 8 种，比设计多 1 种）
+// 差异：增加 waitingPermission（区分等待输入和等待审批）
+enum SessionState: String, Codable, Equatable, Sendable, CaseIterable {
+    case idle        // 空闲 - gray
+    case thinking    // 思考中 - yellow
+    case coding      // 编码中 - green
+    case waiting     // 等待输入 - orange
+    case waitingPermission  // 等待权限审批 - yellow (闪烁)
+    case completed   // 已完成 - green
+    case error       // 错误 - red
+    case compacting  // 压缩中 - orange (闪烁)
 }
 
-// SessionState → IslandStatus 映射
-extension SessionState {
-    var islandStatus: IslandStatus {
-        switch self {
-        case .idle: .idle
-        case .thinking, .coding, .completed: .running
-        case .waiting: .waiting
-        case .error: .error
-        case .compacting: .compacting
-        }
-    }
-}
+// 注意：IslandStatus (5种) 独立枚举未在代码中实现
+// 代码直接使用 SessionState 驱动 UI，通过 isBlinking 标识闪烁状态
 
-// 会话状态
-struct SessionStateModel: Codable, Sendable {
-    let sessionID: String
-    let tool: ToolType
-    var state: SessionState        // AI 内部状态
-    var islandStatus: IslandStatus // UI 显示状态（自动映射）
-    var projectName: String?
-    var startedAt: Date
-    var lastEventAt: Date
-    var contextUsagePercent: Double? // 0.0~1.0
+// 会话（替代原 SessionStateModel）
+struct Session: Codable, Equatable, Sendable {
+    let sessionId: String
+    let cwd: String
+    var status: SessionState
+    var lastActivity: Date
+    var branch: String?
+    var source: String?              // 工具来源
+    var sessionName: String?
+    var lastTool: String?
+    var lastToolDetail: String?
+    var lastPrompt: String?
+    var notificationMessage: String?
+    var activeSubagents: [SubagentInfo]
+    var pid: UInt32?                 // 进程 ID
+    var pidStartTime: TimeInterval?
+    var contextUsage: Double?        // 上下文使用率
+    var contextTokensUsed: Int?
+    var contextTokensTotal: Int?
 }
 ```
 
@@ -501,13 +568,17 @@ struct SessionStateModel: Codable, Sendable {
 
 ## 7. 项目文件结构
 
+> **注意**：以下为实际代码结构，与原始设计有差异。
+
 ```
 vibe-island/
 ├── VibeIsland.xcodeproj
 ├── project.yml                      ← XcodeGen 配置
+├── LICENSE                          ← MIT
+├── README.md
 │
 ├── Packages/
-│   └── LLMQuotaKit/                 ← SPM 共享包
+│   └── LLMQuotaKit/                 ← SPM 共享包（原 ai-quota 遗留）
 │       ├── Package.swift
 │       └── Sources/LLMQuotaKit/
 │           ├── Models/              ← QuotaInfo, ProviderType, AppSettings
@@ -515,45 +586,141 @@ vibe-island/
 │           └── Storage/             ← KeychainStorage, SharedDefaults
 │
 ├── Sources/
-│   └── VibeIsland/                  ← 主 App
+│   └── VibeIsland/                  ← 主 App (28 个 Swift 文件)
 │       ├── App/
-│       │   ├── VibeIslandApp.swift      ← 入口 + NSPanel 初始化
-│       │   ├── Info.plist
-│       │   └── VibeIsland.entitlements
+│       │   └── VibeIslandApp.swift      ← 入口 + NSPanel 初始化
 │       ├── Window/
 │       │   ├── DynamicIslandPanel.swift ← 借鉴 Lyrisland
 │       │   └── IslandState.swift        ← compact/expanded 状态
-│       ├── ViewModel/
-│       │   └── StateManager.swift       ← 核心状态管理（原 QuotaViewModel）
-│       ├── Views/
-│       │   ├── IslandView.swift         ← 主视图，切换 compact/expanded
-│       │   ├── CompactIslandView.swift  ← 收起态
-│       │   ├── ExpandedIslandView.swift ← 展开态
-│       │   ├── SettingsView.swift       ← 设置面板
-│       │   └── CircularGaugeView.swift  ← 环形进度条
-│       └── Resources/               ← 资源文件
+│       ├── ViewModels/                  ← (注意: 复数目录名)
+│       │   └── StateManager.swift       ← 核心状态管理
+│       ├── Models/                      ← 数据模型
+│       │   ├── Session.swift            ← 完整会话模型
+│       │   ├── SessionEvent.swift       ← 事件名称 + 事件数据
+│       │   └── SessionState.swift       ← 8 种状态机 + 颜色
+│       ├── Services/                    ← 服务层 (10 个文件)
+│       │   ├── SessionFileWatcher.swift ← DispatchSource 文件监听
+│       │   ├── SessionManager.swift     ← Claude Code 会话管理
+│       │   ├── MultiToolAggregator.swift← 多工具状态聚合
+│       │   ├── OpenCodeMonitor.swift    ← OpenCode 四级降级
+│       │   ├── CodexMonitor.swift       ← Codex 进程检测
+│       │   ├── ProcessDetector.swift    ← pgrep + lsof 检测
+│       │   ├── ContextMonitor.swift     ← 上下文使用监控
+│       │   ├── SoundManager.swift       ← 声音管理
+│       │   ├── HookAutoInstaller.swift  ← Hook 自动安装/卸载
+│       │   └── ErrorPresenter.swift     ← 统一错误提示
+│       ├── Pet/                         ← 宠物系统 (4 个文件)
+│       │   ├── PetEngine.swift          ← 状态机 + 动画集
+│       │   ├── PetView.swift            ← Canvas 渲染
+│       │   ├── PetAnimations.swift      ← 像素帧数据 (6+ 只宠物)
+│       │   └── PetState.swift           ← 8 种宠物状态
+│       └── Views/                       ← UI 视图 (8 个文件)
+│           ├── IslandView.swift         ← 主视图 + CompactIslandView
+│           ├── ExpandedIslandView.swift ← 展开态（3 标签页）
+│           ├── SessionListView.swift    ← 会话列表
+│           ├── SettingsView.swift       ← 设置面板
+│           ├── CircularGaugeView.swift  ← 环形进度条
+│           ├── ContextUsageView.swift   ← 上下文使用显示
+│           ├── OnboardingView.swift     ← 首次启动引导
+│           └── (VisualEffectView 内嵌)  ← NSVisualEffectView 包装
 │
-├── Widget/                          ← macOS Widget（未来扩展）
-│   ├── LLMQuotaWidget.swift
-│   ├── Provider/
-│   └── Views/
+├── Widget/                          ← macOS Widget（未来扩展，空框架）
 │
 ├── docs/
 │   └── superpowers/specs/
-│       ├── 2026-04-11-task-plan.md
-│       ├── 2026-04-11-tech-validation.md
 │       ├── 2026-04-11-vibe-island-design.md
-│       ├── 2026-04-13-technical-uncertainty-assessment.md
-│       └── 2026-04-13-ui-design.md
+│       ├── 2026-04-13-ui-design.md
+│       └── ...
 │
-├── VibeIsland.entitlements
-├── LICENSE                          ← MIT
-└── README.md
+└── .vscode/
+    └── mcp.json
 ```
+
+**与原始设计的主要差异**：
+- 原始设计中 `VibeIslandKit` SPM 共享包未创建，使用现有 `LLMQuotaKit` 包
+- 无独立 `CLI/`、`Monitor/`、`Observer/`、`Storage/` 子包
+- `CLI` 工具（`vibe-island hook`）尚未实现
+- 无独立 `Theme/` 目录，主题逻辑嵌入 `IslandView`
+- 无独立 `Sound/` 目录，`SoundManager` 放在 `Services/`
+- 无独立 `State/` 目录，`StateManager` 放在 `ViewModels/`
+- 原始设计中 `CompactIslandView.swift` 为独立文件，实际嵌入 `IslandView.swift`
 
 ---
 
-## 8. 技术选型总结
+## 8. 当前实现状态
+
+> 更新时间：2026-04-14
+> 代码路径：`/Users/twzhan/Documents/dev/llm-quota-island/Sources/VibeIsland/`
+> 源文件总数：28 个 Swift 文件
+
+### 8.1 按 Phase 的实现状态
+
+| Phase | 功能项 | 状态 | 对应代码文件 | 备注 |
+|-------|--------|------|-------------|------|
+| **Phase 1** | 文件+DispatchSource 通信 | ✅ 已实现 | `SessionFileWatcher.swift` | DispatchSource + 100ms 防抖 + 5s 降级轮询 |
+| | Claude Code hooks 自动配置 | ✅ 已实现 | `HookAutoInstaller.swift` | 非破坏性合并 + 备份回滚 |
+| | StateManager 状态机 | ✅ 已实现 | `StateManager.swift` + `SessionManager.swift` | 8 种状态 + 优先级排序 |
+| | DynamicIslandPanel 颜色变化 | ✅ 已实现 | `DynamicIslandPanel.swift` + `IslandView.swift` | 状态色驱动 |
+| | CLI 工具 `vibe-island hook` | ❌ 未实现 | — | **待实现**：接收 stdin JSON 并写入文件 |
+| **Phase 2** | 8 款宠物数据 | ✅ 已实现 (6/8+) | `PetAnimations.swift` | 已有 cat/dog/rabbit/fox/penguin + 更多 |
+| | PetEngine 状态机 | ✅ 已实现 | `PetEngine.swift` + `PetState.swift` | 8 种状态完整映射 |
+| | SpriteRenderer 渲染 | ✅ 已实现 | `PetView.swift` | SwiftUI Canvas + hex 颜色 |
+| | 像素宠物与会话状态联动 | ✅ 已实现 | `IslandView.swift` (PetView + SessionPetEffect) | 抖动/发光特效 |
+| **Phase 3** | SoundManager（4种提示音） | ✅ 已实现 | `SoundManager.swift` | NSSound + AVAudioPlayer 双引擎 |
+| | PreCompact 事件处理 | ✅ 已实现 | `ContextMonitor.swift` | 正则解析 + 阈值警告 |
+| | 上下文使用率显示 | ✅ 已实现 | `ContextUsageView.swift` + `ContextUsageCard` | 进度条 + 闪烁警告 |
+| | 声音 2 秒重复机制 | ⚠️ 部分实现 | `SoundManager.swift` | 播放功能就绪，重复逻辑待补充 |
+| **Phase 4** | OpenCode Plugin Hook | ✅ 已实现 | `OpenCodeMonitor.swift` | 插件文件监听 + PID 验证 |
+| | OpenCode SSE 客户端 | ✅ 已实现 | `OpenCodeSSEClient` (内嵌) | SSE 解析 + 自动重连 |
+| | OpenCode 文件监控 | ✅ 已实现 | `OpenCodePluginFileWatcher` (内嵌) | 降级轮询 |
+| | OpenCode 进程检测 | ✅ 已实现 | `OpenCodeMonitor.checkProcessStatus()` | pgrep 兜底 |
+| | Codex 进程监控 | ✅ 已实现 | `CodexMonitor.swift` | pgrep + cwd 检测 |
+| | 多工具状态聚合 | ✅ 已实现 | `MultiToolAggregator.swift` | Claude/OpenCode/Codex 统一视图 |
+| **Phase 5** | SettingsView | ✅ 已实现 | `SettingsView.swift` | Hook/声音/宠物/多工具/上下文 |
+| | GlassTheme | ✅ 已实现 | `IslandView.swift` (VisualEffectView) | NSVisualEffectView |
+| | PixelTheme | ⚠️ 基础实现 | `IslandView.swift` | 暗色背景 + 边框，像素风格待完善 |
+| | OnboardingView | ✅ 已实现 | `OnboardingView.swift` | 4 步引导流程 |
+| | ThemeManager | ❌ 未实现 | — | **待实现**：统一主题管理 |
+
+### 8.2 数据模型对齐
+
+| 文档描述 | 代码实现 | 对齐情况 | 差异说明 |
+|----------|---------|---------|---------|
+| `SessionEvent` (12种事件) | `SessionEvent` (14种事件) | ⚠️ 有差异 | 代码额外增加 `SessionError`、`PostCompact` |
+| `HookEventType` (12种) | `SessionEventName` (14种) | ⚠️ 有差异 | 枚举名不同，事件覆盖更全 |
+| `ToolType` 枚举 | `ToolSource` 枚举 | ✅ 一致 | 实现名不同，功能一致 |
+| `SessionState` (7种) | `SessionState` (8种) | ⚠️ 有差异 | 代码额外增加 `waitingPermission`（区分等待输入和等待审批） |
+| `IslandStatus` (5种) | 不存在独立枚举 | ❌ 不一致 | **代码直接使用 SessionState 驱动 UI，未做 IslandStatus 映射层** |
+| `SessionStateModel` | `Session` 结构体 | ✅ 基本一致 | 代码模型更丰富（含 subagents、PID、context 等） |
+| `islandStatus` 计算属性 | `isBlinking` 计算属性 | ⚠️ 有差异 | 代码用 isBlinking 标识闪烁状态，非独立 IslandStatus |
+
+### 8.3 颜色体系对齐
+
+| 文档描述状态 | 文档颜色 | 代码颜色 | 对齐情况 |
+|-------------|---------|---------|---------|
+| 运行中 (thinking/coding/completed) | 🟢 `#34C759` | `.green` | ⚠️ 代码使用系统色，非精确 hex |
+| 待审批 (waitingPermission) | 🟡 `#FFCC00` | `.purple` | ❌ **不一致：文档黄色，代码紫色** |
+| 错误 (error) | 🔴 `#FF3B30` | `.red` | ✅ 基本一致 |
+| 压缩中 (compacting) | 🟠 `#FF9500` | `.cyan` | ❌ **不一致：文档橙色，代码青色** |
+| 空闲 (idle) | ⚪ `#8E8E93` | `.green` | ❌ **不一致：文档灰色，代码绿色** |
+
+### 8.4 未实现功能清单
+
+| 功能 | 优先级 | 所属 Phase | 说明 |
+|------|--------|-----------|------|
+| CLI 工具 (`vibe-island hook`) | 🔴 高 | Phase 1 | 接收 stdin JSON 并写入 `~/.vibe-island/sessions/` |
+| 宠物进化系统 (XP) | 🟡 中 | Phase 2 | XP 积累 + 等级进化 (Egg→Baby→Grow→Adult→Master) |
+| 夜间模式声音静音 | 🟡 中 | Phase 3 | 22:00-08:00 自动静音 |
+| 声音 2 秒重复机制 | 🟡 中 | Phase 3 | 审批提醒需重复播放直到确认 |
+| ThemeManager 统一管理 | 🟢 低 | Phase 5 | 当前主题切换散落在各处 |
+| PixelTheme 完整像素风格 | 🟢 低 | Phase 5 | 像素字体、像素边框等 |
+| 多会话列表（左滑/长按操作） | 🟢 低 | Phase 5 | 展开态底部的会话列表交互 |
+| 会话统计（时长/Token 消耗） | 🟢 低 | Phase 5 | 今日会话数、Token 消耗等统计面板 |
+| Widget 支持 | 🟢 低 | 未来 | `Widget/` 目录已有框架 |
+
+---
+
+## 9. 技术选型总结
 
 | 维度 | 选型 |
 |------|------|
@@ -561,12 +728,12 @@ vibe-island/
 | UI 框架 | SwiftUI + AppKit (NSPanel) |
 | 最低系统 | macOS 14 (Sonoma) |
 | 通信 | 文件+DispatchSource (CLI → App) |
-| 配置存储 | UserDefaults |
+| 配置存储 | UserDefaults (SharedDefaults) |
 | Hook 配置 | 自动修改 `~/.claude/settings.json`（参考 cc-status-bar） |
-| 共享数据层 | SPM 本地包 VibeIslandKit |
-| 音频 | AVAudioPlayer |
-| 像素帧格式 | hex 编码（兼容 claude-buddy） |
-| 字体 | Press Start 2P (OFL) |
+| 共享数据层 | SPM 本地包 LLMQuotaKit |
+| 音频 | NSSound (系统音效) + AVAudioPlayer (自定义音效) |
+| 像素帧格式 | 自定义像素数组（PetFrame.Pixel），非 claude-buddy hex 格式 |
+| 字体 | Press Start 2P (OFL) — 待集成 |
 | 项目管理 | XcodeGen project.yml |
 | 构建 | Xcode + SPM |
 | 许可证 | MIT |

@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import LLMQuotaKit
 
 final class DynamicIslandPanel: NSPanel {
     private(set) var positionMode: IslandPositionMode
@@ -56,7 +57,7 @@ final class DynamicIslandPanel: NSPanel {
     }
 
     func resize(to size: NSSize, animated: Bool = true) {
-        guard let screen = screen ?? NSScreen.main else { return }
+        guard let screen = getCurrentScreen() else { return }
         let screenFrame = screen.visibleFrame
         let newOrigin = NSPoint(
             x: screenFrame.midX - size.width / 2,
@@ -76,7 +77,7 @@ final class DynamicIslandPanel: NSPanel {
     }
 
     private func applyPosition() {
-        guard let screen = screen ?? NSScreen.main else { return }
+        guard let screen = getCurrentScreen() else { return }
         let screenFrame = screen.visibleFrame
         let frame = self.frame
         let origin = NSPoint(
@@ -84,6 +85,14 @@ final class DynamicIslandPanel: NSPanel {
             y: screenFrame.maxY - frame.height - 8
         )
         setFrameOrigin(origin)
+    }
+    
+    /// 获取当前鼠标所在的显示器（用于多显示器场景）
+    private func getCurrentScreen() -> NSScreen? {
+        let mouseLocation = NSEvent.mouseLocation
+        return NSScreen.screens.first { screen in
+            NSMouseInRect(mouseLocation, screen.frame, false)
+        } ?? NSScreen.main
     }
 
     override var canBecomeKey: Bool { false }

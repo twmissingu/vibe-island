@@ -1,0 +1,213 @@
+/*
+  Localizable.strings
+  VibeIsland - English
+
+  Generated for internationalization support.
+*/
+
+// MARK: - App Name & Description
+
+"app.name" = "Vibe Island";
+"app.description" = "Your AI Coding Assistant Status Monitor";
+
+// MARK: - Session States
+
+"state.idle" = "Idle";
+"state.thinking" = "Thinking";
+"state.coding" = "Coding";
+"state.waiting" = "Waiting for Input";
+"state.waitingPermission" = "Waiting for Permission";
+"state.completed" = "Completed";
+"state.error" = "Error";
+"state.compacting" = "Compacting";
+
+// MARK: - Settings View
+
+"settings.title" = "Settings";
+"settings.section.appearance" = "Appearance";
+"settings.hudStyle" = "HUD Style";
+"settings.section.claudeHook" = "Claude Code Hook";
+"settings.hookStatus" = "Hook Status";
+"settings.hook.installed" = "Installed";
+"settings.hook.notInstalled" = "Not Installed";
+"settings.hook.install" = "Install Hook";
+"settings.hook.uninstall" = "Uninstall Hook";
+"settings.claudeStatus" = "Claude Code Status";
+"settings.claude.running" = "Running";
+"settings.claude.notRunning" = "Not Running";
+"settings.section.sound" = "Sound";
+"settings.sound.enable" = "Enable Sound Effects";
+"settings.sound.volume" = "Volume";
+"settings.sound.test" = "Test Sound Effects";
+"settings.sound.permission" = "Permission";
+"settings.sound.completed" = "Completed";
+"settings.sound.error" = "Error";
+"settings.sound.compacting" = "Compacting";
+"settings.section.pet" = "Pixel Pet";
+"settings.pet.enable" = "Enable Pixel Pet";
+"settings.pet.type" = "Pet Type";
+"settings.pet.size" = "Pet Size";
+"settings.section.multiTool" = "Multi-Tool Monitoring";
+"settings.section.context" = "Context Awareness";
+"settings.context.enable" = "Enable Context Monitoring";
+"settings.context.warningThreshold" = "Warning Threshold";
+"settings.section.refresh" = "Refresh";
+"settings.pollingInterval" = "Polling Interval";
+"settings.interval.1min" = "1 minute";
+"settings.interval.3min" = "3 minutes";
+"settings.interval.5min" = "5 minutes";
+"settings.interval.10min" = "10 minutes";
+"settings.interval.15min" = "15 minutes";
+"settings.interval.30min" = "30 minutes";
+"settings.section.apiKeys" = "API Keys";
+"settings.addKey" = "Add Key";
+"settings.section.system" = "System";
+"settings.launchAtLogin" = "Launch at Login";
+"settings.refreshNow" = "Refresh Now";
+"settings.configured" = "Configured";
+"settings.notConfigured" = "Not Configured";
+"settings.delete" = "Delete";
+"settings.addKeyTitle" = "Add API Key";
+"settings.platform" = "Platform";
+"settings.pasteApiKey" = "Paste API Key";
+"settings.cancel" = "Cancel";
+"settings.save" = "Save";
+"settings.saveFailed" = "Save failed: %@";
+"settings.detectedTools" = "Detected Tools";
+"settings.none" = "None";
+
+// MARK: - Pet Names
+
+"pet.cat" = "Cat";
+"pet.dog" = "Dog";
+"pet.rabbit" = "Rabbit";
+"pet.hamster" = "Hamster";
+"pet.fox" = "Fox";
+"pet.penguin" = "Penguin";
+"pet.owl" = "Owl";
+"pet.robot" = "Robot";
+
+// MARK: - Onboarding
+
+"onboarding.welcome.title" = "Welcome to Vibe Island";
+"onboarding.welcome.subtitle" = "Your AI Coding Assistant Status Monitor\nReal-time monitoring of Claude Code, OpenCode, Codex";
+"onboarding.feature.realTime" = "Real-time Status Awareness";
+"onboarding.feature.sound" = "Sound Alerts";
+"onboarding.feature.pet" = "Pixel Pet";
+"onboarding.feature.multiTool" = "Multi-Tool Monitoring";
+"onboarding.selectPlatforms" = "Select Platforms to Monitor";
+"onboarding.selectPlatforms.subtitle" = "You can modify this in settings at any time";
+"onboarding.configureHook" = "Configure Claude Code Hook";
+"onboarding.configureHook.subtitle" = "Install Hook for real-time status awareness";
+"onboarding.hook.installed" = "Installed";
+"onboarding.hook.install" = "Install Hook";
+"onboarding.hook.restartNotice" = "Hook installed successfully\nRestart Claude Code to take effect";
+"onboarding.hook.tip" = "Tip: You can also install it later in settings";
+"onboarding.completion.title" = "Setup Complete!";
+"onboarding.completion.platforms" = "Selected %d platforms";
+"onboarding.completion.hookInstalled" = "Hook installed";
+"onboarding.completion.hookNotInstalled" = "Hook not installed (can be installed in settings)";
+"onboarding.completion.petEnabled" = "Pixel pet enabled";
+"onboarding.completion.soundEnabled" = "Sound alerts enabled";
+"onboarding.completion.instruction" = "Click \"Get Started\" to enter the main interface";
+"onboarding.button.previous" = "Previous";
+"onboarding.button.next" = "Next";
+"onboarding.button.getStart" = "Get Started";
+"onboarding.button.skip" = "Skip";
+"onboarding.button.skipOnboarding" = "Skip Onboarding";
+
+// MARK: - Island View
+
+"island.loading" = "Loading...";
+"island.addApiKey" = "Click to Add API Key";
+"island.addApiKeyInstruction" = "Please add API Key in settings";
+"island.updatedAt" = "Updated at %@";
+
+// MARK: - Context Usage
+
+"context.usage.title" = "Context Usage";
+"context.used" = "Used";
+"context.total" = "Total";
+"context.remaining" = "Remaining";
+"context.usageRate" = "Usage Rate";
+
+// MARK: - Widget
+
+"widget.configurationDisplayName" = "Quota Island";
+"widget.description" = "View LLM API Quota";
+"widget.notConfigured" = "Not Configured";
+"widget.platform.title" = "Platform";
+"widget.platform.mimo" = "Xiaomi MIMO";
+"widget.platform.kimi" = "Kimi";
+"widget.platform.minimax" = "MiniMax";
+"widget.platform.zai" = "Zhipu";
+"widget.platform.ark" = "Volcano Ark";
+"widget.platform.all" = "All";
+"widget.selectProvider.title" = "Select Platform";
+"widget.selectProvider.description" = "Select platforms to display";
+
+// MARK: - Provider Types
+
+"provider.mimo" = "Xiaomi MIMO";
+"provider.kimi" = "Kimi";
+"provider.minimax" = "MiniMax";
+"provider.zai" = "Zhipu";
+"provider.ark" = "Volcano Ark";
+
+// MARK: - Buttons
+
+"button.ok" = "OK";
+"button.cancel" = "Cancel";
+
+// MARK: - Error Messages
+
+"error.title" = "Error";
+"error.unknown" = "An unknown error occurred";
+"error.saveFailed" = "Save failed: %@";
+"error.installFailed" = "Failed: %@";
+
+// MARK: - Hook Installation
+
+"hook.install.success.title" = "Hook Installed Successfully";
+"hook.install.success.message" = "VibeIsland Hook has been configured in Claude Code";
+"hook.install.success.detail" = "Backup location: %@";
+"hook.install.failed.title" = "Hook Installation Failed";
+"hook.install.recovery.title" = "Suggested Fix";
+
+"hook.uninstall.success.title" = "Hook Uninstalled Successfully";
+"hook.uninstall.success.message" = "VibeIsland Hook has been removed from Claude Code";
+"hook.uninstall.success.detail" = "Backup location: %@";
+"hook.uninstall.failed.title" = "Hook Uninstallation Failed";
+
+"hook.recovery.claudeNotFound" = "Please ensure Claude Code is installed, and verify the installation by running `claude` in the terminal.";
+"hook.recovery.settingsNotFound" = "Please run Claude Code once to create the configuration file, then try installing the Hook again.";
+"hook.recovery.notInstalled" = "Please install the Hook before attempting to uninstall it.";
+"hook.recovery.configNotFound" = "Built-in configuration file is missing. Please check app integrity or reinstall Vibe Island.";
+"hook.recovery.backupFailed" = "Please ensure the ~/.claude/vibe-island-backups directory is writable and check disk space.";
+"hook.recovery.writeFailed" = "Please check write permissions for the ~/.claude/settings.json file.";
+"hook.recovery.backupNotFound" = "Backup file does not exist. Cannot restore. Please check configuration manually.";
+"hook.recovery.rollbackFailed" = "Automatic rollback failed. Please manually restore the ~/.claude/settings.json file.";
+
+// MARK: - Hook Errors
+
+"hook.error.claudeNotFound" = "Claude Code not detected. Please install Claude Code first.";
+"hook.error.settingsNotFound" = "Claude Code configuration file not found (~/.claude/settings.json)";
+"hook.error.notInstalled" = "VibeIsland hooks not installed";
+"hook.error.configNotFound" = "Built-in hooks configuration file not found (hooks-config.json)";
+"hook.error.backupFailed" = "Backup failed: %@";
+"hook.error.writeFailed" = "Failed to write configuration: %@";
+"hook.error.backupNotFound" = "Backup file not found: %@";
+"hook.error.rollbackFailed" = "Rollback failed: %@";
+
+// MARK: - Quota Refresh
+
+"quota.refresh.failed.title" = "Quota Refresh Failed";
+"quota.refresh.failed.message" = "Unable to fetch quota information for some platforms";
+"quota.refresh.failed.detail" = "Error details: %@";
+
+// MARK: - Quota Card
+
+"quota.remaining" = "Remaining";
+"quota.used" = "Used";
+"quota.reset" = "Reset";
+"quota.key" = "Key";

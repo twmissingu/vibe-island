@@ -15,7 +15,7 @@ struct QuotaSmallWidget: Widget {
     let kind = "QuotaSmallWidget"
 
     var body: some WidgetConfiguration {
-        AppIntentConfiguration(kind: kind, intent: ProviderIntent.self, provider: QuotaTimelineProvider()) { entry in
+        StaticConfiguration(kind: kind, provider: QuotaTimelineProvider()) { entry in
             WidgetSmallView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
         }
@@ -29,7 +29,7 @@ struct QuotaMediumWidget: Widget {
     let kind = "QuotaMediumWidget"
 
     var body: some WidgetConfiguration {
-        AppIntentConfiguration(kind: kind, intent: ProviderIntent.self, provider: QuotaTimelineProvider()) { entry in
+        StaticConfiguration(kind: kind, provider: QuotaTimelineProvider()) { entry in
             WidgetMediumView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
         }
@@ -42,8 +42,8 @@ struct QuotaMediumWidget: Widget {
 // MARK: - ProviderIntent
 
 struct ProviderIntent: WidgetConfigurationIntent {
-    static var title: LocalizedStringResource = "选择平台"
-    static var description = IntentDescription("选择要显示的平台")
+    static var title: LocalizedStringResource { "选择平台" }
+    static var description: IntentDescription { IntentDescription("选择要显示的平台") }
 
     @Parameter(title: "平台")
     var provider: ProviderTypeAppEnum?
@@ -52,13 +52,15 @@ struct ProviderIntent: WidgetConfigurationIntent {
 enum ProviderTypeAppEnum: String, AppEnum {
     case mimo, kimi, minimax, zai, ark, all
 
-    static var typeDisplayRepresentation: TypeDisplayRepresentation = "平台"
-    static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
-        .mimo: "小米 MIMO",
-        .kimi: "Kimi",
-        .minimax: "MiniMax",
-        .zai: "智谱",
-        .ark: "火山方舟",
-        .all: "全部"
-    ]
+    static var typeDisplayRepresentation: TypeDisplayRepresentation { "平台" }
+    static var caseDisplayRepresentations: [Self: DisplayRepresentation] {
+        [
+            .mimo: "小米 MIMO",
+            .kimi: "Kimi",
+            .minimax: "MiniMax",
+            .zai: "智谱",
+            .ark: "火山方舟",
+            .all: "全部"
+        ]
+    }
 }

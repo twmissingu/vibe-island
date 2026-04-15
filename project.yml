@@ -25,10 +25,13 @@ schemes:
       targets:
         VibeIsland: all
         VibeWidget: all
+        VibeIslandCLI: all
     run:
       config: Debug
     test:
       config: Debug
+      targets:
+        - VibeIslandTests
 
 targets:
   VibeIsland:
@@ -41,8 +44,6 @@ targets:
       - path: Sources/VibeIsland/Resources
     dependencies:
       - package: LLMQuotaKit
-      - target: VibeWidget
-        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.twmissingu.VibeIsland
@@ -83,3 +84,43 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.twmissingu.LLMQuotaKit
         SWIFT_VERSION: "6.0"
+
+  VibeIslandCLI:
+    type: tool
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Sources/CLI
+        excludes:
+          - "**/SharedModels.swift"
+      - path: Sources/CLI/SharedModels.swift
+    settings:
+      base:
+        PRODUCT_NAME: vibe-island
+        SWIFT_VERSION: "6.0"
+        CODE_SIGN_STYLE: Automatic
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+
+  VibeIslandTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Tests/VibeIslandTests
+        excludes:
+          - "dispatch_source_test.swift"
+          - "hook_format_test.swift"
+    dependencies:
+      - target: VibeIsland
+      - package: LLMQuotaKit
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+        ENABLE_TESTING_SEARCH_PATHS: YES
+      configs:
+        Debug:
+          ENABLE_TESTING_SEARCH_PATHS: YES
+        Release:
+          ENABLE_TESTING_SEARCH_PATHS: NO

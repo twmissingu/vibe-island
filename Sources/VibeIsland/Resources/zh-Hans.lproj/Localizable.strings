@@ -1,0 +1,213 @@
+/*
+  Localizable.strings
+  VibeIsland - 简体中文
+
+  Generated for internationalization support.
+*/
+
+// MARK: - App Name & Description
+
+"app.name" = "Vibe Island";
+"app.description" = "你的 AI 编码助手状态监控平台";
+
+// MARK: - Session States
+
+"state.idle" = "空闲";
+"state.thinking" = "思考中";
+"state.coding" = "编码中";
+"state.waiting" = "等待输入";
+"state.waitingPermission" = "等待权限";
+"state.completed" = "已完成";
+"state.error" = "错误";
+"state.compacting" = "压缩中";
+
+// MARK: - Settings View
+
+"settings.title" = "设置";
+"settings.section.appearance" = "外观";
+"settings.hudStyle" = "HUD 风格";
+"settings.section.claudeHook" = "Claude Code Hook";
+"settings.hookStatus" = "Hook 状态";
+"settings.hook.installed" = "已安装";
+"settings.hook.notInstalled" = "未安装";
+"settings.hook.install" = "安装 Hook";
+"settings.hook.uninstall" = "卸载 Hook";
+"settings.claudeStatus" = "Claude Code 状态";
+"settings.claude.running" = "运行中";
+"settings.claude.notRunning" = "未运行";
+"settings.section.sound" = "声音";
+"settings.sound.enable" = "启用提示音";
+"settings.sound.volume" = "音量";
+"settings.sound.test" = "测试提示音";
+"settings.sound.permission" = "审批";
+"settings.sound.completed" = "完成";
+"settings.sound.error" = "错误";
+"settings.sound.compacting" = "压缩";
+"settings.section.pet" = "像素宠物";
+"settings.pet.enable" = "启用像素宠物";
+"settings.pet.type" = "宠物类型";
+"settings.pet.size" = "宠物大小";
+"settings.section.multiTool" = "多工具监控";
+"settings.section.context" = "上下文感知";
+"settings.context.enable" = "启用上下文监控";
+"settings.context.warningThreshold" = "警告阈值";
+"settings.section.refresh" = "刷新";
+"settings.pollingInterval" = "轮询间隔";
+"settings.interval.1min" = "1 分钟";
+"settings.interval.3min" = "3 分钟";
+"settings.interval.5min" = "5 分钟";
+"settings.interval.10min" = "10 分钟";
+"settings.interval.15min" = "15 分钟";
+"settings.interval.30min" = "30 分钟";
+"settings.section.apiKeys" = "API Keys";
+"settings.addKey" = "添加 Key";
+"settings.section.system" = "系统";
+"settings.launchAtLogin" = "开机自启";
+"settings.refreshNow" = "立即刷新所有";
+"settings.configured" = "已配置 ✅";
+"settings.notConfigured" = "未配置";
+"settings.delete" = "删除";
+"settings.addKeyTitle" = "添加 API Key";
+"settings.platform" = "平台";
+"settings.pasteApiKey" = "粘贴 API Key";
+"settings.cancel" = "取消";
+"settings.save" = "保存";
+"settings.saveFailed" = "保存失败: %@";
+"settings.detectedTools" = "检测到的工具";
+"settings.none" = "无";
+
+// MARK: - Pet Names
+
+"pet.cat" = "猫咪";
+"pet.dog" = "小狗";
+"pet.rabbit" = "兔子";
+"pet.hamster" = "仓鼠";
+"pet.fox" = "狐狸";
+"pet.penguin" = "企鹅";
+"pet.owl" = "猫头鹰";
+"pet.robot" = "机器人";
+
+// MARK: - Onboarding
+
+"onboarding.welcome.title" = "欢迎使用 Vibe Island";
+"onboarding.welcome.subtitle" = "你的 AI 编码助手状态监控平台\n实时监控 Claude Code、OpenCode、Codex 的运行状态";
+"onboarding.feature.realTime" = "实时状态感知";
+"onboarding.feature.sound" = "声音提醒";
+"onboarding.feature.pet" = "像素宠物";
+"onboarding.feature.multiTool" = "多工具监控";
+"onboarding.selectPlatforms" = "选择要监控的平台";
+"onboarding.selectPlatforms.subtitle" = "你可以随时在设置中修改";
+"onboarding.configureHook" = "配置 Claude Code Hook";
+"onboarding.configureHook.subtitle" = "安装 Hook 以实现实时状态感知";
+"onboarding.hook.installed" = "已安装";
+"onboarding.hook.install" = "安装 Hook";
+"onboarding.hook.restartNotice" = "Hook 已成功安装\n重启 Claude Code 后生效";
+"onboarding.hook.tip" = "提示：你也可以稍后在设置中安装";
+"onboarding.completion.title" = "设置完成！";
+"onboarding.completion.platforms" = "已选择 %d 个平台";
+"onboarding.completion.hookInstalled" = "Hook 已安装";
+"onboarding.completion.hookNotInstalled" = "Hook 未安装（可在设置中安装）";
+"onboarding.completion.petEnabled" = "像素宠物已启用";
+"onboarding.completion.soundEnabled" = "声音提醒已启用";
+"onboarding.completion.instruction" = "点击「开始使用」进入主界面";
+"onboarding.button.previous" = "上一步";
+"onboarding.button.next" = "下一步";
+"onboarding.button.getStart" = "开始使用";
+"onboarding.button.skip" = "跳过";
+"onboarding.button.skipOnboarding" = "跳过引导";
+
+// MARK: - Island View
+
+"island.loading" = "加载中…";
+"island.addApiKey" = "点击添加 API Key";
+"island.addApiKeyInstruction" = "请在设置中添加 API Key";
+"island.updatedAt" = "更新于 %@";
+
+// MARK: - Context Usage
+
+"context.usage.title" = "上下文使用";
+"context.used" = "已用";
+"context.total" = "总量";
+"context.remaining" = "剩余";
+"context.usageRate" = "使用率";
+
+// MARK: - Widget
+
+"widget.configurationDisplayName" = "Quota Island";
+"widget.description" = "查看大模型 API 额度";
+"widget.notConfigured" = "未配置";
+"widget.platform.title" = "平台";
+"widget.platform.mimo" = "小米 MIMO";
+"widget.platform.kimi" = "Kimi";
+"widget.platform.minimax" = "MiniMax";
+"widget.platform.zai" = "智谱";
+"widget.platform.ark" = "火山方舟";
+"widget.platform.all" = "全部";
+"widget.selectProvider.title" = "选择平台";
+"widget.selectProvider.description" = "选择要显示的平台";
+
+// MARK: - Provider Types
+
+"provider.mimo" = "小米 MIMO";
+"provider.kimi" = "Kimi";
+"provider.minimax" = "MiniMax";
+"provider.zai" = "智谱";
+"provider.ark" = "火山方舟";
+
+// MARK: - Buttons
+
+"button.ok" = "确定";
+"button.cancel" = "取消";
+
+// MARK: - Error Messages
+
+"error.title" = "错误";
+"error.unknown" = "发生未知错误";
+"error.saveFailed" = "保存失败: %@";
+"error.installFailed" = "失败: %@";
+
+// MARK: - Hook Installation
+
+"hook.install.success.title" = "Hook 安装成功";
+"hook.install.success.message" = "已成功将 VibeIsland Hook 配置到 Claude Code";
+"hook.install.success.detail" = "备份位置: %@";
+"hook.install.failed.title" = "Hook 安装失败";
+"hook.install.recovery.title" = "修复建议";
+
+"hook.uninstall.success.title" = "Hook 卸载成功";
+"hook.uninstall.success.message" = "已成功从 Claude Code 移除 VibeIsland Hook";
+"hook.uninstall.success.detail" = "备份位置: %@";
+"hook.uninstall.failed.title" = "Hook 卸载失败";
+
+"hook.recovery.claudeNotFound" = "请确保已安装 Claude Code，并在终端中运行 `claude` 命令验证安装。";
+"hook.recovery.settingsNotFound" = "请先运行一次 Claude Code 以创建配置文件，然后再尝试安装 Hook。";
+"hook.recovery.notInstalled" = "请先安装 Hook 后再尝试卸载。";
+"hook.recovery.configNotFound" = "内置配置文件缺失，请检查应用完整性或重新安装 Vibe Island。";
+"hook.recovery.backupFailed" = "请确保 ~/.claude/vibe-island-backups 目录可写，并检查磁盘空间。";
+"hook.recovery.writeFailed" = "请检查 ~/.claude/settings.json 文件的写入权限。";
+"hook.recovery.backupNotFound" = "备份文件不存在，无法恢复。请手动检查配置。";
+"hook.recovery.rollbackFailed" = "自动回滚失败，请手动恢复 ~/.claude/settings.json 文件。";
+
+// MARK: - Hook Errors
+
+"hook.error.claudeNotFound" = "未检测到 Claude Code，请先安装 Claude Code";
+"hook.error.settingsNotFound" = "未找到 Claude Code 配置文件 (~/.claude/settings.json)";
+"hook.error.notInstalled" = "VibeIsland hooks 未安装";
+"hook.error.configNotFound" = "未找到内置 hooks 配置文件 (hooks-config.json)";
+"hook.error.backupFailed" = "备份失败: %@";
+"hook.error.writeFailed" = "写入配置失败: %@";
+"hook.error.backupNotFound" = "未找到备份文件: %@";
+"hook.error.rollbackFailed" = "回滚失败: %@";
+
+// MARK: - Quota Refresh
+
+"quota.refresh.failed.title" = "额度刷新失败";
+"quota.refresh.failed.message" = "无法获取部分平台的额度信息";
+"quota.refresh.failed.detail" = "错误详情：%@";
+
+// MARK: - Quota Card
+
+"quota.remaining" = "剩余";
+"quota.used" = "已用";
+"quota.reset" = "重置";
+"quota.key" = "Key";
