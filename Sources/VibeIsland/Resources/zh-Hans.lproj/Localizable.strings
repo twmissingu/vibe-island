@@ -75,6 +75,44 @@
 "settings.saveFailed" = "保存失败: %@";
 "settings.detectedTools" = "检测到的工具";
 "settings.none" = "无";
+"settings.claudeMonitor" = "Claude Code 监控";
+"settings.openCodeMonitor" = "OpenCode 监控";
+"settings.installHook" = "安装 Hook";
+"settings.uninstallHook" = "卸载 Hook";
+"settings.installPlugin" = "安装插件";
+"settings.uninstallPlugin" = "卸载插件";
+"settings.hookInstallationGuide" = "安装指南";
+"settings.hook.install.claude.required" = "确保已安装 Claude Code 并在终端运行 `claude` 命令";
+"settings.hook.install.disk.access" = "开启完全磁盘访问权限：系统设置→隐私与安全性→完全磁盘访问→添加 Vibe Island";
+"settings.hook.install.restart.app" = "重启 App 后重新尝试";
+"settings.restartRequired" = "安装后需重启";
+"settings.pluginInstallationGuide" = "插件安装指南";
+"settings.soundTest" = "测试提示音";
+"settings.soundTestPermission" = "审批";
+"settings.soundTestCompleted" = "完成";
+"settings.soundTestError" = "错误";
+"settings.soundTestCompacting" = "压缩";
+"settings.petImage" = "宠物形象";
+"settings.apiKeys" = "API Keys";
+"settings.refreshNow" = "立即刷新所有";
+"settings.launchAtLogin" = "开机自启";
+"settings.interval.1min" = "1 分钟";
+"settings.interval.3min" = "3 分钟";
+"settings.interval.5min" = "5 分钟";
+"settings.interval.10min" = "10 分钟";
+"settings.interval.15min" = "15 分钟";
+"settings.interval.30min" = "30 分钟";
+"settings.addKey" = "添加 Key";
+"settings.pasteApiKey" = "粘贴 API Key";
+"settings.cancel" = "取消";
+"settings.save" = "保存";
+"settings.delete" = "删除";
+"settings.throttle" = "节流";
+"settings.warningThreshold" = "警告阈值";
+"settings.contextMonitoring" = "上下文监控";
+"settings.petMonitoring" = "像素宠物监控";
+"settings.appearance" = "外观";
+"settings.system" = "系统";
 
 // MARK: - Pet Names
 
@@ -115,6 +153,29 @@
 "onboarding.button.getStart" = "开始使用";
 "onboarding.button.skip" = "跳过";
 "onboarding.button.skipOnboarding" = "跳过引导";
+
+// MARK: - Onboarding View (Additional)
+
+"onboarding.welcome.subtitle.full" = "你的 AI 编码助手状态监控平台\n实时监控 Claude Code、OpenCode 的运行状态";
+"onboarding.feature.realTime" = "实时状态感知";
+"onboarding.feature.sound" = "声音提醒";
+"onboarding.feature.pet" = "像素宠物";
+"onboarding.feature.multiTool" = "多工具监控";
+"onboarding.selectPlatforms" = "选择要监控的平台";
+"onboarding.selectPlatforms.subtitle" = "你可以随时在设置中修改";
+"onboarding.configureHook" = "配置 Claude Code Hook";
+"onboarding.configureHook.subtitle" = "安装 Hook 以实现实时状态感知";
+"onboarding.hook.installed" = "已安装";
+"onboarding.hook.install" = "安装 Hook";
+"onboarding.hook.restartNotice" = "Hook 已成功安装\n重启 Claude Code 后生效";
+"onboarding.hook.tip" = "提示：你也可以稍后在设置中安装";
+"onboarding.completion.title" = "设置完成！";
+"onboarding.completion.platforms" = "已选择 %d 个平台";
+"onboarding.completion.hookInstalled" = "Hook 已安装";
+"onboarding.completion.hookNotInstalled" = "Hook 未安装（可在设置中安装）";
+"onboarding.completion.petEnabled" = "像素宠物已启用";
+"onboarding.completion.soundEnabled" = "声音提醒已启用";
+"onboarding.completion.instruction" = "点击「开始使用」进入主界面";
 
 // MARK: - Island View
 

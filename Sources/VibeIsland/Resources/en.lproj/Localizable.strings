@@ -75,6 +75,44 @@
 "settings.saveFailed" = "Save failed: %@";
 "settings.detectedTools" = "Detected Tools";
 "settings.none" = "None";
+"settings.claudeMonitor" = "Claude Code Monitor";
+"settings.openCodeMonitor" = "OpenCode Monitor";
+"settings.installHook" = "Install Hook";
+"settings.uninstallHook" = "Uninstall Hook";
+"settings.installPlugin" = "Install Plugin";
+"settings.uninstallPlugin" = "Uninstall Plugin";
+"settings.hookInstallationGuide" = "Installation Guide";
+"settings.hook.install.claude.required" = "Ensure Claude Code is installed and run `claude` in terminal";
+"settings.hook.install.disk.access" = "Enable full disk access: Settings → Privacy & Security → Full Disk Access → Add Vibe Island";
+"settings.hook.install.restart.app" = "Restart app and try again";
+"settings.restartRequired" = "Restart required after installation";
+"settings.pluginInstallationGuide" = "Plugin Installation Guide";
+"settings.soundTest" = "Test Sound";
+"settings.soundTestPermission" = "Permission";
+"settings.soundTestCompleted" = "Completed";
+"settings.soundTestError" = "Error";
+"settings.soundTestCompacting" = "Compacting";
+"settings.petImage" = "Pet Image";
+"settings.apiKeys" = "API Keys";
+"settings.refreshNow" = "Refresh Now";
+"settings.launchAtLogin" = "Launch at Login";
+"settings.interval.1min" = "1 minute";
+"settings.interval.3min" = "3 minutes";
+"settings.interval.5min" = "5 minutes";
+"settings.interval.10min" = "10 minutes";
+"settings.interval.15min" = "15 minutes";
+"settings.interval.30min" = "30 minutes";
+"settings.addKey" = "Add Key";
+"settings.pasteApiKey" = "Paste API Key";
+"settings.cancel" = "Cancel";
+"settings.save" = "Save";
+"settings.delete" = "Delete";
+"settings.throttle" = "Throttle";
+"settings.warningThreshold" = "Warning Threshold";
+"settings.contextMonitoring" = "Context Monitoring";
+"settings.petMonitoring" = "Pixel Pet Monitoring";
+"settings.appearance" = "Appearance";
+"settings.system" = "System";
 
 // MARK: - Pet Names
 
@@ -115,6 +153,29 @@
 "onboarding.button.getStart" = "Get Started";
 "onboarding.button.skip" = "Skip";
 "onboarding.button.skipOnboarding" = "Skip Onboarding";
+
+// MARK: - Onboarding View (Additional)
+
+"onboarding.welcome.subtitle.full" = "Your AI Coding Assistant Status Monitor\nReal-time monitoring of Claude Code, OpenCode";
+"onboarding.feature.realTime" = "Real-time Status Awareness";
+"onboarding.feature.sound" = "Sound Alerts";
+"onboarding.feature.pet" = "Pixel Pet";
+"onboarding.feature.multiTool" = "Multi-Tool Monitoring";
+"onboarding.selectPlatforms" = "Select Platforms to Monitor";
+"onboarding.selectPlatforms.subtitle" = "You can modify this in settings at any time";
+"onboarding.configureHook" = "Configure Claude Code Hook";
+"onboarding.configureHook.subtitle" = "Install Hook for real-time status awareness";
+"onboarding.hook.installed" = "Installed";
+"onboarding.hook.install" = "Install Hook";
+"onboarding.hook.restartNotice" = "Hook installed successfully\nRestart Claude Code to take effect";
+"onboarding.hook.tip" = "Tip: You can also install it later in settings";
+"onboarding.completion.title" = "Setup Complete!";
+"onboarding.completion.platforms" = "Selected %d platforms";
+"onboarding.completion.hookInstalled" = "Hook installed";
+"onboarding.completion.hookNotInstalled" = "Hook not installed (can be installed in settings)";
+"onboarding.completion.petEnabled" = "Pixel pet enabled";
+"onboarding.completion.soundEnabled" = "Sound alerts enabled";
+"onboarding.completion.instruction" = "Click \"Get Started\" to enter the main interface";
 
 // MARK: - Island View
 

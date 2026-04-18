@@ -8,15 +8,15 @@ import LLMQuotaKit
 struct OnboardingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(StateManager.self) private var stateManager
-    
+
     @State private var currentStep = 0
     @State private var selectedPlatforms: Set<ProviderType> = []
     @State private var hookInstalled = false
     @State private var soundTested = false
     @State private var petSelected = false
-    
+
     let totalSteps = 4
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // 进度指示器
@@ -28,7 +28,7 @@ struct OnboardingView: View {
                 }
             }
             .padding(.top, 20)
-            
+
             // 内容区域
             Group {
                 switch currentStep {
@@ -39,39 +39,25 @@ struct OnboardingView: View {
                 default: EmptyView()
                 }
             }
-            
+
             // 底部按钮
             HStack {
                 if currentStep > 0 {
-                    Button("上一步") {
-                        withAnimation { currentStep -= 1 }
-                    }
-                    .buttonStyle(.bordered)
+                    Button(NSLocalizedString("onboarding.button.previous", comment: "Previous button"))
+                        .buttonStyle(.bordered)
                 }
-                
+
                 Spacer()
-                
+
                 if currentStep < totalSteps - 1 {
-                    Button("下一步") {
-                        withAnimation { currentStep += 1 }
-                    }
-                    .buttonStyle(.borderedProminent)
+                    Button(NSLocalizedString("onboarding.button.next", comment: "Next button"))
+                        .buttonStyle(.borderedProminent)
                 } else {
-                    Button("开始使用") {
-                        // 保存设置
-                        var settings = stateManager.settings
-                        settings.claudeMonitorEnabled = hookInstalled
-                        settings.selectedPetID = "cat"
-                        settings.petEnabled = true
-                        SharedDefaults.saveSettings(settings)
-                        SharedDefaults.saveEnrolled(selectedPlatforms)
-                        
-                        dismiss()
-                    }
-                    .buttonStyle(.borderedProminent)
+                    Button(NSLocalizedString("onboarding.button.getStart", comment: "Get Started button"))
+                        .buttonStyle(.borderedProminent)
                 }
-                
-                Button(currentStep == totalSteps - 1 ? "跳过" : "跳过引导") {
+
+                Button(currentStep == totalSteps - 1 ? NSLocalizedString("onboarding.button.skip", comment: "Skip") : NSLocalizedString("onboarding.button.skipOnboarding", comment: "Skip Onboarding")) {
                     dismiss()
                 }
                 .buttonStyle(.borderless)
@@ -91,20 +77,20 @@ struct WelcomeStep: View {
             Image(systemName: "island.fill")
                 .font(.system(size: 64))
                 .foregroundStyle(.blue)
-            
+
             Text("欢迎使用 Vibe Island")
                 .font(.title)
                 .fontWeight(.bold)
-            
+
             Text("你的 AI 编码助手状态监控平台\n实时监控 Claude Code、OpenCode 的运行状态")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
-            
+
             VStack(alignment: .leading, spacing: 12) {
-                Label("实时状态感知", systemImage: "bolt.fill")
-                Label("声音提醒", systemImage: "speaker.wave.2.fill")
-                Label("像素宠物", systemImage: "cat.fill")
-                Label("多工具监控", systemImage: "rectangle.stack.fill")
+                Label(NSLocalizedString("onboarding.feature.realTime", comment: "Real-time Status Awareness"), systemImage: "bolt.fill")
+                Label(NSLocalizedString("onboarding.feature.sound", comment: "Sound Alerts"), systemImage: "speaker.wave.2.fill")
+                Label(NSLocalizedString("onboarding.feature.pet", comment: "Pixel Pet"), systemImage: "cat.fill")
+                Label(NSLocalizedString("onboarding.feature.multiTool", comment: "Multi-Tool Monitoring"), systemImage: "rectangle.stack.fill")
             }
             .padding()
             .background(Color.gray.opacity(0.1))
@@ -118,16 +104,16 @@ struct WelcomeStep: View {
 
 struct PlatformSelectionStep: View {
     @Binding var selectedPlatforms: Set<ProviderType>
-    
+
     var body: some View {
         VStack(spacing: 24) {
             Text("选择要监控的平台")
                 .font(.title2)
                 .fontWeight(.bold)
-            
+
             Text("你可以随时在设置中修改")
                 .foregroundStyle(.secondary)
-            
+
             VStack(spacing: 12) {
                 ForEach(ProviderType.allCases, id: \.self) { provider in
                     Button {
@@ -163,16 +149,16 @@ struct PlatformSelectionStep: View {
 struct HookSetupStep: View {
     @Binding var installed: Bool
     let stateManager: StateManager
-    
+
     var body: some View {
         VStack(spacing: 24) {
             Text("配置 Claude Code Hook")
                 .font(.title2)
                 .fontWeight(.bold)
-            
+
             Text("安装 Hook 以实现实时状态感知")
                 .foregroundStyle(.secondary)
-            
+
             VStack(spacing: 16) {
                 Button {
                     Task {
@@ -188,7 +174,7 @@ struct HookSetupStep: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(installed)
-                
+
                 if installed {
                     Text("✅ Hook 已成功安装\n重启 Claude Code 后生效")
                         .multilineTextAlignment(.center)
@@ -197,7 +183,7 @@ struct HookSetupStep: View {
                         .background(Color.green.opacity(0.1))
                         .cornerRadius(8)
                 }
-                
+
                 Text("💡 提示：你也可以稍后在设置中安装")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
@@ -212,28 +198,28 @@ struct HookSetupStep: View {
 struct CompletionStep: View {
     let selectedPlatforms: Set<ProviderType>
     let hookInstalled: Bool
-    
+
     var body: some View {
         VStack(spacing: 24) {
             Image(systemName: "checkmark.seal.fill")
                 .font(.system(size: 64))
                 .foregroundStyle(.green)
-            
+
             Text("设置完成！")
                 .font(.title2)
                 .fontWeight(.bold)
-            
+
             VStack(alignment: .leading, spacing: 8) {
-                Label("已选择 \(selectedPlatforms.count) 个平台", systemImage: "checkmark")
-                Label(hookInstalled ? "Hook 已安装" : "Hook 未安装（可在设置中安装）", systemImage: hookInstalled ? "checkmark" : "info.circle")
-                Label("像素宠物已启用", systemImage: "checkmark")
-                Label("声音提醒已启用", systemImage: "checkmark")
+                Label(String(format: NSLocalizedString("onboarding.completion.platforms", comment: "Selected platforms"), selectedPlatforms.count), systemImage: "checkmark")
+                Label(hookInstalled ? NSLocalizedString("onboarding.completion.hookInstalled", comment: "Hook installed") : NSLocalizedString("onboarding.completion.hookNotInstalled", comment: "Hook not installed"), systemImage: hookInstalled ? "checkmark" : "info.circle")
+                Label(NSLocalizedString("onboarding.completion.petEnabled", comment: "Pixel pet enabled"), systemImage: "checkmark")
+                Label(NSLocalizedString("onboarding.completion.soundEnabled", comment: "Sound alerts enabled"), systemImage: "checkmark")
             }
             .padding()
             .background(Color.gray.opacity(0.1))
             .cornerRadius(12)
-            
-            Text("点击「开始使用」进入主界面")
+
+            Text(NSLocalizedString("onboarding.completion.instruction", comment: "Get Started instruction"))
                 .foregroundStyle(.secondary)
         }
         .padding(40)
@@ -245,11 +231,11 @@ struct CompletionStep: View {
 extension ProviderType {
     var keyDescription: String {
         switch self {
-        case .mimo: return "小米 MIMO"
-        case .kimi: return "Kimi"
-        case .minimax: return "MiniMax"
-        case .zai: return "智谱"
-        case .ark: return "火山方舟"
+        case .mimo: return NSLocalizedString("provider.mimo", comment: "Xiaomi MIMO")
+        case .kimi: return NSLocalizedString("provider.kimi", comment: "Kimi")
+        case .minimax: return NSLocalizedString("provider.minimax", comment: "MiniMax")
+        case .zai: return NSLocalizedString("provider.zai", comment: "Zhipu")
+        case .ark: return NSLocalizedString("provider.ark", comment: "Volcano Ark")
         }
     }
 }

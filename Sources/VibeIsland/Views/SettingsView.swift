@@ -40,8 +40,8 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-            Section("外观") {
-                Picker("HUD 风格", selection: Binding(
+            Section(NSLocalizedString("settings.appearance", comment: "Appearance")) {
+                Picker(NSLocalizedString("settings.hudStyle", comment: "HUD Style"), selection: Binding(
                     get: { viewModel.settings.theme },
                     set: { viewModel.settings.theme = $0; saveSettings() }
                 )) {
@@ -53,7 +53,7 @@ struct SettingsView: View {
             }
 
             // MARK: - Hook 管理
-            Section("Claude Code Hook") {
+            Section(NSLocalizedString("settings.section.claudeHook", comment: "Claude Code Hook")) {
                 hookStatusRow
 
                 Button(hookActionTitle) {
@@ -66,35 +66,35 @@ struct SettingsView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(hookMessageIsError ? .red : .green)
                 }
-                
+
                 // 安装帮助提示
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("💡 安装失败？按以下步骤解决：")
+                    Text("💡 \(NSLocalizedString("settings.hookInstallationGuide", comment: "Installation Guide"))：")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
-                    Text("1. 确保已安装Claude Code且能在终端执行`claude`命令")
+                    Text("1. \(NSLocalizedString("settings.hook.install.claude.required", comment: "Ensure Claude Code is installed"))")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
-                    Text("2. 开启完全磁盘访问权限：系统设置→隐私与安全性→完全磁盘访问→添加Vibe Island")
+                    Text("2. \(NSLocalizedString("settings.hook.install.disk.access", comment: "Enable full disk access"))")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
-                    Text("3. 重启App后重新尝试安装即可")
+                    Text("3. \(NSLocalizedString("settings.hook.install.restart.app", comment: "Restart app and try again"))")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
                 .padding(.top, 4)
 
                 HStack {
-                    Text("Claude Code 状态")
+                    Text(NSLocalizedString("settings.claudeStatus", comment: "Claude Code Status"))
                     Spacer()
-                    Text(claudeRunning ? "运行中" : "未运行")
+                    Text(claudeRunning ? NSLocalizedString("settings.claude.running", comment: "Running") : NSLocalizedString("settings.claude.notRunning", comment: "Not Running"))
                         .font(.system(size: 12))
                         .foregroundStyle(claudeRunning ? .green : .secondary)
                 }
             }
 
             // MARK: - OpenCode 插件管理
-            Section("OpenCode 插件") {
+            Section(NSLocalizedString("settings.section.opencodePlugin", comment: "OpenCode Plugin")) {
                 openCodePluginStatusRow
 
                 Button(openCodePluginActionTitle) {
@@ -109,19 +109,19 @@ struct SettingsView: View {
                 }
 
                 HStack {
-                    Text("OpenCode 状态")
+                    Text(NSLocalizedString("settings.opencodeStatus", comment: "OpenCode Status"))
                     Spacer()
-                    Text(openCodeRunning ? "运行中" : "未运行")
+                    Text(openCodeRunning ? NSLocalizedString("settings.claude.running", comment: "Running") : NSLocalizedString("settings.claude.notRunning", comment: "Not Running"))
                         .font(.system(size: 12))
                         .foregroundStyle(openCodeRunning ? .green : .secondary)
                 }
 
                 // 安装帮助提示
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("💡 安装后需要重启 OpenCode 才能生效")
+                    Text("💡 \(NSLocalizedString("settings.restartRequired", comment: "Restart required"))")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
-                    Text("插件会调用 vibe-island CLI，CLI 需要从 App 中自动安装")
+                    Text(NSLocalizedString("settings.pluginInstallationGuide", comment: "Plugin Installation Guide"))
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
@@ -129,8 +129,8 @@ struct SettingsView: View {
             }
 
             // MARK: - 声音设置
-            Section("声音") {
-                Toggle("启用提示音", isOn: Binding(
+            Section(NSLocalizedString("settings.section.sound", comment: "Sound")) {
+                Toggle(NSLocalizedString("settings.sound.enable", comment: "Enable Sound Effects"), isOn: Binding(
                     get: { soundEnabled },
                     set: {
                         soundEnabled = $0
@@ -139,7 +139,7 @@ struct SettingsView: View {
                 ))
 
                 HStack {
-                    Text("音量")
+                    Text(NSLocalizedString("settings.sound.volume", comment: "Volume"))
                     Slider(value: $soundVolume, in: 0...1) { editing in
                         if !editing {
                             viewModel.soundManager.setVolume(soundVolume)
@@ -154,14 +154,14 @@ struct SettingsView: View {
             }
 
     // MARK: - 宠物设置
-    Section("像素宠物") {
-        Toggle("启用像素宠物", isOn: Binding(
+    Section(NSLocalizedString("settings.section.pet", comment: "Pixel Pet")) {
+        Toggle(NSLocalizedString("settings.pet.enable", comment: "Enable Pixel Pet"), isOn: Binding(
             get: { viewModel.settings.petEnabled },
             set: { viewModel.settings.petEnabled = $0; saveSettings() }
         ))
 
         if viewModel.settings.petEnabled {
-            Picker("宠物形象", selection: Binding(
+            Picker(NSLocalizedString("settings.petImage", comment: "Pet Image"), selection: Binding(
                 get: { viewModel.settings.selectedPetID },
                 set: { viewModel.settings.selectedPetID = $0; saveSettings() }
             )) {
@@ -173,20 +173,20 @@ struct SettingsView: View {
     }
 
             // MARK: - 多工具监控
-            Section("多工具监控") {
-                Toggle("Claude Code 监控", isOn: Binding(
+            Section(NSLocalizedString("settings.section.multiTool", comment: "Multi-Tool Monitoring")) {
+                Toggle(NSLocalizedString("settings.claudeMonitor", comment: "Claude Code Monitor"), isOn: Binding(
                     get: { isToolEnabled(.claudeCode) },
                     set: { setToolEnabled(.claudeCode, $0) }
                 ))
 
-                Toggle("OpenCode 监控", isOn: Binding(
+                Toggle(NSLocalizedString("settings.openCodeMonitor", comment: "OpenCode Monitor"), isOn: Binding(
                     get: { isToolEnabled(.openCode) },
                     set: { setToolEnabled(.openCode, $0) }
                 ))
 
                 if !detectedTools.isEmpty {
                     HStack {
-                        Text("检测到的工具")
+                        Text(NSLocalizedString("settings.detectedTools", comment: "Detected Tools"))
                         Spacer()
                         ForEach(detectedTools, id: \.self) { tool in
                             Label(tool.displayName, systemImage: "checkmark.circle.fill")
@@ -196,9 +196,9 @@ struct SettingsView: View {
                     }
                 } else {
                     HStack {
-                        Text("检测到的工具")
+                        Text(NSLocalizedString("settings.detectedTools", comment: "Detected Tools"))
                         Spacer()
-                        Text("无")
+                        Text(NSLocalizedString("settings.none", comment: "None"))
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }
@@ -206,15 +206,15 @@ struct SettingsView: View {
             }
 
             // MARK: - 上下文感知
-            Section("上下文感知") {
-                Toggle("启用上下文监控", isOn: Binding(
+            Section(NSLocalizedString("settings.section.context", comment: "Context Awareness")) {
+                Toggle(NSLocalizedString("settings.context.enable", comment: "Enable Context Monitoring"), isOn: Binding(
                     get: { viewModel.settings.contextMonitorEnabled },
                     set: { viewModel.settings.contextMonitorEnabled = $0; saveSettings() }
                 ))
 
                 if viewModel.settings.contextMonitorEnabled {
                     HStack {
-                        Text("警告阈值")
+                        Text(NSLocalizedString("settings.context.warningThreshold", comment: "Warning Threshold"))
                         Slider(value: $contextWarningThreshold, in: 50...95, step: 5) { editing in
                             if !editing {
                                 viewModel.settings.contextWarningThreshold = contextWarningThreshold
@@ -229,17 +229,17 @@ struct SettingsView: View {
             }
 
             // MARK: - 刷新
-            Section("刷新") {
-                Picker("轮询间隔", selection: Binding(
+            Section(NSLocalizedString("settings.section.refresh", comment: "Refresh")) {
+                Picker(NSLocalizedString("settings.pollingInterval", comment: "Polling Interval"), selection: Binding(
                     get: { viewModel.settings.pollingIntervalMinutes },
                     set: { viewModel.settings.pollingIntervalMinutes = $0; saveSettings(); viewModel.startPolling() }
                 )) {
-                    Text("1 分钟").tag(1)
-                    Text("3 分钟").tag(3)
-                    Text("5 分钟").tag(5)
-                    Text("10 分钟").tag(10)
-                    Text("15 分钟").tag(15)
-                    Text("30 分钟").tag(30)
+                    Text("1 \(NSLocalizedString("settings.interval.1min", comment: "1 minute"))").tag(1)
+                    Text("3 \(NSLocalizedString("settings.interval.3min", comment: "3 minutes"))").tag(3)
+                    Text("5 \(NSLocalizedString("settings.interval.5min", comment: "5 minutes"))").tag(5)
+                    Text("10 \(NSLocalizedString("settings.interval.10min", comment: "10 minutes"))").tag(10)
+                    Text("15 \(NSLocalizedString("settings.interval.15min", comment: "15 minutes"))").tag(15)
+                    Text("30 \(NSLocalizedString("settings.interval.30min", comment: "30 minutes"))").tag(30)
                 }
             }
 
@@ -249,29 +249,29 @@ struct SettingsView: View {
                     providerRow(type)
                 }
 
-                Button("添加 Key") {
+                Button(NSLocalizedString("settings.addKey", comment: "Add Key")) {
                     showAddKey = true
                 }
             }
 
             // MARK: - 系统
-            Section("系统") {
-                Toggle("开机自启", isOn: Binding(
+            Section(NSLocalizedString("settings.section.system", comment: "System")) {
+                Toggle(NSLocalizedString("settings.launchAtLogin", comment: "Launch at Login"), isOn: Binding(
                     get: { viewModel.settings.launchAtLogin },
                     set: { viewModel.settings.launchAtLogin = $0; saveSettings() }
                 ))
 
-                Button("立即刷新所有") {
+                Button(NSLocalizedString("settings.refreshNow", comment: "Refresh Now")) {
                     Task { await viewModel.refresh() }
                 }
             }
         }
             .formStyle(.grouped)
             .frame(width: 450, height: 680)
-            .navigationTitle("设置")
+            .navigationTitle(NSLocalizedString("settings.title", comment: "Settings"))
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") {
+                    Button(NSLocalizedString("button.ok", comment: "OK")) {
                         dismiss()
                     }
                 }
@@ -293,15 +293,15 @@ struct SettingsView: View {
 
     private var hookStatusRow: some View {
         HStack {
-            Text("Hook 状态")
+            Text(NSLocalizedString("settings.hookStatus", comment: "Hook Status"))
             Spacer()
             Group {
                 switch hookStatus {
                 case .installed:
-                    Label("已安装", systemImage: "checkmark.circle.fill")
+                    Label(NSLocalizedString("settings.hook.installed", comment: "Installed"), systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                 case .notInstalled:
-                    Label("未安装", systemImage: "xmark.circle.fill")
+                    Label(NSLocalizedString("settings.hook.notInstalled", comment: "Not Installed"), systemImage: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
                 case .unknown:
                     ProgressView()
@@ -314,8 +314,8 @@ struct SettingsView: View {
 
     private var hookActionTitle: String {
         switch hookStatus {
-        case .installed: "卸载 Hook"
-        case .notInstalled, .unknown: "安装 Hook"
+        case .installed: NSLocalizedString("settings.uninstallHook", comment: "Uninstall Hook")
+        case .notInstalled, .unknown: NSLocalizedString("settings.installHook", comment: "Install Hook")
         }
     }
 
@@ -343,7 +343,7 @@ struct SettingsView: View {
             hookMessage = msg
             await refreshHookStatus()
         case .failure(let error):
-            hookMessage = "失败: \(error.localizedDescription)"
+            hookMessage = NSLocalizedString("settings.saveFailed", comment: "Save failed: %@")
             await refreshHookStatus()
         }
     }
@@ -365,15 +365,15 @@ struct SettingsView: View {
 
     private var openCodePluginStatusRow: some View {
         HStack {
-            Text("插件状态")
+            Text(NSLocalizedString("settings.hookStatus", comment: "Hook Status"))
             Spacer()
             Group {
                 switch openCodePluginStatus {
                 case .installed:
-                    Label("已安装", systemImage: "checkmark.circle.fill")
+                    Label(NSLocalizedString("settings.hook.installed", comment: "Installed"), systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                 case .notInstalled:
-                    Label("未安装", systemImage: "xmark.circle.fill")
+                    Label(NSLocalizedString("settings.hook.notInstalled", comment: "Not Installed"), systemImage: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
                 case .unknown:
                     ProgressView()
@@ -386,8 +386,8 @@ struct SettingsView: View {
 
     private var openCodePluginActionTitle: String {
         switch openCodePluginStatus {
-        case .installed: "卸载插件"
-        case .notInstalled, .unknown: "安装插件"
+        case .installed: NSLocalizedString("settings.uninstallPlugin", comment: "Uninstall Plugin")
+        case .notInstalled, .unknown: NSLocalizedString("settings.installPlugin", comment: "Install Plugin")
         }
     }
 
@@ -415,7 +415,7 @@ struct SettingsView: View {
             openCodePluginMessage = msg
             await refreshOpenCodePluginStatus()
         case .failure(let error):
-            openCodePluginMessage = "失败: \(error.localizedDescription)"
+            openCodePluginMessage = NSLocalizedString("settings.saveFailed", comment: "Save failed: %@")
             await refreshOpenCodePluginStatus()
         }
     }
@@ -429,15 +429,15 @@ struct SettingsView: View {
 
     private var testSoundButtons: some View {
         HStack {
-            Text("测试提示音")
+            Text(NSLocalizedString("settings.soundTest", comment: "Test Sound"))
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
             Spacer()
             HStack(spacing: 8) {
-                testSoundButton("审批", type: .permissionRequest)
-                testSoundButton("完成", type: .completed)
-                testSoundButton("错误", type: .error)
-                testSoundButton("压缩", type: .compacting)
+                testSoundButton(NSLocalizedString("settings.soundTestPermission", comment: "Permission"), type: .permissionRequest)
+                testSoundButton(NSLocalizedString("settings.soundTestCompleted", comment: "Completed"), type: .completed)
+                testSoundButton(NSLocalizedString("settings.soundTestError", comment: "Error"), type: .error)
+                testSoundButton(NSLocalizedString("settings.soundTestCompacting", comment: "Compacting"), type: .compacting)
             }
         }
     }
@@ -508,10 +508,10 @@ struct SettingsView: View {
                 .font(.system(size: 13, weight: .medium))
             Spacer()
             if isEnrolled {
-                Text("已配置 ✅")
+                Text(NSLocalizedString("settings.configured", comment: "Configured"))
                     .font(.system(size: 11))
                     .foregroundStyle(.green)
-                Button("删除", role: .destructive) {
+                Button(NSLocalizedString("settings.delete", comment: "Delete"), role: .destructive) {
                     viewModel.keychain.delete(for: type.rawValue)
                     var updated = enrolled
                     updated.remove(type)
@@ -519,7 +519,7 @@ struct SettingsView: View {
                 }
                 .font(.system(size: 11))
             } else {
-                Text("未配置")
+                Text(NSLocalizedString("settings.notConfigured", comment: "Not Configured"))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -528,16 +528,16 @@ struct SettingsView: View {
 
     private var addKeySheet: some View {
         VStack(spacing: 16) {
-            Text("添加 API Key")
+            Text(NSLocalizedString("settings.addKeyTitle", comment: "Add API Key"))
                 .font(.headline)
 
-            Picker("平台", selection: $newKeyType) {
+            Picker(NSLocalizedString("settings.platform", comment: "Platform"), selection: $newKeyType) {
                 ForEach(ProviderType.allCases, id: \.self) { type in
                     Text(type.displayName).tag(type)
                 }
             }
 
-            SecureField("粘贴 API Key", text: $newKeyValue)
+            SecureField(NSLocalizedString("settings.pasteApiKey", comment: "Paste API Key"), text: $newKeyValue)
                 .textFieldStyle(.roundedBorder)
 
             if let msg = keyValidation {
@@ -547,9 +547,9 @@ struct SettingsView: View {
             }
 
             HStack {
-                Button("取消") { showAddKey = false }
+                Button(NSLocalizedString("settings.cancel", comment: "Cancel")) { showAddKey = false }
                 Spacer()
-                Button("保存") {
+                Button(NSLocalizedString("settings.save", comment: "Save")) {
                     saveNewKey()
                 }
                 .buttonStyle(.borderedProminent)
@@ -570,7 +570,7 @@ struct SettingsView: View {
             keyValidation = nil
             showAddKey = false
         } catch {
-            keyValidation = "保存失败: \(error.localizedDescription)"
+            keyValidation = NSLocalizedString("settings.saveFailed", comment: "Save failed: %@")
         }
     }
 
@@ -589,13 +589,13 @@ struct PetCatalog {
     }
 
     static let allPets: [PetInfo] = [
-        PetInfo(id: "cat", name: "猫咪", systemImage: "cat"),
-        PetInfo(id: "dog", name: "小狗", systemImage: "dog"),
-        PetInfo(id: "rabbit", name: "兔子", systemImage: "hare"),
-        PetInfo(id: "hamster", name: "仓鼠", systemImage: "pawprint"),
-        PetInfo(id: "fox", name: "狐狸", systemImage: "leaf"),
-        PetInfo(id: "penguin", name: "企鹅", systemImage: "cloud"),
-        PetInfo(id: "owl", name: "猫头鹰", systemImage: "moon"),
-        PetInfo(id: "robot", name: "机器人", systemImage: "robot"),
+        PetInfo(id: "cat", name: NSLocalizedString("pet.cat", comment: "Cat"), systemImage: "cat"),
+        PetInfo(id: "dog", name: NSLocalizedString("pet.dog", comment: "Dog"), systemImage: "dog"),
+        PetInfo(id: "rabbit", name: NSLocalizedString("pet.rabbit", comment: "Rabbit"), systemImage: "hare"),
+        PetInfo(id: "hamster", name: NSLocalizedString("pet.hamster", comment: "Hamster"), systemImage: "pawprint"),
+        PetInfo(id: "fox", name: NSLocalizedString("pet.fox", comment: "Fox"), systemImage: "leaf"),
+        PetInfo(id: "penguin", name: NSLocalizedString("pet.penguin", comment: "Penguin"), systemImage: "cloud"),
+        PetInfo(id: "owl", name: NSLocalizedString("pet.owl", comment: "Owl"), systemImage: "moon"),
+        PetInfo(id: "robot", name: NSLocalizedString("pet.robot", comment: "Robot"), systemImage: "robot"),
     ]
 }
