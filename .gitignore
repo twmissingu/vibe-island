@@ -44,3 +44,7 @@ Packages/LLMQuotaKit/build/
 
 # Sisyphus (automated testing framework)
 .sisyphus/
+
+# Worktrees
+.worktrees/
+worktrees/
