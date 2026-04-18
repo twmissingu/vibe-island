@@ -49,30 +49,25 @@ struct CompactIslandView: View {
     private var shouldBlink: Bool {
         aggregateState.isBlinking
     }
+    
+    /// Whether to animate brackets on state change
+    @State private var animateBrackets = false
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 0) {
+            // Left parenthesis
+            Text("(")
+                .foregroundColor(aggregateState.color)
+                .font(.system(size: 24, weight: .bold, design: .monospaced))
+                .baselineOffset(2)
+                .offset(x: animateBrackets ? -4.0 : 0)
+
+            Spacer().frame(width: 8)
+
             // Session indicator dot (left aligned)
             sessionIndicatorDot
 
-            // Session summary (if active and non-idle)
-            if let session = topSession, aggregateState != .idle {
-                sessionSummary(session)
-            }
-
-            // Context usage indicator (if available)
-            if let snapshot = contextSnapshot, snapshot.usageRatio > 0 {
-                contextUsageSection(snapshot)
-            }
-
-            Divider()
-                .frame(height: 16)
-                .opacity(0.3)
-
-            // Quota display (existing functionality)
-            quotaSection
-
-            Spacer() // Push pet to rightmost position
+            Spacer() // Middle notch area
 
             // Pet view with session state integration (fixed width regardless of enable status)
             Group {
@@ -84,16 +79,35 @@ struct CompactIslandView: View {
                 }
             }
             .frame(width: 20, height: 20) // Match pet view size to keep layout consistent
+
+            Spacer().frame(width: 8)
+
+            // Right parenthesis
+            Text(")")
+                .foregroundColor(aggregateState.color)
+                .font(.system(size: 24, weight: .bold, design: .monospaced))
+                .baselineOffset(2)
+                .offset(x: animateBrackets ? 4.0 : 0)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .frame(width: 360) // Same width as expanded island
+        .frame(height: 44) // Fixed height only, width determined by parent panel
         .background(backgroundView)
         .clipShape(Capsule())
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: aggregateState)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: topSession?.sessionId)
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: contextSnapshot)
+
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: viewModel.settings.petEnabled)
+        .onChange(of: aggregateState) { _, _ in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                animateBrackets = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    animateBrackets = false
+                }
+            }
+        }
     }
 
 
@@ -194,51 +208,8 @@ struct CompactIslandView: View {
 
     @ViewBuilder
     private var backgroundView: some View {
-        let stateColor = aggregateState.color
-        let gradientColors = stateColor.stateGradientColors
-
-        switch viewModel.settings.theme {
-        case .glass:
-            ZStack {
-                // 毛玻璃背景
-                VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
-                    .opacity(0.7)
-
-                // 渐变边框
-                RoundedRectangle(cornerRadius: 22)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                gradientColors.0.opacity(0.9),
-                                gradientColors.1.opacity(0.6),
-                                gradientColors.0.opacity(0.9)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 2.5
-                    )
-            }
-        case .pixel:
-            ZStack {
-                Color(white: 0.12)
-                RoundedRectangle(cornerRadius: 22)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                gradientColors.0,
-                                gradientColors.1.opacity(0.7),
-                                gradientColors.0
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 2.5
-                    )
-            }
-        }
+        Color.black
     }
-
     // MARK: - 发光效果状态指示器
 
     @ViewBuilder
@@ -266,21 +237,6 @@ struct CompactIslandView: View {
     }
 }
 
-// MARK: - Session State Gradient Colors Extension
-extension SessionState {
-    var gradientColors: (Color, Color) {
-        switch self {
-        case .idle: return (.gray.opacity(0.8), .gray.opacity(0.3))
-        case .thinking: return (.yellow.opacity(0.9), .orange.opacity(0.5))
-        case .coding: return (.green.opacity(0.9), .cyan.opacity(0.5))
-        case .waiting: return (.orange.opacity(0.9), .red.opacity(0.5))
-        case .waitingPermission: return (.yellow.opacity(0.9), .orange.opacity(0.6))
-        case .completed: return (.green.opacity(0.9), .mint.opacity(0.5))
-        case .error: return (.red.opacity(0.9), .pink.opacity(0.5))
-        case .compacting: return (.orange.opacity(0.9), .yellow.opacity(0.5))
-        }
-    }
-}
 
 // MARK: - Ripple Animation View
 

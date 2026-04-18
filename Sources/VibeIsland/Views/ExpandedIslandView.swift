@@ -46,7 +46,7 @@ struct ExpandedIslandView: View {
             tabContent
         }
         .padding(12)
-        .frame(width: 360)
+        // No fixed width - let DynamicIslandPanel control width
         .background(backgroundView)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: contextSnapshot)

@@ -9,7 +9,8 @@ final class DynamicIslandPanel: NSPanel {
     init(contentView: some View) {
         positionMode = SharedDefaults.loadSettings().islandPositionMode
 
-        let initialSize = NSSize(width: 420, height: 44)
+        let notchAwareWidth = calculateNotchAwareWidth()
+        let initialSize = NSSize(width: notchAwareWidth, height: 44)
 
         super.init(
             contentRect: NSRect(origin: .zero, size: initialSize),
@@ -184,3 +185,26 @@ final class DynamicIslandPanel: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 }
+
+    /// 计算适配刘海的灵动岛宽度
+    ///
+    /// 返回值:
+    /// - 500pt: 14" MacBook Pro (notch ~200pt, ~150pt visible each side)
+    /// - 580pt: 16" MacBook Pro (notch ~238pt, ~171pt visible each side)
+    /// - 420pt: 非刘海 Mac 或未知屏幕
+    func calculateNotchAwareWidth() -> CGFloat {
+        guard let screen = getBuiltInScreen() else { return 420 }
+        
+        let screenFrame = screen.frame
+        let screenWidth = screenFrame.width
+        
+        // 14" MacBook Pro 屏幕宽度 ~3024pt (2x scale)
+        // 16" MacBook Pro 屏幕宽度 ~3456pt (2x scale)
+        // 使用 3100pt 作为分界值
+        
+        let hasNotch = screen.safeAreaInsets.top > 24
+        guard hasNotch else { return 420 }
+        
+        return screenWidth >= 3100 ? 580 : 500
+    }
+
