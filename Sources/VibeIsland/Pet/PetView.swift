@@ -1,19 +1,89 @@
 import SwiftUI
 
-/// 像素宠物渲染器 - 使用 SwiftUI Canvas 渲染像素帧
+// MARK: - 像素宠物视图（增强版）
+/// 包含粒子效果、过渡动画和物理效果
 struct PetView: View {
     @State private var petEngine: PetEngine
     @State private var currentFrameIndex = 0
     @State private var animationTimer: Timer?
     
-    let scale: CGFloat  // 像素缩放倍数
+    // 物理效果状态
+    @State private var shakeOffset: CGFloat = 0
+    @State private var bounceOffset: CGFloat = 0
+    @State private var pulseScale: CGFloat = 1.0
     
-    init(scale: CGFloat = 4.0) {
-        _petEngine = State(initialValue: PetEngine(state: .idle))
+    // 粒子效果状态
+    @State private var showConfetti = false
+    @State private var showExclamation = false
+    @State private var showCompression = false
+    
+    let scale: CGFloat  // 像素缩放倍数
+    let petId: String // 宠物ID
+    
+    init(petId: String = "cat", scale: CGFloat = 4.0) {
+        // 根据petId加载对应的动画集
+        let animationSet: PetAnimationSet
+        switch petId {
+        case "dog": animationSet = .dog
+        case "rabbit": animationSet = .rabbit
+        case "fox": animationSet = .fox
+        case "penguin": animationSet = .penguin
+        case "robot": animationSet = .robot
+        case "ghost": animationSet = .ghost
+        case "dragon": animationSet = .dragon
+        default: animationSet = .cat
+        }
+        _petEngine = State(initialValue: PetEngine(state: .idle, animationSet: animationSet))
         self.scale = scale
+        self.petId = petId
     }
     
     var body: some View {
+        ZStack {
+            // 粒子覆盖层
+            particleOverlay
+            
+            // 宠物渲染
+            petCanvas
+        }
+        // 状态变化时触发物理效果
+        .onChange(of: petEngine.state) { oldValue, newValue in
+            handleStateTransition(from: oldValue, to: newValue)
+        }
+        .onAppear {
+            startAnimation()
+        }
+        .onDisappear {
+            stopAnimation()
+        }
+    }
+    
+    // MARK: - 粒子覆盖层
+    
+    @ViewBuilder
+    private var particleOverlay: some View {
+        // 庆祝 - 彩带粒子
+        if showConfetti {
+            ParticleOverlayView(type: .confetti, intensity: .high, autoStart: true)
+                .allowsHitTesting(false)
+        }
+        
+        // 错误 - 感叹号粒子
+        if showExclamation {
+            ParticleOverlayView(type: .exclamation, intensity: .medium, autoStart: true)
+                .allowsHitTesting(false)
+        }
+        
+        // 压缩 - 压缩粒子
+        if showCompression {
+            ParticleOverlayView(type: .compression, intensity: .medium, autoStart: true)
+                .allowsHitTesting(false)
+        }
+    }
+    
+    // MARK: - 宠物画布渲染
+    
+    private var petCanvas: some View {
         Canvas { context, size in
             let frames = petEngine.animationSet.frames(for: petEngine.state)
             guard !frames.isEmpty else { return }
@@ -38,18 +108,136 @@ struct PetView: View {
             width: CGFloat(petEngine.animationSet.frames(for: petEngine.state).first?.width ?? 16) * scale,
             height: CGFloat(petEngine.animationSet.frames(for: petEngine.state).first?.height ?? 16) * scale
         )
-        // 禁用抗锯齿，保持像素边缘锐利（与 UI 设计文档 4.3 节一致）
-        .onAppear {
-            startAnimation()
-        }
-        .onDisappear {
-            stopAnimation()
-        }
-        .onChange(of: petEngine.state) { _, _ in
-            currentFrameIndex = 0
-            startAnimation()
+        // 应用物理效果
+        .offset(x: shakeOffset, y: bounceOffset)
+        .scaleEffect(pulseScale)
+    }
+    
+    // MARK: - 状态过渡处理
+    
+    private func handleStateTransition(from oldValue: PetState, to newValue: PetState) {
+        // 1. 粒子效果触发
+        handleParticleTrigger(for: newValue)
+        
+        // 2. 物理效果触发
+        handlePhysicsEffect(for: newValue)
+        
+        // 3. 重置动画帧
+        currentFrameIndex = 0
+        startAnimation()
+    }
+    
+    private func handleParticleTrigger(for state: PetState) {
+        // 先清除所有粒子
+        showConfetti = false
+        showExclamation = false
+        showCompression = false
+        
+        // 根据状态触发对应粒子效果
+        switch state {
+        case .celebrating:
+            showConfetti = true
+            // 2秒后自动停止
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                showConfetti = false
+            }
+        case .error:
+            showExclamation = true
+            // 持续显示直到状态改变
+        case .compacting:
+            showCompression = true
+        default:
+            // 其他状态不显示特殊粒子
+            break
         }
     }
+    
+    private func handlePhysicsEffect(for state: PetState) {
+        // 停止所有当前物理效果
+        stopAllPhysicsEffects()
+        
+        switch state {
+        case .waiting:
+            // 等待状态 - 抖动效果
+            startShakeEffect()
+        case .celebrating:
+            // 庆祝状态 - 弹跳效果
+            startBounceEffect()
+        case .error:
+            // 错误状态 - 脉冲效果
+            startPulseEffect()
+        default:
+            break
+        }
+    }
+    
+    // MARK: - 物理效果实现
+    
+    private func startShakeEffect() {
+        let shakeCount = 10
+        let shakeDuration = 0.05
+        
+        for i in 0..<shakeCount {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * shakeDuration) {
+                withAnimation(.easeInOut(duration: shakeDuration)) {
+                    self.shakeOffset = i % 2 == 0 ? 3 : -3
+                }
+            }
+        }
+        
+        // 复位
+        DispatchQueue.main.asyncAfter(deadline: .now() + Double(shakeCount) * shakeDuration) {
+            withAnimation(.easeOut(duration: 0.1)) {
+                self.shakeOffset = 0
+            }
+        }
+    }
+    
+    private func startBounceEffect() {
+        let bounceCount = 3
+        let bounceDuration = 0.15
+        
+        for i in 0..<bounceCount {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * bounceDuration * 2) {
+                withAnimation(.spring(response: 0.15, dampingFraction: 0.3)) {
+                    self.bounceOffset = i % 2 == 0 ? -8 : 0
+                }
+            }
+        }
+        
+        // 复位
+        DispatchQueue.main.asyncAfter(deadline: .now() + Double(bounceCount) * bounceDuration * 2) {
+            withAnimation(.easeOut(duration: 0.1)) {
+                self.bounceOffset = 0
+            }
+        }
+    }
+    
+    private func startPulseEffect() {
+        let pulseCount = 3
+        let pulseDuration = 0.2
+        
+        for i in 0..<pulseCount {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * pulseDuration) {
+                withAnimation(.easeInOut(duration: pulseDuration / 2)) {
+                    self.pulseScale = 1.15
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + pulseDuration / 2) {
+                    withAnimation(.easeInOut(duration: pulseDuration / 2)) {
+                        self.pulseScale = 1.0
+                    }
+                }
+            }
+        }
+    }
+    
+    private func stopAllPhysicsEffects() {
+        shakeOffset = 0
+        bounceOffset = 0
+        pulseScale = 1.0
+    }
+    
+    // MARK: - 动画控制
     
     private func startAnimation() {
         animationTimer?.invalidate()
@@ -75,7 +263,7 @@ struct PetView: View {
     }
 }
 
-/// Color hex 初始化扩展
+// MARK: - Color hex 初始化扩展
 extension Color {
     init?(hex: String) {
         var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -95,7 +283,7 @@ extension Color {
     }
 }
 
-/// 宠物引擎 - 管理状态和动画
+// MARK: - 宠物引擎 - 管理状态和动画
 class PetEngine: ObservableObject {
     @Published var state: PetState
     let animationSet: PetAnimationSet
@@ -110,6 +298,7 @@ class PetEngine: ObservableObject {
     }
 }
 
+// MARK: - 预览
 #Preview {
     VStack(spacing: 20) {
         Text("像素宠物渲染原型测试")
