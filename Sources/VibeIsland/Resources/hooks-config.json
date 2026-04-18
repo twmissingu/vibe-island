@@ -114,6 +114,32 @@
           }
         ]
       }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"ok\": true, \"message\": \"vibe-island pre-compact\"}'",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"ok\": true, \"message\": \"vibe-island post-compact\"}'",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
     ]
   },
   "disableAllHooks": false,

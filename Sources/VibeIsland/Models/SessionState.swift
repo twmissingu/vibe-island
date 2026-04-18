@@ -18,14 +18,14 @@ enum SessionState: String, Codable, Equatable, Sendable, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .idle: return "空闲"
-        case .thinking: return "思考中"
-        case .coding: return "编码中"
-        case .waiting: return "等待输入"
-        case .waitingPermission: return "等待权限"
-        case .completed: return "已完成"
-        case .error: return "错误"
-        case .compacting: return "压缩中"
+        case .idle: return "Idle"
+        case .thinking: return "Thinking"
+        case .coding: return "Coding"
+        case .waiting: return "Waiting"
+        case .waitingPermission: return "Permission"
+        case .completed: return "Completed"
+        case .error: return "Error"
+        case .compacting: return "Compacting"
         }
     }
 
@@ -33,7 +33,7 @@ enum SessionState: String, Codable, Equatable, Sendable, CaseIterable {
 
     var color: Color {
         switch self {
-        case .idle: return .gray          // ⚪ 空闲/待机
+        case .idle: return .black         // ⚫ 空闲/待机
         case .thinking: return .yellow     // 🟡 思考中
         case .coding: return .green        // 🟢 编码中（正常运行）
         case .waiting: return .orange      // 🟠 等待输入
@@ -130,6 +130,45 @@ enum SessionState: String, Codable, Equatable, Sendable, CaseIterable {
         case .waiting: return 5             // 等待输入
         case .completed: return 6           // 已完成
         case .idle: return 7                // 最低：空闲
+        }
+    }
+    
+    /// 渐变颜色数组（用于边框）
+    var gradientColors: [Color] {
+        switch self {
+        case .idle:
+            return [.gray.opacity(0.5), .gray.opacity(0.3)]
+        case .thinking:
+            return [.yellow, .orange, .yellow.opacity(0.5)]
+        case .coding:
+            return [.green, .cyan, .green.opacity(0.5)]
+        case .waiting:
+            return [.orange, .yellow, .orange.opacity(0.5)]
+        case .waitingPermission:
+            return [.yellow, .white, .yellow.opacity(0.5)]
+        case .completed:
+            return [.green, .mint, .green.opacity(0.5)]
+        case .error:
+            return [.red, .pink, .red.opacity(0.5)]
+        case .compacting:
+            return [.orange, .yellow, .red.opacity(0.5)]
+        }
+    }
+}
+
+
+// MARK: - Color 扩展
+
+extension Color {
+    /// 获取渐变色（用于边框渐变）
+    var stateGradientColors: (Color, Color) {
+        switch self {
+        case .black: return (.gray.opacity(0.3), .black.opacity(0.5))
+        case .yellow: return (.yellow.opacity(0.8), .orange)
+        case .green: return (.green.opacity(0.8), .mint)
+        case .orange: return (.orange.opacity(0.8), .red.opacity(0.5))
+        case .red: return (.red.opacity(0.8), .red)
+        default: return (self, self.opacity(0.7))
         }
     }
 }

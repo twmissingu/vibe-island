@@ -52,19 +52,19 @@ final class SessionFileWatcher {
 
     /// DispatchSource 文件监听器（每个文件一个）
     @ObservationIgnored
-    private var fileSources: [URL: DispatchSourceFileSystemObject] = [:]
+    nonisolated(unsafe) private var fileSources: [URL: DispatchSourceFileSystemObject] = [:]
     /// 文件描述符锁，保护 fileSources 并发访问
     @ObservationIgnored
-    private let sourcesLock = NSLock()
+    nonisolated private let sourcesLock = NSLock()
     /// 防抖动时间戳记录
     @ObservationIgnored
-    private var lastEventTimes: [URL: UInt64] = [:]
+    nonisolated(unsafe) private var lastEventTimes: [URL: UInt64] = [:]
     @ObservationIgnored
-    private let debounceLock = NSLock()
+    nonisolated private let debounceLock = NSLock()
 
     /// 降级轮询任务
     @ObservationIgnored
-    private var pollingTask: Task<Void, Never>?
+    nonisolated(unsafe) private var pollingTask: Task<Void, Never>?
     /// 文件修改时间快照（用于降级轮询对比）
     @ObservationIgnored
     private var fileModificationDates: [URL: Date] = [:]

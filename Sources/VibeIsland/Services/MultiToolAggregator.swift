@@ -7,14 +7,12 @@ import OSLog
 enum ToolSource: String, Codable, Equatable, Sendable {
     case claudeCode = "claude_code"
     case openCode = "opencode"
-    case codex = "codex"
 
     /// 显示名称
     var displayName: String {
         switch self {
         case .claudeCode: return "Claude Code"
         case .openCode: return "OpenCode"
-        case .codex: return "Codex"
         }
     }
 
@@ -23,7 +21,6 @@ enum ToolSource: String, Codable, Equatable, Sendable {
         switch self {
         case .claudeCode: return "C"
         case .openCode: return "O"
-        case .codex: return "X"
         }
     }
 }
@@ -66,7 +63,7 @@ struct UnifiedSessionView: Identifiable, Equatable, Sendable {
 
 // MARK: - 多工具状态聚合器
 
-/// 聚合 Claude Code、OpenCode、Codex 的状态
+/// 聚合 Claude Code、OpenCode 的状态
 ///
 /// 职责：
 /// - 从各监控服务收集会话状态
@@ -137,7 +134,6 @@ final class MultiToolAggregator {
 
     private let sessionManager = SessionManager.shared
     private let openCodeMonitor = OpenCodeMonitor.shared
-    private let codexMonitor = CodexMonitor.shared
     private static let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "com.twmissingu.VibeIsland",
         category: "MultiToolAggregator"
@@ -163,7 +159,6 @@ final class MultiToolAggregator {
         // 启动各子监控服务
         sessionManager.start()
         openCodeMonitor.start()
-        codexMonitor.start()
 
         // 设置定时聚合刷新
         refreshTimer = Timer.scheduledTimer(
@@ -185,10 +180,8 @@ final class MultiToolAggregator {
     func stop() {
         hasSetup = false
         isRunning = false
-
         sessionManager.stop()
         openCodeMonitor.stop()
-        codexMonitor.stop()
 
         refreshTimer?.invalidate()
         refreshTimer = nil
@@ -202,7 +195,6 @@ final class MultiToolAggregator {
     func refresh() {
         sessionManager.refresh()
         openCodeMonitor.refresh()
-        codexMonitor.refresh()
         aggregate()
     }
 
@@ -246,22 +238,7 @@ final class MultiToolAggregator {
         }
         sessions.append(contentsOf: openCodeSessions)
 
-        // 3. 收集 Codex 会话
-        let codexSessions = codexMonitor.sessions.map { session -> UnifiedSessionView in
-            UnifiedSessionView(
-                id: "codex_\(session.sessionId)",
-                source: .codex,
-                originalSessionId: session.sessionId,
-                cwd: session.cwd ?? "unknown",
-                status: session.status.toSessionState,
-                name: "Codex: \(session.cwd?.split(separator: "/").last?.description ?? "unknown")",
-                lastTool: nil,
-                message: nil,
-                lastActivity: session.lastCheck,
-                activeSubagentCount: 0
-            )
-        }
-        sessions.append(contentsOf: codexSessions)
+        unifiedSessions = sessions
 
         unifiedSessions = sessions
     }
@@ -309,7 +286,6 @@ final class MultiToolAggregator {
     func summaryText() -> String {
         let claudeCount = countBySource[.claudeCode] ?? 0
         let openCodeCount = countBySource[.openCode] ?? 0
-        let codexCount = countBySource[.codex] ?? 0
         let total = activeCount
 
         guard total > 0 else {
@@ -322,9 +298,6 @@ final class MultiToolAggregator {
         }
         if openCodeCount > 0 {
             parts.append("OpenCode:\(openCodeCount)")
-        }
-        if codexCount > 0 {
-            parts.append("Codex:\(codexCount)")
         }
 
         let detail = parts.joined(separator: " | ")
@@ -350,9 +323,6 @@ final class MultiToolAggregator {
             case .openCode:
                 // OpenCodeMonitor 自动过滤 PID 不存活的会话
                 break
-            case .codex:
-                // Codex 检测自动清理
-                break
             }
         } else {
             sessionManager.removeCompletedSessions()
@@ -364,8 +334,6 @@ final class MultiToolAggregator {
         sessionManager.clearAll()
         openCodeMonitor.stop()
         openCodeMonitor.start()
-        codexMonitor.stop()
-        codexMonitor.start()
         aggregate()
     }
 }
@@ -373,5 +341,5 @@ final class MultiToolAggregator {
 // MARK: - ToolSource 便捷扩展
 
 extension ToolSource {
-    static var allCases: [ToolSource] { [.claudeCode, .openCode, .codex] }
+    static var allCases: [ToolSource] { [.claudeCode, .openCode] }
 }

@@ -31,7 +31,7 @@ public struct AppSettings: Codable, Sendable {
     // 多工具监控
     public var claudeMonitorEnabled: Bool
     public var openCodeMonitorEnabled: Bool
-    public var codexMonitorEnabled: Bool
+
 
     // 上下文感知
     public var contextMonitorEnabled: Bool
@@ -53,7 +53,6 @@ public struct AppSettings: Codable, Sendable {
         detachedPositionY: Double? = nil,
         claudeMonitorEnabled: Bool = true,
         openCodeMonitorEnabled: Bool = true,
-        codexMonitorEnabled: Bool = true,
         contextMonitorEnabled: Bool = true,
         contextWarningThreshold: Double = 80.0,
         sessionTrackingMode: String = "auto",
@@ -70,7 +69,7 @@ public struct AppSettings: Codable, Sendable {
         self.detachedPositionY = detachedPositionY
         self.claudeMonitorEnabled = claudeMonitorEnabled
         self.openCodeMonitorEnabled = openCodeMonitorEnabled
-        self.codexMonitorEnabled = codexMonitorEnabled
+
         self.contextMonitorEnabled = contextMonitorEnabled
         self.contextWarningThreshold = contextWarningThreshold
         self.sessionTrackingMode = sessionTrackingMode

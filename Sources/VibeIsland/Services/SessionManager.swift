@@ -24,7 +24,6 @@ enum TrackingMode: Equatable {
 /// 多工具支持：
 /// - Claude Code：通过文件 hook（SessionFileWatcher）
 /// - OpenCode：通过 OpenCodeMonitor（四级降级）
-/// - Codex：通过 CodexMonitor（进程检测）
 ///
 /// SessionManager 主要管理 Claude Code 会话，
 /// 多工具聚合由 MultiToolAggregator 负责。
@@ -211,7 +210,7 @@ final class SessionManager {
         }
     }
 
-    /// 注册外部工具的会话（OpenCode / Codex 等）
+    /// 注册外部工具的会话（OpenCode 等）
     /// - Parameter session: 外部工具会话
     func registerExternalSession(_ session: Session) {
         // 为外部会话生成唯一 ID，避免与 Claude Code 冲突
@@ -333,16 +332,7 @@ final class SessionManager {
             parts.append("OpenCode:\(openCodeActive)")
         }
 
-        // Codex
-        let codexActive = sessions.values.filter {
-            $0.source == "codex"
-                && $0.status != .completed && $0.status != .idle
-        }.count
-        if codexActive > 0 {
-            parts.append("Codex:\(codexActive)")
-        }
-
-        let total = claudeActive + openCodeActive + codexActive
+        let total = claudeActive + openCodeActive
 
         guard total > 0 else {
             return "\u{2713} 无活跃会话"

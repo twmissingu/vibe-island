@@ -18,41 +18,39 @@ struct SessionListView: View {
 
         var body: some View {
             Button(action: onSelect) {
-                HStack(spacing: 8) {
-                    // 状态图标
-                    Image(systemName: session.status.icon)
-                        .font(.system(size: 12))
-                        .foregroundStyle(session.status.color)
-
-                    // 状态名称
-                    Text(session.status.displayName)
-                        .font(.system(size: 10))
-                        .foregroundStyle(session.status.color)
-                        .frame(width: 48, alignment: .leading)
+                HStack(spacing: 6) {
+                    // 状态图标 + 名称
+                    HStack(spacing: 3) {
+                        Image(systemName: session.status.icon)
+                            .font(.system(size: 11))
+                            .foregroundStyle(session.status.color)
+                        Text(session.status.displayName)
+                            .font(.system(size: 10))
+                            .foregroundStyle(session.status.color)
+                    }
+                    .frame(width: 72, alignment: .leading)
 
                     // 会话名
-                    VStack(alignment: .leading, spacing: 2) {
-                        if let name = session.sessionName, !name.isEmpty {
-                            Text(name)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(.primary)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                        }
-                        Text(shortenedCwd(session.cwd))
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
+                    Text(session.sessionName ?? shortenedCwd(session.cwd))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Spacer()
+                    // 工具来源
+                    Text(toolSourceName(for: session))
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 44, alignment: .trailing)
 
                     // 跟踪指示器
                     if isTracked {
                         Image(systemName: isAutoMode ? "arrow.triangle.2.circlepath" : "pin.fill")
-                            .font(.system(size: 10))
+                            .font(.system(size: 9))
                             .foregroundStyle(.blue)
+                    } else {
+                        Color.clear.frame(width: 9, height: 9)
                     }
                 }
                 .padding(.vertical, 6)
@@ -64,6 +62,14 @@ struct SessionListView: View {
             }
             .buttonStyle(.plain)
             .contentShape(Rectangle())
+        }
+
+        /// 根据会话来源返回工具名称
+        private func toolSourceName(for session: Session) -> String {
+            switch session.source {
+            case "opencode": return "OpenCode"
+            default: return "Claude"
+            }
         }
 
         /// 缩短工作目录路径
@@ -188,7 +194,7 @@ extension SessionState {
     var icon: String {
         switch self {
         case .idle: return "checkmark.circle.fill"
-        case .thinking: return "brain.head.filled"
+        case .thinking: return "brain.fill"
         case .coding: return "hammer.fill"
         case .waiting: return "text.bubble.fill"
         case .waitingPermission: return "lock.shield.fill"

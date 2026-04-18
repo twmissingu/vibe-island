@@ -90,7 +90,7 @@
 // MARK: - Onboarding
 
 "onboarding.welcome.title" = "Welcome to Vibe Island";
-"onboarding.welcome.subtitle" = "Your AI Coding Assistant Status Monitor\nReal-time monitoring of Claude Code, OpenCode, Codex";
+"onboarding.welcome.subtitle" = "Your AI Coding Assistant Status Monitor\nReal-time monitoring of Claude Code, OpenCode";
 "onboarding.feature.realTime" = "Real-time Status Awareness";
 "onboarding.feature.sound" = "Sound Alerts";
 "onboarding.feature.pet" = "Pixel Pet";

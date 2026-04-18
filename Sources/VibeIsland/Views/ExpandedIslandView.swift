@@ -5,8 +5,15 @@ import LLMQuotaKit
 
 struct ExpandedIslandView: View {
     @Environment(StateManager.self) private var viewModel
-    @State private var selectedTab: ExpandedTab = .quota
+    @State private var selectedTab: ExpandedTab = .sessions
+    @State private var showSettings = false
     private var contextMonitor: ContextMonitor { .shared }
+    private var sessionManager: SessionManager { .shared }
+
+    /// 聚合状态用于渐变边框
+    private var aggregateState: SessionState {
+        sessionManager.aggregateState
+    }
 
     /// 展开视图的标签页
     enum ExpandedTab: String, CaseIterable {
@@ -18,7 +25,7 @@ struct ExpandedIslandView: View {
             switch self {
             case .quota: return "key.fill"
             case .sessions: return "terminal"
-            case .context: return "brain.head.filled"
+            case .context: return "brain.fill"
             }
         }
     }
@@ -43,6 +50,10 @@ struct ExpandedIslandView: View {
         .background(backgroundView)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: contextSnapshot)
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+                .environment(viewModel)
+        }
     }
 
     // MARK: - 标签栏
@@ -122,29 +133,46 @@ struct ExpandedIslandView: View {
 
     @ViewBuilder
     private var sessionsTab: some View {
-        SessionListView()
-            .environment(viewModel)
+        VStack(spacing: 8) {
+            SessionListView()
+                .environment(viewModel)
+            Spacer()
+            footer
+        }
     }
 
     // MARK: - 上下文标签
 
     @ViewBuilder
     private var contextTab: some View {
-        if let snapshot = contextSnapshot, snapshot.usageRatio > 0 {
-            VStack(spacing: 8) {
-                ContextUsageCard(snapshot: snapshot)
-                Spacer()
+        VStack(spacing: 8) {
+            if let snapshot = contextSnapshot, snapshot.usageRatio > 0 {
+                VStack(spacing: 8) {
+                    // 标题行
+                    HStack {
+                        Image(systemName: "brain.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.blue)
+                        Text("上下文使用")
+                            .font(.system(size: 12, weight: .semibold))
+                        Spacer()
+                    }
+                    
+                    ContextUsageCard(snapshot: snapshot)
+                }
+            } else {
+                VStack(spacing: 8) {
+                    Image(systemName: "brain")
+                        .font(.system(size: 24))
+                        .foregroundStyle(.secondary)
+                    Text("暂无上下文数据")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(height: 100)
             }
-        } else {
-            VStack(spacing: 8) {
-                Image(systemName: "brain")
-                    .font(.system(size: 24))
-                    .foregroundStyle(.secondary)
-                Text("暂无上下文数据")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-            .frame(height: 100)
+            Spacer()
+            footer
         }
     }
 
@@ -162,14 +190,31 @@ struct ExpandedIslandView: View {
 
     private var footer: some View {
         HStack {
-            if let last = viewModel.lastRefresh {
-                Text("更新于 \(last.formatted(date: .omitted, time: .shortened))")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-            }
-            Spacer()
+            // 左下角设置按钮
             Button {
-                Task { await viewModel.refresh() }
+                showSettings = true
+            } label: {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 11))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            
+            Spacer()
+            
+            // 右下角刷新按钮
+            Button {
+                Task {
+                    switch selectedTab {
+                    case .quota:
+                        await viewModel.refresh()
+                    case .sessions:
+                        sessionManager.refresh()
+                    case .context:
+                        // 上下文数据随会话更新自动同步，刷新会话即可
+                        sessionManager.refresh()
+                    }
+                }
             } label: {
                 Image(systemName: "arrow.clockwise")
                     .font(.system(size: 11))
@@ -177,19 +222,53 @@ struct ExpandedIslandView: View {
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
         }
+        .padding(.top, 4)
     }
 
     @ViewBuilder
     private var backgroundView: some View {
+        let stateColor = aggregateState.color
+        let gradientColors = stateColor.stateGradientColors
+
         switch viewModel.settings.theme {
         case .glass:
-            VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
+            ZStack {
+                // 毛玻璃背景
+                VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
+                    .opacity(0.7)
+
+                // 渐变边框
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                gradientColors.0.opacity(0.9),
+                                gradientColors.1.opacity(0.6),
+                                gradientColors.0.opacity(0.9)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 2.5
+                    )
+            }
         case .pixel:
-            Color(white: 0.1)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(Color(white: 0.3), lineWidth: 2)
-                )
+            ZStack {
+                Color(white: 0.1)
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                gradientColors.0,
+                                gradientColors.1.opacity(0.7),
+                                gradientColors.0
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 2.5
+                    )
+            }
         }
     }
 }

@@ -77,7 +77,7 @@ struct ContextUsageView: View {
         if isCritical {
             return "exclamationmark.triangle.fill"
         } else if isWarning {
-            return "brain.head.filled"
+            return "brain.fill"
         }
         return "brain"
     }
@@ -171,7 +171,7 @@ struct ContextUsageCard: View {
         VStack(spacing: 8) {
             // 标题行
             HStack {
-                Image(systemName: snapshot.isCritical ? "exclamationmark.triangle.fill" : "brain.head.filled")
+                Image(systemName: snapshot.isCritical ? "exclamationmark.triangle.fill" : "brain.fill")
                     .font(.system(size: 12))
                     .foregroundStyle(statusColor)
 

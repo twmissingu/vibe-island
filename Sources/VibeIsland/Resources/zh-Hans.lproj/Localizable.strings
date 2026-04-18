@@ -90,7 +90,7 @@
 // MARK: - Onboarding
 
 "onboarding.welcome.title" = "欢迎使用 Vibe Island";
-"onboarding.welcome.subtitle" = "你的 AI 编码助手状态监控平台\n实时监控 Claude Code、OpenCode、Codex 的运行状态";
+"onboarding.welcome.subtitle" = "你的 AI 编码助手状态监控平台\n实时监控 Claude Code、OpenCode 的运行状态";
 "onboarding.feature.realTime" = "实时状态感知";
 "onboarding.feature.sound" = "声音提醒";
 "onboarding.feature.pet" = "像素宠物";

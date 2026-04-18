@@ -52,7 +52,7 @@ struct CompactIslandView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Session indicator dot
+            // Session indicator dot (left aligned)
             sessionIndicatorDot
 
             // Session summary (if active and non-idle)
@@ -72,29 +72,30 @@ struct CompactIslandView: View {
             // Quota display (existing functionality)
             quotaSection
 
-            // Pet view with session state integration
-            if viewModel.settings.petEnabled {
-                petView
+            Spacer() // Push pet to rightmost position
+
+            // Pet view with session state integration (fixed width regardless of enable status)
+            Group {
+                if viewModel.settings.petEnabled {
+                    PetView(petId: viewModel.settings.selectedPetID, scale: 1.0)
+                        .modifier(SessionPetEffect(state: aggregateState))
+                } else {
+                    Color.clear
+                }
             }
+            .frame(width: 20, height: 20) // Match pet view size to keep layout consistent
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
+        .frame(width: 360) // Same width as expanded island
         .background(backgroundView)
         .clipShape(Capsule())
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: aggregateState)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: topSession?.sessionId)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: contextSnapshot)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: viewModel.settings.petEnabled)
     }
 
-    // MARK: - Session Indicator Dot
-
-    @ViewBuilder
-    private var sessionIndicatorDot: some View {
-        Circle()
-            .fill(aggregateState.color)
-            .frame(width: 8, height: 8)
-            .modifier(BlinkModifier(shouldBlink: shouldBlink))
-    }
 
     // MARK: - Quota Section
 
@@ -114,13 +115,7 @@ struct CompactIslandView: View {
         } else if viewModel.isLoading {
             ProgressView()
                 .controlSize(.small)
-            Text("加载中…")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-        } else {
-            Image(systemName: "plus.circle")
-                .foregroundStyle(.secondary)
-            Text("点击添加 API Key")
+            Text("Loading…")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         }
@@ -130,23 +125,39 @@ struct CompactIslandView: View {
 
     @ViewBuilder
     private func sessionSummary(_ session: Session) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 4) {
+        HStack(spacing: 6) {
+            // 状态图标 + 名称
+            HStack(spacing: 3) {
                 Image(systemName: sessionStateIcon)
                     .font(.system(size: 10))
                     .foregroundStyle(aggregateState.color)
                 Text(aggregateState.displayName)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(.system(size: 10))
                     .foregroundStyle(aggregateState.color)
             }
-            if let name = session.sessionName {
-                Text(name)
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .frame(maxWidth: 80, alignment: .leading)
-            }
+            .frame(width: 72, alignment: .leading)
+
+            // 会话名
+            Text(session.sessionName ?? (session.cwd as NSString).lastPathComponent)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            // 工具来源
+            Text(toolSourceName(for: session))
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+                .frame(width: 44, alignment: .trailing)
+        }
+    }
+
+    /// 根据会话来源返回工具名称
+    private func toolSourceName(for session: Session) -> String {
+        switch session.source {
+        case "opencode": return "OpenCode"
+        default: return "Claude"
         }
     }
 
@@ -160,7 +171,7 @@ struct CompactIslandView: View {
     private var sessionStateIcon: String {
         switch aggregateState {
         case .idle: return "checkmark.circle.fill"
-        case .thinking: return "brain.head.filled"
+        case .thinking: return "brain.fill"
         case .coding: return "hammer.fill"
         case .waiting: return "text.bubble.fill"
         case .waitingPermission: return "lock.shield.fill"
@@ -174,7 +185,7 @@ struct CompactIslandView: View {
 
     @ViewBuilder
     private var petView: some View {
-        PetView()
+        PetView(scale: 1.0)
             .frame(width: 20, height: 20)
             .modifier(SessionPetEffect(state: aggregateState))
     }
@@ -183,18 +194,134 @@ struct CompactIslandView: View {
 
     @ViewBuilder
     private var backgroundView: some View {
+        let stateColor = aggregateState.color
+        let gradientColors = stateColor.stateGradientColors
+
         switch viewModel.settings.theme {
         case .glass:
-            VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
+            ZStack {
+                // 毛玻璃背景
+                VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
+                    .opacity(0.7)
+
+                // 渐变边框
+                RoundedRectangle(cornerRadius: 22)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                gradientColors.0.opacity(0.9),
+                                gradientColors.1.opacity(0.6),
+                                gradientColors.0.opacity(0.9)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 2.5
+                    )
+            }
         case .pixel:
-            Color(white: 0.12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22)
-                        .strokeBorder(Color(white: 0.3), lineWidth: 2)
-                )
+            ZStack {
+                Color(white: 0.12)
+                RoundedRectangle(cornerRadius: 22)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                gradientColors.0,
+                                gradientColors.1.opacity(0.7),
+                                gradientColors.0
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 2.5
+                    )
+            }
+        }
+    }
+
+    // MARK: - 发光效果状态指示器
+
+    @ViewBuilder
+    private var sessionIndicatorDot: some View {
+        ZStack {
+            // 外层发光
+            Circle()
+                .fill(aggregateState.color.opacity(0.3))
+                .frame(width: 20, height: 20)
+                .blur(radius: 4)
+            
+            // 主圆点
+            Circle()
+                .fill(aggregateState.color)
+                .frame(width: 12, height: 12)
+                .shadow(color: aggregateState.color.opacity(0.5), radius: 4, x: 0, y: 0)
+        }
+        .modifier(BlinkModifier(shouldBlink: shouldBlink))
+    }
+
+    // MARK: - 波纹动画效果
+    @ViewBuilder
+    private func rippleEffect(color: Color) -> some View {
+        RippleAnimationView(color: color)
+    }
+}
+
+// MARK: - Session State Gradient Colors Extension
+extension SessionState {
+    var gradientColors: (Color, Color) {
+        switch self {
+        case .idle: return (.gray.opacity(0.8), .gray.opacity(0.3))
+        case .thinking: return (.yellow.opacity(0.9), .orange.opacity(0.5))
+        case .coding: return (.green.opacity(0.9), .cyan.opacity(0.5))
+        case .waiting: return (.orange.opacity(0.9), .red.opacity(0.5))
+        case .waitingPermission: return (.yellow.opacity(0.9), .orange.opacity(0.6))
+        case .completed: return (.green.opacity(0.9), .mint.opacity(0.5))
+        case .error: return (.red.opacity(0.9), .pink.opacity(0.5))
+        case .compacting: return (.orange.opacity(0.9), .yellow.opacity(0.5))
         }
     }
 }
+
+// MARK: - Ripple Animation View
+
+struct RippleAnimationView: View {
+    let color: Color
+    @State private var scale: CGFloat = 0.5
+    @State private var opacity: Double = 0.8
+    @State private var isAnimating = false
+    
+    var body: some View {
+        Circle()
+            .stroke(color, lineWidth: 2)
+            .frame(width: 24, height: 24)
+            .scaleEffect(scale)
+            .opacity(opacity)
+            .onAppear {
+                startAnimation()
+            }
+            .onChange(of: color) { _, _ in
+                resetAnimation()
+                startAnimation()
+            }
+    }
+    
+    private func startAnimation() {
+        guard !isAnimating else { return }
+        isAnimating = true
+        withAnimation(.easeOut(duration: 0.8).repeatForever(autoreverses: false)) {
+            scale = 1.5
+            opacity = 0
+        }
+    }
+    
+    private func resetAnimation() {
+        isAnimating = false
+        scale = 0.5
+        opacity = 0.8
+    }
+}
+
+// MARK: - Blink Modifier
 
 // MARK: - Blink Modifier
 

@@ -96,7 +96,7 @@ struct WelcomeStep: View {
                 .font(.title)
                 .fontWeight(.bold)
             
-            Text("你的 AI 编码助手状态监控平台\n实时监控 Claude Code、OpenCode、Codex 的运行状态")
+            Text("你的 AI 编码助手状态监控平台\n实时监控 Claude Code、OpenCode 的运行状态")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
             

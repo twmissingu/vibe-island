@@ -40,8 +40,12 @@ targets:
     deploymentTarget: "14.0"
     sources:
       - path: Sources/VibeIsland
+        excludes:
+          - "**/*.md"
     resources:
       - path: Sources/VibeIsland/Resources
+        excludes:
+          - "**/*.md"
     dependencies:
       - package: LLMQuotaKit
     settings:
@@ -73,6 +77,7 @@ targets:
         SWIFT_VERSION: "6.0"
         CODE_SIGN_STYLE: Automatic
         INFOPLIST_FILE: Widget/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Widget/VibeWidget.entitlements
 
   LLMQuotaKit:
     type: framework

@@ -205,4 +205,77 @@ final class SessionFileWatcherTests: XCTestCase {
         XCTAssertNoThrow(watcher.refreshAll())
         watcher.stopWatching()
     }
+    
+    // MARK: - 队列安全测试（针对本次libdispatch断言崩溃修复）
+    
+    /// 测试：DispatchSource并发文件事件不会触发队列断言崩溃
+    /// 验证修复：全局队列回调调用主Actor方法时已正确切换上下文
+    func testDispatchSourceConcurrentFileEvents_noAssertionFailure() async {
+        // 启动监听
+        watcher.startWatching()
+        
+        // 模拟并发写入10个会话文件到系统实际会话目录
+        let sessionDir = SessionFileWatcher.sessionsDirectory
+        try? FileManager.default.createDirectory(at: sessionDir, withIntermediateDirectories: true)
+        
+        // 并发写入多个文件，触发多个DispatchSource事件
+        await withTaskGroup(of: Void.self) { group in
+            for i in 0..<10 {
+                group.addTask {
+                    let sessionFile = sessionDir.appendingPathComponent("test-session-\(i)-\(UUID().uuidString).json")
+                    let json = """
+                    {
+                        "sessionId": "test-session-\(i)",
+                        "status": "coding",
+                        "cwd": "/tmp/project",
+                        "lastActivity": "\(ISO8601DateFormatter().string(from: Date()))"
+                    }
+                    """
+                    try? json.write(to: sessionFile, atomically: true, encoding: .utf8)
+                    // 立即删除测试文件
+                    try? FileManager.default.removeItem(at: sessionFile)
+                }
+            }
+        }
+        
+        // 等待事件处理完成
+        try? await Task.sleep(for: .milliseconds(500))
+        
+        // 验证无崩溃发生
+        XCTAssertTrue(watcher.isWatching)
+        XCTAssertNoThrow(watcher.stopWatching())
+    }
+    
+    /// 测试：高频文件修改不会触发队列断言崩溃
+    /// 验证修复：防抖动逻辑在主队列正确执行，无跨队列调用问题
+    func testHighFrequencyFileModifications_noQueueCrash() async {
+        watcher.startWatching()
+        let sessionDir = SessionFileWatcher.sessionsDirectory
+        try? FileManager.default.createDirectory(at: sessionDir, withIntermediateDirectories: true)
+        
+        let testFile = sessionDir.appendingPathComponent("high-frequency-test-\(UUID().uuidString).json")
+        
+        // 高频写入同一个文件20次，触发防抖动逻辑
+        for _ in 0..<20 {
+            let json = """
+            {
+                "sessionId": "high-frequency-test",
+                "status": "coding",
+                "cwd": "/tmp/project",
+                "lastActivity": "\(ISO8601DateFormatter().string(from: Date()))"
+            }
+            """
+            try? json.write(to: testFile, atomically: true, encoding: .utf8)
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        
+        // 等待处理完成
+        try? await Task.sleep(for: .milliseconds(300))
+        
+        // 清理测试文件
+        try? FileManager.default.removeItem(at: testFile)
+        
+        // 验证无崩溃
+        XCTAssertNoThrow(watcher.stopWatching())
+    }
 }

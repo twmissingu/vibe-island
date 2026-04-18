@@ -291,16 +291,19 @@ final class OpenCodeMonitor {
 
     /// 尝试使用 SSE 方案
     private func attemptSSESource() {
+        // 动态发现 OpenCode SSE 端口
+        let ssePort = discoverOpenCodeSSEPort() ?? Self.defaultSSEPort
+        
         // 检测 SSE 服务是否可达
-        guard isSSEReachable() else {
-            Self.logger.debug("SSE 服务不可达，跳过 SSE 方案")
+        guard isSSEReachable(port: ssePort) else {
+            Self.logger.debug("SSE 服务不可达（端口 \(ssePort)），跳过 SSE 方案")
             return
         }
 
-        Self.logger.info("使用 SSE 事件订阅方案")
+        Self.logger.info("使用 SSE 事件订阅方案（端口 \(ssePort)）")
         currentSource = .sse
 
-        let client = OpenCodeSSEClient(port: Self.defaultSSEPort)
+        let client = OpenCodeSSEClient(port: ssePort)
         client.onSessionsChanged = { [weak self] sessions in
             Task { @MainActor in
                 self?.updateSessions(sessions, source: .sse)
@@ -310,9 +313,49 @@ final class OpenCodeMonitor {
         sseClient = client
     }
 
+    /// 动态发现 OpenCode SSE 端口
+    private func discoverOpenCodeSSEPort() -> Int? {
+        // 使用 lsof 查找 opencode 进程监听的端口
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
+        process.arguments = ["-i", "-P", "-n"]
+        
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        
+        do {
+            try process.run()
+            process.waitUntilExit()
+            
+            guard let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) else {
+                return nil
+            }
+            
+            // 查找 opencode 进程的 LISTEN 端口
+            for line in output.split(separator: "\n") {
+                if line.contains("opencode") && line.contains("LISTEN") {
+                    // 格式: opencode PID USER FD TYPE DEVICE SIZE/OFF NODE NAME
+                    // NAME 列格式: localhost:PORT (LISTEN)
+                    let parts = line.split(separator: " ").filter { !$0.isEmpty }
+                    if let namePart = parts.last {
+                        // 提取端口号
+                        if let portRange = namePart.range(of: ":(\\d+)", options: .regularExpression) {
+                            let portStr = String(namePart[portRange]).dropFirst() // 去掉 ":"
+                            return Int(portStr)
+                        }
+                    }
+                }
+            }
+        } catch {
+            Self.logger.error("lsof 执行失败: \(error.localizedDescription)")
+        }
+        
+        return nil
+    }
+
     /// 检测 SSE 服务是否可达
-    private func isSSEReachable() -> Bool {
-        let url = URL(string: "http://localhost:\(Self.defaultSSEPort)/event")!
+    private func isSSEReachable(port: Int) -> Bool {
+        let url = URL(string: "http://localhost:\(port)/global/event")!
         var request = URLRequest(url: url)
         request.httpMethod = "HEAD"
         request.timeoutInterval = 2.0

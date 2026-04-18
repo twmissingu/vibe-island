@@ -3,6 +3,7 @@ import LLMQuotaKit
 
 struct SettingsView: View {
     @Environment(StateManager.self) private var viewModel
+    @Environment(\.dismiss) private var dismiss
     @State private var showAddKey = false
     @State private var newKeyType: ProviderType = .mimo
     @State private var newKeyValue = ""
@@ -13,21 +14,32 @@ struct SettingsView: View {
     @State private var claudeRunning = false
     @State private var hookMessage: String?
 
+    // OpenCode 插件状态
+    @State private var openCodePluginStatus: OpenCodePluginHookStatus = .unknown
+    @State private var openCodeRunning = false
+    @State private var openCodePluginMessage: String?
+
     // 声音设置
     @State private var soundEnabled = true
     @State private var soundVolume: Float = 0.7
 
-    // 宠物设置
-    @State private var petSize: Double = 1.0
-
     // 多工具监控
     @State private var detectedTools: [ToolSource] = []
+    
+    // 宠物设置 - 仅展示已解锁宠物
+    private var unlockedPets: [PetCatalog.PetInfo] {
+        // 解锁逻辑：默认解锁前3个宠物，后续可根据使用时长、成就等条件解锁更多
+        let defaultUnlockedIds: Set<String> = ["cat", "dog", "rabbit"]
+        return PetCatalog.allPets.filter { defaultUnlockedIds.contains($0.id) }
+        // 后续扩展：使用 .filter { viewModel.unlockedPetIds.contains($0.id) }
+    }
 
     // 上下文感知
     @State private var contextWarningThreshold: Double = 80.0
 
     var body: some View {
-        Form {
+        NavigationStack {
+            Form {
             Section("外观") {
                 Picker("HUD 风格", selection: Binding(
                     get: { viewModel.settings.theme },
@@ -54,6 +66,23 @@ struct SettingsView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(hookMessageIsError ? .red : .green)
                 }
+                
+                // 安装帮助提示
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("💡 安装失败？按以下步骤解决：")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Text("1. 确保已安装Claude Code且能在终端执行`claude`命令")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                    Text("2. 开启完全磁盘访问权限：系统设置→隐私与安全性→完全磁盘访问→添加Vibe Island")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                    Text("3. 重启App后重新尝试安装即可")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.top, 4)
 
                 HStack {
                     Text("Claude Code 状态")
@@ -62,6 +91,41 @@ struct SettingsView: View {
                         .font(.system(size: 12))
                         .foregroundStyle(claudeRunning ? .green : .secondary)
                 }
+            }
+
+            // MARK: - OpenCode 插件管理
+            Section("OpenCode 插件") {
+                openCodePluginStatusRow
+
+                Button(openCodePluginActionTitle) {
+                    Task { await performOpenCodePluginAction() }
+                }
+                .disabled(openCodePluginButtonDisabled)
+
+                if let msg = openCodePluginMessage {
+                    Text(msg)
+                        .font(.system(size: 11))
+                        .foregroundStyle(openCodePluginMessageIsError ? .red : .green)
+                }
+
+                HStack {
+                    Text("OpenCode 状态")
+                    Spacer()
+                    Text(openCodeRunning ? "运行中" : "未运行")
+                        .font(.system(size: 12))
+                        .foregroundStyle(openCodeRunning ? .green : .secondary)
+                }
+
+                // 安装帮助提示
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("💡 安装后需要重启 OpenCode 才能生效")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Text("插件会调用 vibe-island CLI，CLI 需要从 App 中自动安装")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.top, 4)
             }
 
             // MARK: - 声音设置
@@ -89,37 +153,24 @@ struct SettingsView: View {
                 testSoundButtons
             }
 
-            // MARK: - 宠物设置
-            Section("像素宠物") {
-                Toggle("启用像素宠物", isOn: Binding(
-                    get: { viewModel.settings.petEnabled },
-                    set: { viewModel.settings.petEnabled = $0; saveSettings() }
-                ))
+    // MARK: - 宠物设置
+    Section("像素宠物") {
+        Toggle("启用像素宠物", isOn: Binding(
+            get: { viewModel.settings.petEnabled },
+            set: { viewModel.settings.petEnabled = $0; saveSettings() }
+        ))
 
-                if viewModel.settings.petEnabled {
-                    Picker("宠物类型", selection: Binding(
-                        get: { viewModel.settings.selectedPetID },
-                        set: { viewModel.settings.selectedPetID = $0; saveSettings() }
-                    )) {
-                        ForEach(PetCatalog.allPets, id: \.id) { pet in
-                            Label(pet.name, systemImage: pet.systemImage).tag(pet.id)
-                        }
-                    }
-
-                    HStack {
-                        Text("宠物大小")
-                        Slider(value: $petSize, in: 0.5...2.0) { editing in
-                            if !editing {
-                                viewModel.settings.petScaleFactor = petSize
-                                saveSettings()
-                            }
-                        }
-                        Text("\(Int(petSize * 100))%")
-                            .font(.system(size: 12))
-                            .frame(width: 40)
-                    }
+        if viewModel.settings.petEnabled {
+            Picker("宠物形象", selection: Binding(
+                get: { viewModel.settings.selectedPetID },
+                set: { viewModel.settings.selectedPetID = $0; saveSettings() }
+            )) {
+                ForEach(unlockedPets, id: \.id) { pet in
+                    Text(pet.name).tag(pet.id)
                 }
             }
+        }
+    }
 
             // MARK: - 多工具监控
             Section("多工具监控") {
@@ -131,11 +182,6 @@ struct SettingsView: View {
                 Toggle("OpenCode 监控", isOn: Binding(
                     get: { isToolEnabled(.openCode) },
                     set: { setToolEnabled(.openCode, $0) }
-                ))
-
-                Toggle("Codex 监控", isOn: Binding(
-                    get: { isToolEnabled(.codex) },
-                    set: { setToolEnabled(.codex, $0) }
                 ))
 
                 if !detectedTools.isEmpty {
@@ -220,17 +266,26 @@ struct SettingsView: View {
                 }
             }
         }
-        .formStyle(.grouped)
-        .frame(width: 450, height: 680)
-        .sheet(isPresented: $showAddKey) {
-            addKeySheet
-        }
+            .formStyle(.grouped)
+            .frame(width: 450, height: 680)
+            .navigationTitle("设置")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") {
+                        dismiss()
+                    }
+                }
+            }
+            .sheet(isPresented: $showAddKey) {
+                addKeySheet
+            }
         .task {
             await refreshHookStatus()
+            await refreshOpenCodePluginStatus()
             loadSoundSettings()
-            loadPetSettings()
             loadContextSettings()
             detectRunningTools()
+        }
         }
     }
 
@@ -302,14 +357,83 @@ struct SettingsView: View {
         case installed, notInstalled, unknown
     }
 
+    // MARK: - OpenCode 插件管理
+
+    enum OpenCodePluginHookStatus {
+        case installed, notInstalled, unknown
+    }
+
+    private var openCodePluginStatusRow: some View {
+        HStack {
+            Text("插件状态")
+            Spacer()
+            Group {
+                switch openCodePluginStatus {
+                case .installed:
+                    Label("已安装", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                case .notInstalled:
+                    Label("未安装", systemImage: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                case .unknown:
+                    ProgressView()
+                        .scaleEffect(0.7)
+                }
+            }
+            .font(.system(size: 12))
+        }
+    }
+
+    private var openCodePluginActionTitle: String {
+        switch openCodePluginStatus {
+        case .installed: "卸载插件"
+        case .notInstalled, .unknown: "安装插件"
+        }
+    }
+
+    private var openCodePluginButtonDisabled: Bool {
+        openCodePluginStatus == .unknown
+    }
+
+    private var openCodePluginMessageIsError: Bool {
+        openCodePluginMessage?.hasPrefix("失败") == true || openCodePluginMessage?.hasPrefix("错误") == true
+    }
+
+    private func performOpenCodePluginAction() async {
+        openCodePluginMessage = nil
+        let result: Result<String, Error>
+
+        switch openCodePluginStatus {
+        case .installed:
+            result = await viewModel.uninstallOpenCodePlugin()
+        case .notInstalled, .unknown:
+            result = await viewModel.installOpenCodePlugin()
+        }
+
+        switch result {
+        case .success(let msg):
+            openCodePluginMessage = msg
+            await refreshOpenCodePluginStatus()
+        case .failure(let error):
+            openCodePluginMessage = "失败: \(error.localizedDescription)"
+            await refreshOpenCodePluginStatus()
+        }
+    }
+
+    private func refreshOpenCodePluginStatus() async {
+        openCodePluginStatus = viewModel.isOpenCodePluginInstalled() ? .installed : .notInstalled
+        openCodeRunning = viewModel.isOpenCodeRunning()
+    }
+
     // MARK: - 声音设置
 
     private var testSoundButtons: some View {
-        VStack(spacing: 8) {
+        HStack {
             Text("测试提示音")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
-            HStack(spacing: 12) {
+            Spacer()
+            HStack(spacing: 8) {
                 testSoundButton("审批", type: .permissionRequest)
                 testSoundButton("完成", type: .completed)
                 testSoundButton("错误", type: .error)
@@ -333,11 +457,7 @@ struct SettingsView: View {
         soundVolume = viewModel.soundManager.volume
     }
 
-    // MARK: - 宠物设置
-
-    private func loadPetSettings() {
-        petSize = viewModel.settings.petScaleFactor
-    }
+    // 已移除宠物大小设置功能
 
     // MARK: - 多工具监控
 
@@ -345,7 +465,6 @@ struct SettingsView: View {
         switch tool {
         case .claudeCode: return viewModel.settings.claudeMonitorEnabled
         case .openCode: return viewModel.settings.openCodeMonitorEnabled
-        case .codex: return viewModel.settings.codexMonitorEnabled
         }
     }
 
@@ -353,7 +472,6 @@ struct SettingsView: View {
         switch tool {
         case .claudeCode: viewModel.settings.claudeMonitorEnabled = enabled
         case .openCode: viewModel.settings.openCodeMonitorEnabled = enabled
-        case .codex: viewModel.settings.codexMonitorEnabled = enabled
         }
         saveSettings()
     }

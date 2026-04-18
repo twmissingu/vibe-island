@@ -165,6 +165,9 @@ struct Session: Codable {
     var pid: UInt32?
     var pidStartTime: TimeInterval?
     var endedAt: Date?
+    var contextUsage: Double?
+    var contextTokensUsed: Int?
+    var contextTokensTotal: Int?
     var fileURL: URL?
     
     static func loadFromFile(url: URL) throws -> Session {

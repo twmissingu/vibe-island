@@ -44,6 +44,9 @@ final class StateManager {
         // 设置 SessionManager 的 StateManager 引用（用于持久化跟踪模式）
         SessionManager.shared.viewModel = self
 
+        // 启动多工具聚合器（包含 Claude Code、OpenCode）
+        MultiToolAggregator.shared.start()
+
         // 启动额度轮询
         startPolling()
 
@@ -60,6 +63,9 @@ final class StateManager {
     }
 
     func stopMonitoring() {
+        // 停止多工具聚合器
+        MultiToolAggregator.shared.stop()
+
         // 停止状态观察
         stateObservationTask?.cancel()
         stateObservationTask = nil
@@ -163,6 +169,44 @@ final class StateManager {
 
     func isClaudeCodeRunning() -> Bool {
         !processDetector.detectClaudeCodeProcesses().isEmpty
+    }
+
+    func isOpenCodeRunning() -> Bool {
+        OpenCodeMonitor.shared.isOpenCodeRunning()
+    }
+
+    /// 检查 OpenCode 插件是否已安装
+    func isOpenCodePluginInstalled() -> Bool {
+        hookInstaller.isOpenCodePluginInstalled
+    }
+
+    /// 检查 OpenCode 是否已安装
+    func isOpenCodeInstalled() -> Bool {
+        hookInstaller.isOpenCodeInstalled
+    }
+
+    /// 安装 OpenCode 插件
+    func installOpenCodePlugin() async -> Result<String, Error> {
+        let result = await hookInstaller.installOpenCodePlugin()
+        switch result {
+        case .success(let backupPath):
+            let msg = backupPath.map { "插件安装成功，备份: \($0)" } ?? "插件安装成功"
+            return .success(msg)
+        case .failure(let error):
+            return .failure(error)
+        }
+    }
+
+    /// 卸载 OpenCode 插件
+    func uninstallOpenCodePlugin() async -> Result<String, Error> {
+        let result = await hookInstaller.uninstallOpenCodePlugin()
+        switch result {
+        case .success(let backupPath):
+            let msg = backupPath.map { "插件卸载成功，备份: \($0)" } ?? "插件卸载成功"
+            return .success(msg)
+        case .failure(let error):
+            return .failure(error)
+        }
     }
 
     // MARK: - Refresh（额度刷新，保持不变）

@@ -67,23 +67,124 @@ struct Session: Codable, Equatable, Sendable {
     // MARK: Codable
 
     enum CodingKeys: String, CodingKey {
-        case sessionId = "session_id"
+        case sessionId, session_id
         case cwd
         case status
-        case lastActivity = "last_activity"
+        case lastActivity, last_activity
         case branch
         case source
-        case sessionName = "session_name"
-        case lastTool = "last_tool"
-        case lastToolDetail = "last_tool_detail"
-        case lastPrompt = "last_prompt"
-        case notificationMessage = "notification_message"
-        case activeSubagents = "active_subagents"
+        case sessionName, session_name
+        case lastTool, last_tool
+        case lastToolDetail, last_tool_detail
+        case lastPrompt, last_prompt
+        case notificationMessage, notification_message
+        case activeSubagents, active_subagents
         case pid
-        case pidStartTime = "pid_start_time"
-        case contextUsage = "context_usage"
-        case contextTokensUsed = "context_tokens_used"
-        case contextTokensTotal = "context_tokens_total"
+        case pidStartTime, pid_start_time
+        case contextUsage, context_usage
+        case contextTokensUsed, context_tokens_used
+        case contextTokensTotal, context_tokens_total
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        // 支持驼峰和蛇形两种格式
+        sessionId = try Self.decodeFirst(container, key1: .sessionId, key2: .session_id) { c, k in
+            try c.decode(String.self, forKey: k)
+        }
+        
+        cwd = try container.decode(String.self, forKey: .cwd)
+        status = try container.decodeIfPresent(SessionState.self, forKey: .status) ?? .idle
+        
+        lastActivity = try Self.decodeFirst(container, key1: .lastActivity, key2: .last_activity) { c, k in
+            try c.decode(Date.self, forKey: k)
+        }
+        
+        branch = try container.decodeIfPresent(String.self, forKey: .branch)
+        source = try container.decodeIfPresent(String.self, forKey: .source)
+        
+        sessionName = try Self.decodeFirstOptional(container, key1: .sessionName, key2: .session_name) { c, k in
+            try c.decodeIfPresent(String.self, forKey: k)
+        }
+        lastTool = try Self.decodeFirstOptional(container, key1: .lastTool, key2: .last_tool) { c, k in
+            try c.decodeIfPresent(String.self, forKey: k)
+        }
+        lastToolDetail = try Self.decodeFirstOptional(container, key1: .lastToolDetail, key2: .last_tool_detail) { c, k in
+            try c.decodeIfPresent(String.self, forKey: k)
+        }
+        lastPrompt = try Self.decodeFirstOptional(container, key1: .lastPrompt, key2: .last_prompt) { c, k in
+            try c.decodeIfPresent(String.self, forKey: k)
+        }
+        notificationMessage = try Self.decodeFirstOptional(container, key1: .notificationMessage, key2: .notification_message) { c, k in
+            try c.decodeIfPresent(String.self, forKey: k)
+        }
+        activeSubagents = try Self.decodeFirstOptional(container, key1: .activeSubagents, key2: .active_subagents) { c, k in
+            try c.decodeIfPresent([SubagentInfo].self, forKey: k)
+        } ?? []
+        pid = try container.decodeIfPresent(UInt32.self, forKey: .pid)
+        
+        pidStartTime = try Self.decodeFirstOptional(container, key1: .pidStartTime, key2: .pid_start_time) { c, k in
+            try c.decodeIfPresent(TimeInterval.self, forKey: k)
+        }
+        
+        contextUsage = try Self.decodeFirstOptional(container, key1: .contextUsage, key2: .context_usage) { c, k in
+            try c.decodeIfPresent(Double.self, forKey: k)
+        }
+        contextTokensUsed = try Self.decodeFirstOptional(container, key1: .contextTokensUsed, key2: .context_tokens_used) { c, k in
+            try c.decodeIfPresent(Int.self, forKey: k)
+        }
+        contextTokensTotal = try Self.decodeFirstOptional(container, key1: .contextTokensTotal, key2: .context_tokens_total) { c, k in
+            try c.decodeIfPresent(Int.self, forKey: k)
+        }
+        fileURL = nil
+    }
+    
+    /// 尝试解码第一个可用的键（必需字段）
+    private static func decodeFirst<T: Decodable>(
+        _ container: KeyedDecodingContainer<CodingKeys>,
+        key1: CodingKeys,
+        key2: CodingKeys,
+        decode: (KeyedDecodingContainer<CodingKeys>, CodingKeys) throws -> T
+    ) throws -> T {
+        if let value = try container.decodeIfPresent(T.self, forKey: key1) {
+            return value
+        }
+        return try decode(container, key2)
+    }
+    
+    /// 尝试解码第一个可用的键（可选字段）
+    private static func decodeFirstOptional<T: Decodable>(
+        _ container: KeyedDecodingContainer<CodingKeys>,
+        key1: CodingKeys,
+        key2: CodingKeys,
+        decode: (KeyedDecodingContainer<CodingKeys>, CodingKeys) throws -> T?
+    ) throws -> T? {
+        if let value = try container.decodeIfPresent(T.self, forKey: key1) {
+            return value
+        }
+        return try decode(container, key2)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(sessionId, forKey: .sessionId)
+        try container.encode(cwd, forKey: .cwd)
+        try container.encode(status, forKey: .status)
+        try container.encode(lastActivity, forKey: .lastActivity)
+        try container.encodeIfPresent(branch, forKey: .branch)
+        try container.encodeIfPresent(source, forKey: .source)
+        try container.encodeIfPresent(sessionName, forKey: .sessionName)
+        try container.encodeIfPresent(lastTool, forKey: .lastTool)
+        try container.encodeIfPresent(lastToolDetail, forKey: .lastToolDetail)
+        try container.encodeIfPresent(lastPrompt, forKey: .lastPrompt)
+        try container.encodeIfPresent(notificationMessage, forKey: .notificationMessage)
+        try container.encode(activeSubagents, forKey: .activeSubagents)
+        try container.encodeIfPresent(pid, forKey: .pid)
+        try container.encodeIfPresent(pidStartTime, forKey: .pidStartTime)
+        try container.encodeIfPresent(contextUsage, forKey: .contextUsage)
+        try container.encodeIfPresent(contextTokensUsed, forKey: .contextTokensUsed)
+        try container.encodeIfPresent(contextTokensTotal, forKey: .contextTokensTotal)
     }
 
     init(
