@@ -2,6 +2,86 @@ import Foundation
 import OSLog
 import SwiftUI
 
+// MARK: - 宠物解锁通知
+
+/// 宠物解锁通知
+struct PetUnlockNotification: Equatable, Sendable {
+    /// 解锁的宠物
+    let pet: PetType
+    /// 解锁时间
+    let unlockTime: Date
+    /// 通知ID（用于去重）
+    let id: UUID = UUID()
+}
+
+/// 宠物解锁通知管理器
+@MainActor
+final class PetUnlockNotificationManager {
+    static let shared = PetUnlockNotificationManager()
+
+    /// 最近的通知（保留最近5条）
+    private(set) var recentNotifications: [PetUnlockNotification] = []
+
+    /// 新通知回调
+    var onNewNotification: ((PetUnlockNotification) -> Void)?
+
+    private init() {}
+
+    /// 添加新通知
+    func addNotification(_ notification: PetUnlockNotification) {
+        recentNotifications.insert(notification, at: 0)
+        // 保留最近5条
+        if recentNotifications.count > 5 {
+            recentNotifications.removeLast()
+        }
+        onNewNotification?(notification)
+    }
+
+    /// 清除所有通知
+    func clearNotifications() {
+        recentNotifications.removeAll()
+    }
+}
+
+// MARK: - 宠物解锁动画效果
+
+/// 宠物解锁时的动画效果管理器
+@MainActor
+final class PetUnlockAnimationManager {
+    static let shared = PetUnlockAnimationManager()
+
+    /// 当前播放的动画
+    @MainActor @Observable
+    class var currentAnimation: AnimationState? {
+        didSet {
+            guard let animation = currentAnimation else { return }
+            // 自动在3秒后清除动画
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(3))
+                if PetUnlockAnimationManager.shared.currentAnimation?.id == animation.id {
+                    PetUnlockAnimationManager.shared.currentAnimation = nil
+                }
+            }
+        }
+    }
+
+    /// 动画状态
+    enum AnimationState: Equatable {
+        case unlock(pet: PetType)
+
+        var pet: PetType? {
+            switch self {
+            case .unlock(let pet): return pet
+            }
+        }
+    }
+
+    /// 播放解锁动画
+    func playUnlockAnimation(pet: PetType) {
+        currentAnimation = .unlock(pet: pet)
+    }
+}
+
 // MARK: - 宠物获取前提（XP 解锁系统）
 
 /// 宠物解锁条件
@@ -124,9 +204,22 @@ final class PetProgressManager {
             if !pet.isUnlocked(totalCodingMinutes: oldTotal) &&
                pet.isUnlocked(totalCodingMinutes: totalCodingMinutes) {
                 Self.logger.info("🎉 新宠物解锁: \(pet.displayName)")
-                // 可以触发通知/动画
+
+                // 发送解锁通知
+                let notification = PetUnlockNotification(pet: pet, unlockTime: Date())
+                PetUnlockNotificationManager.shared.addNotification(notification)
+
+                // 触发视觉反馈（粒子效果）
+                Self.triggerUnlockEffect(pet: pet)
             }
         }
+    }
+
+    /// 触发解锁视觉效果
+    private static func triggerUnlockEffect(pet: PetType) {
+        // 触发动画效果
+        PetUnlockAnimationManager.shared.playUnlockAnimation(pet: pet)
+        Self.logger.info("✨ 解锁特效已触发: \(pet.displayName)")
     }
     
     // MARK: 持久化
