@@ -19,20 +19,11 @@ struct PetView: View {
     
     let scale: CGFloat  // 像素缩放倍数
     let petId: String // 宠物ID
-    
-    init(petId: String = "cat", scale: CGFloat = 4.0) {
-        // 根据petId加载对应的动画集
-        let animationSet: PetAnimationSet
-        switch petId {
-        case "dog": animationSet = .dog
-        case "rabbit": animationSet = .rabbit
-        case "fox": animationSet = .fox
-        case "penguin": animationSet = .penguin
-        case "robot": animationSet = .robot
-        case "ghost": animationSet = .ghost
-        case "dragon": animationSet = .dragon
-        default: animationSet = .cat
-        }
+
+    init(petId: String = "cat", level: PetLevel = .basic, scale: CGFloat = 4.0) {
+        // 根据petId和level加载对应的动画集
+        let petType = PetType(rawValue: petId) ?? .cat
+        let animationSet = PetAnimationSet.forPet(petType, level: level)
         _petEngine = State(initialValue: PetEngine(state: .idle, animationSet: animationSet))
         self.scale = scale
         self.petId = petId

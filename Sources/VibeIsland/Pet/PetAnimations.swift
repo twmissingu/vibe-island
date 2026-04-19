@@ -990,16 +990,381 @@ extension PetAnimationSet {
 // MARK: - 公共 API: 根据 PetType 获取动画
 
 extension PetAnimationSet {
-    static func forPet(_ type: PetType) -> PetAnimationSet {
+    static func forPet(_ type: PetType, level: PetLevel = .basic) -> PetAnimationSet {
+        let base: PetAnimationSet
         switch type {
-        case .cat: return .cat
-        case .dog: return .dog
-        case .rabbit: return .rabbit
-        case .fox: return .fox
-        case .penguin: return .penguin
-        case .robot: return .robot
-        case .ghost: return .ghost
-        case .dragon: return .dragon
+        case .cat: base = .cat
+        case .dog: base = .dog
+        case .rabbit: base = .rabbit
+        case .fox: base = .fox
+        case .penguin: base = .penguin
+        case .robot: base = .robot
+        case .ghost: base = .ghost
+        case .dragon: base = .dragon
         }
+        if level == .basic { return base }
+        return base.withSkin(PetSkinPalette.palette(for: type, level: level))
+    }
+}
+
+// MARK: - 皮肤调色板系统
+
+/// 皮肤颜色映射：将原始颜色替换为皮肤特定颜色
+struct PetSkinPalette {
+    /// 原始颜色 → 皮肤颜色的映射（key 均为大写）
+    let colorMap: [String: String]
+
+    /// 应用调色板到颜色
+    func apply(_ color: String) -> String {
+        colorMap[color.uppercased()] ?? color
+    }
+
+    /// 获取指定宠物和等级的调色板
+    static func palette(for pet: PetType, level: PetLevel) -> PetSkinPalette {
+        switch pet {
+        case .cat: return catPalette(level)
+        case .dog: return dogPalette(level)
+        case .rabbit: return rabbitPalette(level)
+        case .fox: return foxPalette(level)
+        case .penguin: return penguinPalette(level)
+        case .robot: return robotPalette(level)
+        case .ghost: return ghostPalette(level)
+        case .dragon: return dragonPalette(level)
+        }
+    }
+
+    // MARK: 猫咪调色板
+
+    private static func catPalette(_ level: PetLevel) -> PetSkinPalette {
+        switch level {
+        case .basic:
+            return PetSkinPalette(colorMap: [:])
+        case .glow:
+            return PetSkinPalette(colorMap: [
+                "#FF9500": "#FFB347",  // 亮橙
+                "#FF6B00": "#FF8C42",  // 亮深橙
+                "#E68A00": "#FFAA33",  // 亮腿色
+                "#FF69B4": "#FF85C8",  // 亮粉鼻
+                "#FF1493": "#FF3CAA",  // 亮粉嘴
+                "#D2691E": "#E8873D",  // 亮胡须
+            ])
+        case .metal:
+            return PetSkinPalette(colorMap: [
+                "#FF9500": "#C0C0C0",  // 银灰身体
+                "#FF6B00": "#A9A9A9",  // 深银耳
+                "#E68A00": "#B0B0B0",  // 银灰腿
+                "#FF69B4": "#D4D4D4",  // 银灰鼻
+                "#FF1493": "#808080",  // 深银嘴
+                "#D2691E": "#A0A0A0",  // 银灰胡须
+            ])
+        case .neon:
+            return PetSkinPalette(colorMap: [
+                "#FF9500": "#FF00FF",  // 品红身体
+                "#FF6B00": "#CC00CC",  // 深品红耳
+                "#E68A00": "#FF33FF",  // 品红腿
+                "#FF69B4": "#00FFFF",  // 青色鼻
+                "#FF1493": "#FF00AA",  // 亮品红嘴
+                "#D2691E": "#AA00FF",  // 紫胡须
+            ])
+        case .king:
+            return PetSkinPalette(colorMap: [
+                "#FF9500": "#FFD700",  // 金身体
+                "#FF6B00": "#DAA520",  // 深金耳
+                "#E68A00": "#FFCC00",  // 金腿
+                "#FF69B4": "#FF4500",  // 红宝石鼻
+                "#FF1493": "#DC143C",  // 深红嘴
+                "#D2691E": "#B8860B",  // 暗金胡须
+            ])
+        }
+    }
+
+    // MARK: 小狗调色板
+
+    private static func dogPalette(_ level: PetLevel) -> PetSkinPalette {
+        switch level {
+        case .basic:
+            return PetSkinPalette(colorMap: [:])
+        case .glow:
+            return PetSkinPalette(colorMap: [
+                "#A0522D": "#C07848",  // 亮棕
+                "#8B4513": "#A65D2E",  // 亮深棕
+                "#CD853F": "#E09850",  // 亮浅棕
+                "#333333": "#555555",  // 亮黑鼻
+            ])
+        case .metal:
+            return PetSkinPalette(colorMap: [
+                "#A0522D": "#B87333",  // 铜色身体
+                "#8B4513": "#8B6914",  // 深铜耳
+                "#CD853F": "#CD853F",  // 保持浅色肚皮
+                "#333333": "#4A3728",  // 铜暗鼻
+            ])
+        case .neon:
+            return PetSkinPalette(colorMap: [
+                "#A0522D": "#00FF88",  // 霓虹绿身体
+                "#8B4513": "#00CC66",  // 深绿耳
+                "#CD853F": "#33FFAA",  // 亮绿肚皮
+                "#333333": "#008844",  // 深绿鼻
+                "#8B0000": "#00FF00",  // 霓虹绿嘴
+            ])
+        case .king:
+            return PetSkinPalette(colorMap: [
+                "#A0522D": "#8B0000",  // 深红身体
+                "#8B4513": "#660000",  // 暗红耳
+                "#CD853F": "#FFD700",  // 金肚皮
+                "#333333": "#4A0000",  // 暗红鼻
+                "#8B0000": "#FF0000",  // 鲜红嘴
+            ])
+        }
+    }
+
+    // MARK: 兔子调色板
+
+    private static func rabbitPalette(_ level: PetLevel) -> PetSkinPalette {
+        switch level {
+        case .basic:
+            return PetSkinPalette(colorMap: [:])
+        case .glow:
+            return PetSkinPalette(colorMap: [
+                "#F5F5F5": "#FFFFFF",  // 纯白
+                "#FFB6C1": "#FFC0CB",  // 亮粉
+                "#FFD1DC": "#FFE0E8",  // 亮腮红
+                "#FF69B4": "#FF85C8",  // 亮深粉
+            ])
+        case .metal:
+            return PetSkinPalette(colorMap: [
+                "#F5F5F5": "#E8E8E8",  // 银白
+                "#FFB6C1": "#C0C0C0",  // 银灰内耳
+                "#FFD1DC": "#D0D0D0",  // 银灰腮红
+                "#FF69B4": "#A0A0A0",  // 深银
+                "#FFB6C1": "#B8B8B8",  // 银灰鼻
+            ])
+        case .neon:
+            return PetSkinPalette(colorMap: [
+                "#F5F5F5": "#E0FFFF",  // 淡青身体
+                "#FFB6C1": "#00FFFF",  // 青色内耳
+                "#FFD1DC": "#00EEEE",  // 青色腮红
+                "#FF69B4": "#00DDFF",  // 青色深粉
+                "#FFB6C1": "#00FFFF",  // 青色鼻
+            ])
+        case .king:
+            return PetSkinPalette(colorMap: [
+                "#F5F5F5": "#FFF8DC",  // 玉米丝白
+                "#FFB6C1": "#FFD700",  // 金内耳
+                "#FFD1DC": "#FFCC00",  // 金腮红
+                "#FF69B4": "#FF4500",  // 橙红深粉
+                "#FFB6C1": "#DAA520",  // 金鼻
+                "#FFFFFF": "#FFFACD",  // 金白尾巴
+            ])
+        }
+    }
+
+    // MARK: 狐狸调色板
+
+    private static func foxPalette(_ level: PetLevel) -> PetSkinPalette {
+        switch level {
+        case .basic:
+            return PetSkinPalette(colorMap: [:])
+        case .glow:
+            return PetSkinPalette(colorMap: [
+                "#FF6347": "#FF7F6E",  // 亮橙红
+                "#CC4F39": "#DD6650",  // 亮深橙红
+                "#FFFFFF": "#FFF5F0",  // 暖白
+            ])
+        case .metal:
+            return PetSkinPalette(colorMap: [
+                "#FF6347": "#B8860B",  // 暗金身体
+                "#CC4F39": "#8B6914",  // 深金耳
+                "#FFFFFF": "#FFD700",  // 金白色
+            ])
+        case .neon:
+            return PetSkinPalette(colorMap: [
+                "#FF6347": "#FF00FF",  // 品红身体
+                "#CC4F39": "#CC00CC",  // 深品红耳
+                "#FFFFFF": "#FF88FF",  // 淡品红白
+            ])
+        case .king:
+            return PetSkinPalette(colorMap: [
+                "#FF6347": "#4B0082",  // 靛蓝身体
+                "#CC4F39": "#380066",  // 深靛蓝耳
+                "#FFFFFF": "#FFD700",  // 金白色
+            ])
+        }
+    }
+
+    // MARK: 企鹅调色板
+
+    private static func penguinPalette(_ level: PetLevel) -> PetSkinPalette {
+        switch level {
+        case .basic:
+            return PetSkinPalette(colorMap: [:])
+        case .glow:
+            return PetSkinPalette(colorMap: [
+                "#2F4F4F": "#3D6363",  // 亮深蓝灰
+                "#1C3333": "#2A4444",  // 亮暗色
+                "#F0F8FF": "#FFFFFF",  // 纯白腹
+                "#FFA500": "#FFB833",  // 亮橙脚
+            ])
+        case .metal:
+            return PetSkinPalette(colorMap: [
+                "#2F4F4F": "#708090",  // 石板灰
+                "#1C3333": "#4A5568",  // 深石板
+                "#F0F8FF": "#C0C0C0",  // 银白腹
+                "#FFA500": "#B87333",  // 铜色脚
+            ])
+        case .neon:
+            return PetSkinPalette(colorMap: [
+                "#2F4F4F": "#000080",  // 海军蓝
+                "#1C3333": "#000066",  // 深海军蓝
+                "#F0F8FF": "#00BFFF",  // 深天蓝腹
+                "#FFA500": "#00FF00",  // 霓虹绿脚
+            ])
+        case .king:
+            return PetSkinPalette(colorMap: [
+                "#2F4F4F": "#4B0082",  // 靛蓝
+                "#1C3333": "#380066",  // 深靛蓝
+                "#F0F8FF": "#FFD700",  // 金腹
+                "#FFA500": "#FF4500",  // 红宝石脚
+            ])
+        }
+    }
+
+    // MARK: 机器人调色板
+
+    private static func robotPalette(_ level: PetLevel) -> PetSkinPalette {
+        switch level {
+        case .basic:
+            return PetSkinPalette(colorMap: [:])
+        case .glow:
+            return PetSkinPalette(colorMap: [
+                "#4682B4": "#5A9FD4",  // 亮钢蓝
+                "#36648B": "#4A7AAA",  // 亮深蓝
+                "#5C94C4": "#70AADE",  // 亮浅蓝
+            ])
+        case .metal:
+            return PetSkinPalette(colorMap: [
+                "#4682B4": "#C0C0C0",  // 银色
+                "#36648B": "#808080",  // 深银
+                "#5C94C4": "#D4D4D4",  // 亮银
+            ])
+        case .neon:
+            return PetSkinPalette(colorMap: [
+                "#4682B4": "#00FF00",  // 霓虹绿
+                "#36648B": "#008800",  // 深绿
+                "#5C94C4": "#33FF33",  // 亮绿
+            ])
+        case .king:
+            return PetSkinPalette(colorMap: [
+                "#4682B4": "#FFD700",  // 金
+                "#36648B": "#B8860B",  // 暗金
+                "#5C94C4": "#FFE44D",  // 亮金
+            ])
+        }
+    }
+
+    // MARK: 幽灵调色板
+
+    private static func ghostPalette(_ level: PetLevel) -> PetSkinPalette {
+        switch level {
+        case .basic:
+            return PetSkinPalette(colorMap: [:])
+        case .glow:
+            return PetSkinPalette(colorMap: [
+                "#E8E8E8": "#FFFFFF",  // 纯白
+                "#CCCCCC": "#E0E0E0",  // 亮灰影
+            ])
+        case .metal:
+            return PetSkinPalette(colorMap: [
+                "#E8E8E8": "#B0C4DE",  // 钢蓝灰
+                "#CCCCCC": "#8BA0B8",  // 深钢蓝
+            ])
+        case .neon:
+            return PetSkinPalette(colorMap: [
+                "#E8E8E8": "#00FFFF",  // 青色
+                "#CCCCCC": "#00CCCC",  // 深青影
+            ])
+        case .king:
+            return PetSkinPalette(colorMap: [
+                "#E8E8E8": "#DDA0DD",  // 梅红
+                "#CCCCCC": "#BA55D3",  // 中兰紫影
+            ])
+        }
+    }
+
+    // MARK: 小龙调色板
+
+    private static func dragonPalette(_ level: PetLevel) -> PetSkinPalette {
+        switch level {
+        case .basic:
+            return PetSkinPalette(colorMap: [:])
+        case .glow:
+            return PetSkinPalette(colorMap: [
+                "#32CD32": "#50FF50",  // 亮绿
+                "#228B22": "#33BB33",  // 亮深绿
+                "#7CFC00": "#90FF20",  // 亮浅绿
+                "#98FB98": "#AAFFAA",  // 亮腹绿
+                "#DAA520": "#FFD700",  // 亮金角
+            ])
+        case .metal:
+            return PetSkinPalette(colorMap: [
+                "#32CD32": "#C0C0C0",  // 银灰
+                "#228B22": "#808080",  // 深银
+                "#7CFC00": "#D4D4D4",  // 亮银
+                "#98FB98": "#E0E0E0",  // 银白腹
+                "#DAA520": "#A0A0A0",  // 银灰角
+            ])
+        case .neon:
+            return PetSkinPalette(colorMap: [
+                "#32CD32": "#FF00FF",  // 品红
+                "#228B22": "#CC00CC",  // 深品红
+                "#7CFC00": "#FF33FF",  // 亮品红
+                "#98FB98": "#FF88FF",  // 淡品红腹
+                "#DAA520": "#00FFFF",  // 青角
+                "#FF4500": "#FF0088",  // 品红火
+                "#FFA500": "#FF00AA",  // 品红火
+                "#FFD700": "#FF00CC",  // 品红火尖
+            ])
+        case .king:
+            return PetSkinPalette(colorMap: [
+                "#32CD32": "#FFD700",  // 金
+                "#228B22": "#B8860B",  // 暗金
+                "#7CFC00": "#FFE44D",  // 亮金
+                "#98FB98": "#FFF8DC",  // 金丝白腹
+                "#DAA520": "#FF4500",  // 红宝石角
+                "#FF4500": "#FF0000",  // 红火
+                "#FFA500": "#FF2200",  // 红火
+                "#FFD700": "#FF4400",  // 红火尖
+            ])
+        }
+    }
+}
+
+// MARK: - PetAnimationSet 皮肤应用
+
+extension PetAnimationSet {
+    /// 应用皮肤调色板，返回新的动画集
+    func withSkin(_ palette: PetSkinPalette) -> PetAnimationSet {
+        PetAnimationSet(
+            idle: idle.map { $0.withPalette(palette) },
+            thinking: thinking.map { $0.withPalette(palette) },
+            coding: coding.map { $0.withPalette(palette) },
+            waiting: waiting.map { $0.withPalette(palette) },
+            celebrating: celebrating.map { $0.withPalette(palette) },
+            error: error.map { $0.withPalette(palette) },
+            compacting: compacting.map { $0.withPalette(palette) },
+            sleeping: sleeping.map { $0.withPalette(palette) }
+        )
+    }
+}
+
+extension PetFrame {
+    /// 应用调色板到帧
+    func withPalette(_ palette: PetSkinPalette) -> PetFrame {
+        PetFrame(
+            pixels: pixels.map { pixel in
+                PetFrame.Pixel(x: pixel.x, y: pixel.y, color: palette.apply(pixel.color))
+            },
+            width: width,
+            height: height
+        )
     }
 }

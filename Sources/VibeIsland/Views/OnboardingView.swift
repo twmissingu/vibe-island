@@ -25,9 +25,11 @@ struct OnboardingView: View {
                     Circle()
                         .fill(step <= currentStep ? Color.blue : Color.gray.opacity(0.3))
                         .frame(width: 8, height: 8)
+                        .accessibilityIdentifier("progressDot")
                 }
             }
             .padding(.top, 20)
+            .accessibilityIdentifier("progressIndicator")
 
             // 内容区域
             Group {

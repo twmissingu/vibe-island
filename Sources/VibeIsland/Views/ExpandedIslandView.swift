@@ -91,6 +91,7 @@ struct ExpandedIslandView: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(tab.rawValue)
     }
 
     // MARK: - 标签内容

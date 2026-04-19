@@ -32,6 +32,7 @@ schemes:
       config: Debug
       targets:
         - VibeIslandTests
+        - VibeIslandUITests
 
 targets:
   VibeIsland:
@@ -118,6 +119,26 @@ targets:
     dependencies:
       - target: VibeIsland
       - package: LLMQuotaKit
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+        ENABLE_TESTING_SEARCH_PATHS: YES
+      configs:
+        Debug:
+          ENABLE_TESTING_SEARCH_PATHS: YES
+        Release:
+          ENABLE_TESTING_SEARCH_PATHS: NO
+
+  VibeIslandUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Tests/VibeIslandUITests
+    dependencies:
+      - target: VibeIsland
     settings:
       base:
         SWIFT_VERSION: "6.0"

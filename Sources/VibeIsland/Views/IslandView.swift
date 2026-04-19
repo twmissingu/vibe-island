@@ -9,8 +9,10 @@ struct IslandView: View {
             switch viewModel.islandState {
             case .compact:
                 CompactIslandView()
+                    .accessibilityIdentifier("compactIslandView")
             case .expanded:
                 ExpandedIslandView()
+                    .accessibilityIdentifier("expandedIslandView")
             }
         }
         .onTapGesture {
@@ -72,7 +74,7 @@ struct CompactIslandView: View {
             // Pet view with session state integration (fixed width regardless of enable status)
             Group {
                 if viewModel.settings.petEnabled {
-                    PetView(petId: viewModel.settings.selectedPetID, scale: 1.0)
+                    PetView(petId: viewModel.settings.selectedPetID, level: PetProgressManager.shared.currentLevel, scale: 1.0)
                         .modifier(SessionPetEffect(state: aggregateState))
                 } else {
                     Color.clear

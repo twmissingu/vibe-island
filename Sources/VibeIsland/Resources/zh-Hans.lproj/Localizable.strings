@@ -154,6 +154,43 @@
 "onboarding.button.skip" = "跳过";
 "onboarding.button.skipOnboarding" = "跳过引导";
 
+// MARK: - Coding Goals
+
+"codingGoals.today" = "今日";
+"codingGoals.today.subtitle" = "今天累计编码时长";
+"codingGoals.week" = "本周";
+"codingGoals.week.subtitle" = "本周一至今累计编码时长";
+"codingGoals.total" = "总计";
+"codingGoals.total.subtitle" = "历史累计编码时长";
+"codingGoals.dailyGoal" = "每日目标";
+"codingGoals.dailyGoal.subtitle" = "今天的目标完成度";
+"codingGoals.weeklyGoal" = "每周目标";
+"codingGoals.weeklyGoal.subtitle" = "本周的目标完成度";
+"codingGoals.goalAchieved" = "🎯 已达成";
+"codingGoals.remainingMinutes" = "%d 分钟";
+"codingGoals.lastAchieved" = "上一次达成：%@";
+
+// MARK: - Pet Unlock Progress
+
+"pet.unlockProgress" = "宠物解锁进度";
+"pet.currentPet" = "当前宠物";
+"pet.nextPet" = "下一个宠物";
+"pet.dogUnlocked" = "🐶 小狗";
+"pet.dogLocked" = "🐶 小狗 (%d 分钟)";
+
+// MARK: - Pet Level System
+
+"pet.level" = "宠物等级";
+"pet.level.current" = "当前宠物";
+"pet.level.nextLevel" = "下一等级";
+"pet.level.maxLevel" = "已达到最高等级";
+"pet.level.remainingMinutes" = "%d 分钟";
+"pet.level.basic" = "基础款";
+"pet.level.glow" = "辉光款";
+"pet.level.metal" = "金属款";
+"pet.level.neon" = "霓虹款";
+"pet.level.king" = "王者款";
+
 // MARK: - Onboarding View (Additional)
 
 "onboarding.welcome.subtitle.full" = "你的 AI 编码助手状态监控平台\n实时监控 Claude Code、OpenCode 的运行状态";
@@ -272,3 +309,91 @@
 "quota.used" = "已用";
 "quota.reset" = "重置";
 "quota.key" = "Key";
+
+// MARK: - Session ListView
+
+"session.list.title" = "会话列表";
+"session.auto.track" = "自动跟踪最高优先级会话";
+"session.pinned" = "已固定: %@";
+"session.noActive" = "暂无活跃会话";
+"session.auto" = "自动";
+"session.pin" = "固定";
+
+// MARK: - Context Usage
+
+"context.usage" = "上下文使用";
+"context.noData" = "暂无上下文数据";
+"context.used" = "已用";
+"context.total" = "总量";
+"context.remaining" = "剩余";
+"context.usageRate" = "使用率";
+
+// MARK: - Expanded View
+
+"expanded.quota" = "额度";
+"expanded.sessions" = "会话";
+"expanded.context" = "上下文";
+"expanded.addApiKey" = "请在设置中添加 API Key";
+
+// MARK: - Circular Gauge
+
+"gauge.percent" = "%";
+
+// MARK: - Onboarding (Additional)
+
+"onboarding.welcome.title" = "欢迎使用 Vibe Island";
+"onboarding.welcome.subtitle" = "你的 AI 编码助手状态监控平台\n实时监控 Claude Code、OpenCode 的运行状态";
+"onboarding.select.platforms" = "选择要监控的平台";
+"onboarding.modify.anytime" = "你可以随时在设置中修改";
+"onboarding.configure.hook" = "配置 Claude Code Hook";
+"onboarding.hook.install.success" = "Hook 已成功安装\n重启 Claude Code 后生效";
+"onboarding.hook.tip" = "提示：你也可以稍后在设置中安装";
+"onboarding.completion.title" = "设置完成！";
+"onboarding.completion.platforms" = "已选择 %d 个平台";
+"onboarding.completion.hookInstalled" = "Hook 已安装";
+"onboarding.completion.hookNotInstalled" = "Hook 未安装（可在设置中安装）";
+"onboarding.completion.petEnabled" = "像素宠物已启用";
+"onboarding.completion.soundEnabled" = "声音提醒已启用";
+"onboarding.completion.instruction" = "点击「开始使用」进入主界面";
+"onboarding.button.previous" = "上一步";
+"onboarding.button.next" = "下一步";
+"onboarding.button.getStart" = "开始使用";
+"onboarding.button.skip" = "跳过";
+"onboarding.button.skipOnboarding" = "跳过引导";
+
+// MARK: - Coding Goals
+
+"codingGoals.today" = "今日";
+"codingGoals.today.subtitle" = "今天累计编码时长";
+"codingGoals.week" = "本周";
+"codingGoals.week.subtitle" = "本周一至今累计编码时长";
+"codingGoals.total" = "总计";
+"codingGoals.total.subtitle" = "历史累计编码时长";
+"codingGoals.dailyGoal" = "每日目标";
+"codingGoals.dailyGoal.subtitle" = "今天的目标完成度";
+"codingGoals.weeklyGoal" = "每周目标";
+"codingGoals.weeklyGoal.subtitle" = "本周的目标完成度";
+"codingGoals.goalAchieved" = "🎯 已达成";
+"codingGoals.remainingMinutes" = "%d 分钟";
+"codingGoals.lastAchieved" = "上一次达成：%@";
+
+// MARK: - Pet Unlock Progress
+
+"pet.unlockProgress" = "宠物解锁进度";
+"pet.currentPet" = "当前宠物";
+"pet.nextPet" = "下一个宠物";
+"pet.dogUnlocked" = "🐶 小狗";
+"pet.dogLocked" = "🐶 小狗 (%d 分钟)";
+
+// MARK: - Pet Level System
+
+"pet.level" = "宠物等级";
+"pet.level.current" = "当前宠物";
+"pet.level.nextLevel" = "下一等级";
+"pet.level.maxLevel" = "已达到最高等级";
+"pet.level.remainingMinutes" = "%d 分钟";
+"pet.level.basic" = "基础款";
+"pet.level.glow" = "辉光款";
+"pet.level.metal" = "金属款";
+"pet.level.neon" = "霓虹款";
+"pet.level.king" = "王者款";

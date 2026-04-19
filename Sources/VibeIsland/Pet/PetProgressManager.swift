@@ -43,6 +43,63 @@ final class PetUnlockNotificationManager {
     }
 }
 
+// MARK: - 宠物等级系统
+
+/// 宠物等级（1-5）
+enum PetLevel: Int, Codable, CaseIterable, Comparable, Sendable {
+    case basic = 1    // 基础款 - 默认
+    case glow = 2     // 辉光款 - 60 分钟
+    case metal = 3    // 金属款 - 120 分钟
+    case neon = 4     // 霓虹款 - 240 分钟
+    case king = 5     // 王者款 - 360 分钟
+
+    static func < (lhs: PetLevel, rhs: PetLevel) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
+
+    /// 显示名称
+    var displayName: String {
+        switch self {
+        case .basic: return "基础款"
+        case .glow: return "辉光款"
+        case .metal: return "金属款"
+        case .neon: return "霓虹款"
+        case .king: return "王者款"
+        }
+    }
+
+    /// 达到该等级所需的累计编码时长（分钟，从该宠物被选中开始）
+    var requiredMinutes: Int {
+        switch self {
+        case .basic: return 0
+        case .glow: return 60
+        case .metal: return 120
+        case .neon: return 240
+        case .king: return 360
+        }
+    }
+
+    /// 从累计时长计算等级
+    static func from(minutes: Int) -> PetLevel {
+        if minutes >= PetLevel.king.requiredMinutes { return .king }
+        if minutes >= PetLevel.neon.requiredMinutes { return .neon }
+        if minutes >= PetLevel.metal.requiredMinutes { return .metal }
+        if minutes >= PetLevel.glow.requiredMinutes { return .glow }
+        return .basic
+    }
+
+    /// 下一个等级（最高级返回 nil）
+    var next: PetLevel? {
+        switch self {
+        case .basic: return .glow
+        case .glow: return .metal
+        case .metal: return .neon
+        case .neon: return .king
+        case .king: return nil
+        }
+    }
+}
+
 // MARK: - 宠物解锁动画效果
 
 /// 宠物解锁时的动画效果管理器
@@ -148,6 +205,28 @@ enum PetType: String, Codable, CaseIterable, Sendable {
     }
 }
 
+// MARK: - 编码目标
+
+/// 编码目标类型
+enum CodingGoalType: String, Codable, CaseIterable {
+    case daily = "daily"
+    case weekly = "weekly"
+}
+
+/// 编码目标
+struct CodingGoal: Codable, Equatable {
+    /// 目标类型
+    let type: CodingGoalType
+    /// 目标时长（分钟）
+    let targetMinutes: Int
+    /// 当前进度（分钟）
+    let currentMinutes: Int
+    /// 是否达成
+    let isAchieved: Bool
+    /// 上次达成时间
+    let lastAchievedDate: Date?
+}
+
 // MARK: - 宠物进度管理
 
 /// 管理宠物解锁进度和已解锁状态
@@ -155,15 +234,18 @@ enum PetType: String, Codable, CaseIterable, Sendable {
 @Observable
 final class PetProgressManager {
     static let shared = PetProgressManager()
-    
+
     /// 累计 vibe coding 时长（分钟）
     private(set) var totalCodingMinutes: Int = 0
-    
+
+    /// 每只宠物被选中时的累计编码时长（分钟）
+    private(set) var petLevelMinutes: [String: Int] = [:]
+
     /// 已解锁的宠物列表
     var unlockedPets: Set<PetType> {
         Set(PetType.allCases.filter { pet in pet.isUnlocked(totalCodingMinutes: totalCodingMinutes) })
     }
-    
+
     /// 当前选中的宠物
     var selectedPet: PetType = .cat {
         didSet {
@@ -175,27 +257,153 @@ final class PetProgressManager {
             saveSelectedPet()
         }
     }
-    
+
+    /// 获取指定宠物的当前等级
+    func level(for pet: PetType) -> PetLevel {
+        let minutes = petLevelMinutes[pet.rawValue] ?? 0
+        return PetLevel.from(minutes: minutes)
+    }
+
+    /// 获取当前选中宠物的等级
+    var currentLevel: PetLevel {
+        level(for: selectedPet)
+    }
+
+    /// 获取指定宠物在当前等级的进度（0.0-1.0）
+    func levelProgress(for pet: PetType) -> Double {
+        let minutes = petLevelMinutes[pet.rawValue] ?? 0
+        let currentLevel = PetLevel.from(minutes: minutes)
+        guard let nextLevel = currentLevel.next else { return 1.0 }
+        let levelStart = currentLevel.requiredMinutes
+        let levelEnd = nextLevel.requiredMinutes
+        let progress = Double(minutes - levelStart) / Double(levelEnd - levelStart)
+        return min(1.0, max(0.0, progress))
+    }
+
+    /// 获取指定宠物升级所需的剩余分钟数
+    func minutesToNextLevel(for pet: PetType) -> Int? {
+        let minutes = petLevelMinutes[pet.rawValue] ?? 0
+        let currentLevel = PetLevel.from(minutes: minutes)
+        guard let nextLevel = currentLevel.next else { return nil }
+        return nextLevel.requiredMinutes - minutes
+    }
+
     /// 宠物是否启用
     var isEnabled: Bool = true {
         didSet { saveEnabled() }
     }
-    
+
+    // MARK: - 编码目标属性
+
+    /// 每日编码目标（分钟）
+    var dailyGoal: Int = 30 {
+        didSet { saveDailyGoal() }
+    }
+
+    /// 今日已编码时长（分钟，用于目标进度）
+    var todayCodingMinutes: Int = 0 {
+        didSet { checkDailyGoalAchievement() }
+    }
+
+    /// 每周编码目标（分钟）
+    var weeklyGoal: Int = 180 {  // 3小时/周
+        didSet { saveWeeklyGoal() }
+    }
+
+    /// 本周已编码时长（分钟，用于目标进度）
+    var weekCodingMinutes: Int = 0 {
+        didSet { checkWeeklyGoalAchievement() }
+    }
+
+    /// 上次达成每日目标的日期
+    var lastDailyGoalDate: Date? {
+        didSet { saveLastDailyGoalDate() }
+    }
+
+    /// 上次达成每周目标的日期
+    var lastWeeklyGoalDate: Date? {
+        didSet { saveLastWeeklyGoalDate() }
+    }
+
     // MARK: 私有方法
-    
+
     private init() {
         loadProgress()
+        loadGoalSettings()
     }
-    
+
     /// 添加编码时长（分钟）
     func addCodingMinutes(_ minutes: Int) {
         guard minutes > 0 else { return }
         let oldTotal = totalCodingMinutes
         totalCodingMinutes += minutes
         saveProgress()
-        
+
+        // 更新今日和本周时长
+        todayCodingMinutes += minutes
+        weekCodingMinutes += minutes
+
+        // 更新当前选中宠物的累计时长
+        let petKey = selectedPet.rawValue
+        let oldPetMinutes = petLevelMinutes[petKey] ?? 0
+        let oldLevel = PetLevel.from(minutes: oldPetMinutes)
+        petLevelMinutes[petKey] = oldPetMinutes + minutes
+        let newLevel = PetLevel.from(minutes: petLevelMinutes[petKey] ?? 0)
+        savePetLevelMinutes()
+
         // 检查是否有新宠物解锁
         checkNewUnlocks(oldTotal: oldTotal)
+
+        // 检查当前宠物是否升级
+        if newLevel > oldLevel {
+            checkPetLevelUp(pet: selectedPet, oldLevel: oldLevel, newLevel: newLevel)
+        }
+    }
+
+    /// 检查每日目标是否达成
+    private func checkDailyGoalAchievement() {
+        guard todayCodingMinutes >= dailyGoal,
+              !isGoalAchievedToday(type: .daily) else { return }
+
+        lastDailyGoalDate = Date()
+        Self.logger.info("🎉 每日目标达成: \(dailyGoal) 分钟")
+
+        // 触发庆祝动画
+        Self.triggerCelebrationForGoal(type: .daily)
+    }
+
+    /// 检查每周目标是否达成
+    private func checkWeeklyGoalAchievement() {
+        guard weekCodingMinutes >= weeklyGoal,
+              !isGoalAchievedThisWeek(type: .weekly) else { return }
+
+        lastWeeklyGoalDate = Date()
+        Self.logger.info("🎉 每周目标达成: \(weeklyGoal) 分钟")
+
+        // 触发庆祝动画
+        Self.triggerCelebrationForGoal(type: .weekly)
+    }
+
+    /// 检查今天是否已达成某类型目标
+    private func isGoalAchievedToday(type: CodingGoalType) -> Bool {
+        guard let date = lastDailyGoalDate else { return false }
+        let calendar = Calendar.current
+        return calendar.isDate(date, inSameDayAs: Date())
+    }
+
+    /// 检查本周是否已达成某类型目标
+    private func isGoalAchievedThisWeek(type: CodingGoalType) -> Bool {
+        guard let date = lastWeeklyGoalDate else { return false }
+        let calendar = Calendar.current
+        let thisWeek = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date())
+        let goalWeek = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
+        return thisWeek.yearForWeekOfYear == goalWeek.yearForWeekOfYear && thisWeek.weekOfYear == goalWeek.weekOfYear
+    }
+
+    /// 触发目标达成庆祝
+    private static func triggerCelebrationForGoal(type: CodingGoalType) {
+        // 触发宠物庆祝动画
+        PetUnlockAnimationManager.shared.playUnlockAnimation(pet: .cat)
     }
     
     /// 检查是否有新宠物解锁
@@ -221,6 +429,18 @@ final class PetProgressManager {
         PetUnlockAnimationManager.shared.playUnlockAnimation(pet: pet)
         Self.logger.info("✨ 解锁特效已触发: \(pet.displayName)")
     }
+
+    /// 检查宠物升级
+    private func checkPetLevelUp(pet: PetType, oldLevel: PetLevel, newLevel: PetLevel) {
+        Self.logger.info("🎉 宠物升级: \(pet.displayName) \(oldLevel.displayName) → \(newLevel.displayName)")
+
+        // 发送解锁通知（复用通知系统）
+        let notification = PetUnlockNotification(pet: pet, unlockTime: Date())
+        PetUnlockNotificationManager.shared.addNotification(notification)
+
+        // 触发庆祝动画
+        PetUnlockAnimationManager.shared.playUnlockAnimation(pet: pet)
+    }
     
     // MARK: 持久化
     
@@ -228,6 +448,7 @@ final class PetProgressManager {
     private let minutesKey = "vibe-island.coding-minutes"
     private let selectedKey = "vibe-island.selected-pet"
     private let enabledKey = "vibe-island.pet-enabled"
+    private let petLevelMinutesKey = "vibe-island.pet-level-minutes"
     
     private func loadProgress() {
         totalCodingMinutes = defaults.integer(forKey: minutesKey)
@@ -237,6 +458,10 @@ final class PetProgressManager {
             selectedPet = pet
         }
         isEnabled = defaults.object(forKey: enabledKey) as? Bool ?? true
+        // 加载宠物等级分钟数
+        if let saved = defaults.dictionary(forKey: petLevelMinutesKey) as? [String: Int] {
+            petLevelMinutes = saved
+        }
     }
     
     private func saveProgress() {
@@ -250,13 +475,66 @@ final class PetProgressManager {
     private func saveEnabled() {
         defaults.set(isEnabled, forKey: enabledKey)
     }
-    
+
+    private func savePetLevelMinutes() {
+        defaults.set(petLevelMinutes, forKey: petLevelMinutesKey)
+    }
+
+    // MARK: - 目标设置持久化
+
+    private let dailyGoalKey = "vibe-island.daily-goal"
+    private let weeklyGoalKey = "vibe-island.weekly-goal"
+    private let lastDailyGoalDateKey = "vibe-island.last-daily-goal-date"
+    private let lastWeeklyGoalDateKey = "vibe-island.last-weekly-goal-date"
+
+    private func loadGoalSettings() {
+        dailyGoal = defaults.integer(forKey: dailyGoalKey) ?? 30
+        weeklyGoal = defaults.integer(forKey: weeklyGoalKey) ?? 180
+        if let date = defaults.object(forKey: lastDailyGoalDateKey) as? Date {
+            lastDailyGoalDate = date
+        }
+        if let date = defaults.object(forKey: lastWeeklyGoalDateKey) as? Date {
+            lastWeeklyGoalDate = date
+        }
+    }
+
+    private func saveDailyGoal() {
+        defaults.set(dailyGoal, forKey: dailyGoalKey)
+    }
+
+    private func saveWeeklyGoal() {
+        defaults.set(weeklyGoal, forKey: weeklyGoalKey)
+    }
+
+    private func saveLastDailyGoalDate() {
+        defaults.set(lastDailyGoalDate, forKey: lastDailyGoalDateKey)
+    }
+
+    private func saveLastWeeklyGoalDate() {
+        defaults.set(lastWeeklyGoalDate, forKey: lastWeeklyGoalDateKey)
+    }
+
     /// 重置进度（测试用）
     func resetProgress() {
         totalCodingMinutes = 0
+        todayCodingMinutes = 0
+        weekCodingMinutes = 0
+        petLevelMinutes.removeAll()
         selectedPet = .cat
         defaults.removeObject(forKey: minutesKey)
         defaults.removeObject(forKey: selectedKey)
+        defaults.removeObject(forKey: dailyGoalKey)
+        defaults.removeObject(forKey: weeklyGoalKey)
+        defaults.removeObject(forKey: lastDailyGoalDateKey)
+        defaults.removeObject(forKey: lastWeeklyGoalDateKey)
+        defaults.removeObject(forKey: petLevelMinutesKey)
+    }
+
+    /// 重置目标进度（保留设置）
+    func resetGoalProgress() {
+        todayCodingMinutes = 0
+        weekCodingMinutes = 0
+        // 不重置 lastGoalDate，避免重复触发
     }
 }
 
