@@ -6,11 +6,13 @@ import CoreGraphics
 final class DynamicIslandPanel: NSPanel {
     private(set) var positionMode: IslandPositionMode
 
-    init(contentView: some View) {
+init(contentView: some View) {
         positionMode = SharedDefaults.loadSettings().islandPositionMode
 
-        let notchAwareWidth = calculateNotchAwareWidth()
-        let initialSize = NSSize(width: notchAwareWidth, height: 44)
+        // 使用静态方法计算初始尺寸
+        let defaultScreen = NSScreen.main ?? NSScreen.screens.first!
+        let initialSize = DynamicIslandPanel.calculateInitialSizeForScreen(defaultScreen)
+        let width = initialSize.width
 
         super.init(
             contentRect: NSRect(origin: .zero, size: initialSize),
@@ -20,7 +22,6 @@ final class DynamicIslandPanel: NSPanel {
         )
 
         // 关键：面板层级必须高于刘海层
-        // .floating 确保在菜单栏和刘海上方
         level = .floating
         isOpaque = false
         backgroundColor = .clear
@@ -52,13 +53,35 @@ final class DynamicIslandPanel: NSPanel {
 
         self.contentView = container
 
-        // 关键修复：延迟定位，确保窗口服务器已初始化面板
-        // 多显示器环境下，立即设置 frame 可能被忽略或偏移
+        // 延迟定位
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.applyPosition()
-            self.orderFront(nil)
+            self.resize(to: NSSize(width: width, height: 44), animated: false)
         }
+    }
+
+    /// 计算初始尺寸 - 静态方法避免 super.init 前使用 self
+    private static func calculateInitialSizeForScreen(_ screen: NSScreen) -> NSSize {
+        let screenFrame = screen.frame
+        let screenWidth = screenFrame.width
+
+        // 14" MacBook Pro 屏幕宽度 ~3024pt (2x scale)
+        // 16" MacBook Pro 屏幕宽度 ~3456pt (2x scale)
+        // 使用 3100pt 作为分界值
+        let hasNotch = screen.safeAreaInsets.top > 24
+        let notchAwareWidth: CGFloat
+        if hasNotch {
+            if screenWidth >= 3100 {
+                notchAwareWidth = 580 // 16" MacBook Pro
+            } else {
+                notchAwareWidth = 500 // 14" MacBook Pro
+            }
+        } else {
+            notchAwareWidth = 420 // 非刘海 Mac 或未知屏幕
+        }
+
+        return NSSize(width: notchAwareWidth, height: 44)
     }
 
     func setPositionMode(_ mode: IslandPositionMode) {

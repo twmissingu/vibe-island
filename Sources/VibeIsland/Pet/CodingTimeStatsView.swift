@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 // MARK: - 编码时长统计面板
 
@@ -102,7 +103,7 @@ struct CodingTimeStatsView: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
+                .fill(Color(nsColor: .windowBackgroundColor))
                 .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
         )
     }

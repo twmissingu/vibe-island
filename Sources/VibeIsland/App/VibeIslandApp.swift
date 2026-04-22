@@ -39,8 +39,8 @@ struct VibeIslandApp: App {
     }
 
     private func checkOnboardingStatus() {
-        // 检查启动参数
-        let arguments = ProcessInfo.processInfo.arguments
+        // 检查启动参数 (使用 CommandLine)
+        let arguments = CommandLine.arguments
 
         if arguments.contains("--onboarding") {
             // 强制显示引导

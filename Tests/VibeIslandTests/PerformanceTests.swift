@@ -88,18 +88,23 @@ final class PerformanceTests: XCTestCase {
     // MARK: MultiToolAggregator 排序性能
 
     func testMultiToolSortPerformance() {
-        let sessions: [UnifiedSessionView] = (0..<1000).map { index in
-            UnifiedSessionView(
-                sessionId: "session-\(index)",
-                sessionName: "Test Session \(index)",
+        // 预先生成测试数据避免编译器类型检查问题
+        var sessions: [UnifiedSessionView] = []
+        for index in 0..<1000 {
+            let statusIdx = index % SessionState.allCases.count
+            let status = SessionState.allCases[statusIdx]
+            let source: ToolSource = index % 3 == 0 ? .claudeCode : (index % 3 == 1 ? .openCode : .codex)
+            let session = UnifiedSessionView(
+                id: "session-\(index)",
+                source: source,
+                originalSessionId: "orig-\(index)",
                 cwd: "/tmp/test-\(index)",
-                status: SessionState.allCases[index % SessionState.allCases.count],
-                source: index % 3 == 0 ? .claudeCode : (index % 3 == 1 ? .openCode : .codex),
-                lastActivity: Date()
+                status: status,
+                lastActivity: Date(),
+                activeSubagentCount: 0
             )
+            sessions.append(session)
         }
-
-        let aggregator = MultiToolAggregator.shared
 
         measure {
             _ = sessions.sorted { $0.status.priority < $1.status.priority }
@@ -154,7 +159,9 @@ final class PerformanceTests: XCTestCase {
         // 连续播放 10 次应无延迟
         measure {
             for _ in 0..<10 {
-                _ = soundManager.play(type: .permissionRequest)
+                Task {
+                    await soundManager.play(.permissionRequest)
+                }
                 Thread.sleep(forTimeInterval: 0.05)
             }
         }

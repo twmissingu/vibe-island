@@ -4,23 +4,26 @@ import OSLog
 // MARK: - 工具来源标识
 
 /// 支持的 LLM 编码工具
-enum ToolSource: String, Codable, Equatable, Sendable {
+enum ToolSource: String, Codable, Equatable, CaseIterable, Sendable {
     case claudeCode = "claude_code"
     case openCode = "opencode"
+    case codex = "codex"
 
     /// 显示名称
     var displayName: String {
         switch self {
         case .claudeCode: return "Claude Code"
         case .openCode: return "OpenCode"
+        case .codex: return "Codex"
         }
     }
 
     /// 工具图标标识
     var iconSymbol: String {
         switch self {
-        case .claudeCode: return "C"
-        case .openCode: return "O"
+        case .claudeCode: return "c"
+        case .openCode: return "o"
+        case .codex: return "x"
         }
     }
 }
@@ -239,8 +242,6 @@ final class MultiToolAggregator {
         sessions.append(contentsOf: openCodeSessions)
 
         unifiedSessions = sessions
-
-        unifiedSessions = sessions
     }
 
     // MARK: 查询方法
@@ -320,8 +321,8 @@ final class MultiToolAggregator {
             switch source {
             case .claudeCode:
                 sessionManager.removeCompletedSessions()
-            case .openCode:
-                // OpenCodeMonitor 自动过滤 PID 不存活的会话
+            case .openCode, .codex:
+                // OpenCode/Codex 自动过滤 PID 不存活的会话
                 break
             }
         } else {
@@ -341,5 +342,5 @@ final class MultiToolAggregator {
 // MARK: - ToolSource 便捷扩展
 
 extension ToolSource {
-    static var allCases: [ToolSource] { [.claudeCode, .openCode] }
+    static var allCases: [ToolSource] { [.claudeCode, .openCode, .codex] }
 }

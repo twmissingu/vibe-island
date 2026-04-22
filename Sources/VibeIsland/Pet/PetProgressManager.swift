@@ -108,15 +108,18 @@ final class PetUnlockAnimationManager {
     static let shared = PetUnlockAnimationManager()
 
     /// 当前播放的动画
-    @MainActor @Observable
-    class var currentAnimation: AnimationState? {
-        didSet {
-            guard let animation = currentAnimation else { return }
+    private var _currentAnimation: AnimationState?
+
+    var currentAnimation: AnimationState? {
+        get { _currentAnimation }
+        set {
+            _currentAnimation = newValue
+            guard let animation = newValue else { return }
             // 自动在3秒后清除动画
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(3))
-                if PetUnlockAnimationManager.shared.currentAnimation?.id == animation.id {
-                    PetUnlockAnimationManager.shared.currentAnimation = nil
+                if PetUnlockAnimationManager.shared._currentAnimation?.id == animation.id {
+                    PetUnlockAnimationManager.shared._currentAnimation = nil
                 }
             }
         }
@@ -125,6 +128,12 @@ final class PetUnlockAnimationManager {
     /// 动画状态
     enum AnimationState: Equatable {
         case unlock(pet: PetType)
+
+        var id: String {
+            switch self {
+            case .unlock(let pet): return pet.rawValue
+            }
+        }
 
         var pet: PetType? {
             switch self {
@@ -296,7 +305,7 @@ final class PetProgressManager {
 
     /// 设置指定宠物的皮肤等级
     func setSelectedSkinLevel(_ level: PetLevel, for pet: PetType) {
-        let actualLevel = level(for: pet)
+        let actualLevel = self.level(for: pet)
         guard level <= actualLevel else { return }
         selectedSkinLevels[pet.rawValue] = level.rawValue
         saveSelectedSkinLevels()
@@ -405,7 +414,7 @@ final class PetProgressManager {
               !isGoalAchievedToday(type: .daily) else { return }
 
         lastDailyGoalDate = Date()
-        Self.logger.info("🎉 每日目标达成: \(dailyGoal) 分钟")
+        Self.logger.info("🎉 每日目标达成: \(self.dailyGoal) 分钟")
 
         // 触发庆祝动画
         Self.triggerCelebrationForGoal(type: .daily)
@@ -417,7 +426,7 @@ final class PetProgressManager {
               !isGoalAchievedThisWeek(type: .weekly) else { return }
 
         lastWeeklyGoalDate = Date()
-        Self.logger.info("🎉 每周目标达成: \(weeklyGoal) 分钟")
+        Self.logger.info("🎉 每周目标达成: \(self.weeklyGoal) 分钟")
 
         // 触发庆祝动画
         Self.triggerCelebrationForGoal(type: .weekly)

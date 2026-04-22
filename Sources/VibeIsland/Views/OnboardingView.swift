@@ -45,22 +45,36 @@ struct OnboardingView: View {
             // 底部按钮
             HStack {
                 if currentStep > 0 {
-                    Button(NSLocalizedString("onboarding.button.previous", comment: "Previous button"))
-                        .buttonStyle(.bordered)
+                    Button {
+                        // previous action
+                    } label: {
+                        Text(NSLocalizedString("onboarding.button.previous", comment: "Previous button"))
+                    }
+                    .buttonStyle(.bordered)
                 }
 
                 Spacer()
 
                 if currentStep < totalSteps - 1 {
-                    Button(NSLocalizedString("onboarding.button.next", comment: "Next button"))
-                        .buttonStyle(.borderedProminent)
+                    Button {
+                        // next action
+                    } label: {
+                        Text(NSLocalizedString("onboarding.button.next", comment: "Next button"))
+                    }
+                    .buttonStyle(.borderedProminent)
                 } else {
-                    Button(NSLocalizedString("onboarding.button.getStart", comment: "Get Started button"))
-                        .buttonStyle(.borderedProminent)
+                    Button {
+                        // get started action
+                    } label: {
+                        Text(NSLocalizedString("onboarding.button.getStart", comment: "Get Started button"))
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
 
-                Button(currentStep == totalSteps - 1 ? NSLocalizedString("onboarding.button.skip", comment: "Skip") : NSLocalizedString("onboarding.button.skipOnboarding", comment: "Skip Onboarding")) {
+                Button {
                     dismiss()
+                } label: {
+                    Text(currentStep == totalSteps - 1 ? NSLocalizedString("onboarding.button.skip", comment: "Skip") : NSLocalizedString("onboarding.button.skipOnboarding", comment: "Skip Onboarding"))
                 }
                 .buttonStyle(.borderless)
                 .foregroundStyle(.secondary)

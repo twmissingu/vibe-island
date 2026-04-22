@@ -91,17 +91,16 @@ final class RankManager {
 
     func updateUserData() {
         let progress = PetProgressManager.shared
-        let tracker = CodingTimeTracker.shared
 
         // 更新总编码时长排名
         let totalMinutes = progress.totalCodingMinutes
         userValue[.total] = totalMinutes
         userRank[.total] = calculateRank(for: totalMinutes, category: .total)
 
-        // 更新今日排名
-        let todayMinutes = tracker.todayCodingMinutes
-        userValue[.daily] = todayMinutes
-        userRank[.daily] = calculateRank(for: todayMinutes, category: .claude)
+        // 更新 Claude 时间排名
+        let claudeMinutes = progress.totalCodingMinutes
+        userValue[.claude] = claudeMinutes
+        userRank[.claude] = calculateRank(for: claudeMinutes, category: .claude)
 
         // 更新成就数
         let achievementCount = AchievementManager.shared.unlockedCount
@@ -110,7 +109,7 @@ final class RankManager {
 
         saveUserData()
 
-        Self.logger.debug("用户排名数据已更新: 今日 \(todayMinutes) 分钟, 总计 \(totalMinutes) 分钟")
+        Self.logger.debug("用户排名数据已更新: 总计 \(totalMinutes) 分钟")
     }
 
     // MARK: - 排行榜生成

@@ -45,7 +45,7 @@ struct PetUnlockView: View {
         .padding(24)
         .background(
             RoundedRectangle(cornerRadius: 20)
-                .fill(Color(.systemBackground))
+                .fill(Color(nsColor: .windowBackgroundColor))
                 .shadow(color: Color.black.opacity(0.1), radius: 20, x: 0, y: 10)
         )
         .padding(20)

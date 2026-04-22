@@ -467,14 +467,14 @@ struct SettingsView: View {
     private func isToolEnabled(_ tool: ToolSource) -> Bool {
         switch tool {
         case .claudeCode: return viewModel.settings.claudeMonitorEnabled
-        case .openCode: return viewModel.settings.openCodeMonitorEnabled
+        case .openCode, .codex: return viewModel.settings.openCodeMonitorEnabled
         }
     }
 
     private func setToolEnabled(_ tool: ToolSource, _ enabled: Bool) {
         switch tool {
         case .claudeCode: viewModel.settings.claudeMonitorEnabled = enabled
-        case .openCode: viewModel.settings.openCodeMonitorEnabled = enabled
+        case .openCode, .codex: viewModel.settings.openCodeMonitorEnabled = enabled
         }
         saveSettings()
     }
@@ -580,6 +580,128 @@ struct SettingsView: View {
     private func saveSettings() {
         SharedDefaults.saveSettings(viewModel.settings)
     }
+
+    // MARK: - 宠物皮肤选择器视图
+    @ViewBuilder
+    private var petSkinSelectorView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // 宠物选择
+            Picker(NSLocalizedString("settings.petImage", comment: "Pet Image"), selection: Binding(
+                get: { viewModel.settings.selectedPetID },
+                set: {
+                    viewModel.settings.selectedPetID = $0
+                    savePetLevel()
+                    saveSettings()
+                }
+            )) {
+                ForEach(unlockedPets, id: \.id) { pet in
+                    HStack {
+                        Image(systemName: pet.systemImage)
+                        Text(pet.name)
+                    }.tag(pet.id)
+                }
+            }
+
+            // 皮肤等级选择
+            VStack(alignment: .leading, spacing: 6) {
+                Text("皮肤等级")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+
+                // 皮肤等级网格
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 70))], spacing: 8) {
+                    ForEach(unlockedLevels, id: \.self) { level in
+                        skinLevelButton(level)
+                    }
+                }
+            }
+
+            // 等级进度条
+            levelProgressView
+        }
+    }
+
+    @ViewBuilder
+    private func skinLevelButton(_ level: PetLevel) -> some View {
+        let isSelected = viewModel.settings.selectedPetLevel == level.rawValue
+        let canUnlock = canUnlockLevel(level)
+
+        Button {
+            selectLevel(level)
+        } label: {
+            VStack(spacing: 4) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(isSelected ? Color.accentColor : Color.secondary.opacity(0.2))
+                        .frame(height: 50)
+
+                    // 预览宠物
+                    PetView(
+                        petId: viewModel.settings.selectedPetID,
+                        level: level,
+                        scale: 2.0
+                    )
+                    .allowsHitTesting(false)
+                }
+
+                Text(level.displayName)
+                    .font(.system(size: 10))
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(!canUnlock)
+        .opacity(canUnlock ? 1 : 0.5)
+    }
+
+    @ViewBuilder
+    private var levelProgressView: some View {
+        let progress = PetProgressManager.shared
+        let selectedPet = PetType(rawValue: viewModel.settings.selectedPetID) ?? .cat
+        let level = progress.level(for: selectedPet)
+        let progressValue = progress.levelProgress(for: selectedPet)
+
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("\(level.displayName) 进度")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("\(Int(progressValue * 100))%")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+
+            ProgressView(value: progressValue)
+                .tint(.accentColor)
+
+            if let remaining = progress.minutesToNextLevel(for: selectedPet), remaining > 0 {
+                Text("还需 \(remaining) ��钟升级")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private func selectLevel(_ level: PetLevel) {
+        guard canUnlockLevel(level) else { return }
+        let selectedPet = PetType(rawValue: viewModel.settings.selectedPetID) ?? .cat
+        let progress = PetProgressManager.shared
+        progress.setSelectedSkinLevel(level, for: selectedPet)
+        viewModel.settings.selectedPetLevel = level.rawValue
+        saveSettings()
+    }
+
+    private func canUnlockLevel(_ level: PetLevel) -> Bool {
+        let progress = PetProgressManager.shared
+        let selectedPet = PetType(rawValue: viewModel.settings.selectedPetID) ?? .cat
+        let actualLevel = progress.level(for: selectedPet)
+        return actualLevel >= level
+    }
+
+    private func savePetLevel() {
+        PetProgressManager.shared.selectedPet = PetType(rawValue: viewModel.settings.selectedPetID) ?? .cat
+    }
 }
 
 // MARK: - 宠物目录
@@ -601,124 +723,4 @@ struct PetCatalog {
         PetInfo(id: "owl", name: NSLocalizedString("pet.owl", comment: "Owl"), systemImage: "moon"),
         PetInfo(id: "robot", name: NSLocalizedString("pet.robot", comment: "Robot"), systemImage: "robot"),
     ]
-}
-
-// MARK: - 宠物皮肤选择器视图
-
-private var petSkinSelectorView: some View {
-    VStack(alignment: .leading, spacing: 12) {
-        // 宠物选择
-        Picker(NSLocalizedString("settings.petImage", comment: "Pet Image"), selection: Binding(
-            get: { viewModel.settings.selectedPetID },
-            set: { 
-                viewModel.settings.selectedPetID = $0
-                savePetLevel()
-                saveSettings()
-            }
-        )) {
-            ForEach(unlockedPets, id: \.id) { pet in
-                HStack {
-                    Image(systemName: pet.systemImage)
-                    Text(pet.name)
-                }.tag(pet.id)
-            }
-        }
-
-        // 皮肤等级选择
-        VStack(alignment: .leading, spacing: 6) {
-            Text("皮肤等级")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-
-            // 皮肤等级网格
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 70))], spacing: 8) {
-                ForEach(unlockedLevels, id: \.self) { level in
-                    skinLevelButton(level)
-                }
-            }
-        }
-
-        // 等级进度条
-        levelProgressView
-    }
-}
-
-private func skinLevelButton(_ level: PetLevel) -> some View {
-    let isSelected = viewModel.settings.selectedPetLevel == level.rawValue
-    let canUnlock = canUnlockLevel(level)
-
-    return Button {
-        selectLevel(level)
-    } label: {
-        VStack(spacing: 4) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? Color.accentColor : Color.secondary.opacity(0.2))
-                    .frame(height: 50)
-
-                // 预览宠物
-                PetView(
-                    petId: viewModel.settings.selectedPetID,
-                    level: level,
-                    scale: 2.0
-                )
-                .allowsHitTesting(false)
-            }
-
-            Text(level.displayName)
-                .font(.system(size: 10))
-                .foregroundStyle(isSelected ? .accentColor : .secondary)
-        }
-    }
-    .buttonStyle(.plain)
-    .disabled(!canUnlock)
-    .opacity(canUnlock ? 1 : 0.5)
-}
-
-private var levelProgressView: some View {
-    let progress = PetProgressManager.shared
-    let selectedPet = PetType(rawValue: viewModel.settings.selectedPetID) ?? .cat
-    let level = progress.level(for: selectedPet)
-    let progressValue = progress.levelProgress(for: selectedPet)
-
-    return VStack(alignment: .leading, spacing: 4) {
-        HStack {
-            Text("\(level.displayName) 进度")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text("\(Int(progressValue * 100))%")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-        }
-
-        ProgressView(value: progressValue)
-            .tint(.accentColor)
-
-        if let remaining = progress.minutesToNextLevel(for: selectedPet), remaining > 0 {
-            Text("还需 \(remaining) 分钟升级")
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
-        }
-    }
-}
-
-private func selectLevel(_ level: PetLevel) {
-    guard canUnlockLevel(level) else { return }
-    let selectedPet = PetType(rawValue: viewModel.settings.selectedPetID) ?? .cat
-    let progress = PetProgressManager.shared
-    progress.setSelectedSkinLevel(level, for: selectedPet)
-    viewModel.settings.selectedPetLevel = level.rawValue
-    saveSettings()
-}
-
-private func canUnlockLevel(_ level: PetLevel) -> Bool {
-    let progress = PetProgressManager.shared
-    let selectedPet = PetType(rawValue: viewModel.settings.selectedPetID) ?? .cat
-    let actualLevel = progress.level(for: selectedPet)
-    return actualLevel >= level
-}
-
-private func savePetLevel() {
-    PetProgressManager.shared.selectedPet = PetType(rawValue: viewModel.settings.selectedPetID) ?? .cat
 }
