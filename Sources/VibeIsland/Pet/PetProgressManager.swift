@@ -184,7 +184,21 @@ enum PetType: String, Codable, CaseIterable, Sendable {
         case .dragon: return "小龙"
         }
     }
-    
+
+    /// 系统图标名称
+    var systemImage: String {
+        switch self {
+        case .cat: return "cat"
+        case .dog: return "dog"
+        case .rabbit: return "hare"
+        case .fox: return "leaf"
+        case .penguin: return "snowflake"
+        case .robot: return "robot"
+        case .ghost: return "ghost"
+        case .dragon: return "flame"
+        }
+    }
+
     /// 解锁所需的 vibe coding 时长（分钟）
     var unlockRequirement: PetUnlockRequirement {
         switch self {
@@ -241,6 +255,9 @@ final class PetProgressManager {
     /// 每只宠物被选中时的累计编码时长（分钟）
     private(set) var petLevelMinutes: [String: Int] = [:]
 
+    /// 用户选择的皮肤等级（与实际等级分开，用户可手动选择显示哪个皮肤）
+    private(set) var selectedSkinLevels: [String: Int] = [:]
+
     /// 已解锁的宠物列表
     var unlockedPets: Set<PetType> {
         Set(PetType.allCases.filter { pet in pet.isUnlocked(totalCodingMinutes: totalCodingMinutes) })
@@ -266,7 +283,29 @@ final class PetProgressManager {
 
     /// 获取当前选中宠物的等级
     var currentLevel: PetLevel {
-        level(for: selectedPet)
+        selectedLevel(for: selectedPet)
+    }
+
+    /// 获取指定宠物的显示等级（用户选择的皮肤等级，不能超过实际等级）
+    func selectedLevel(for pet: PetType) -> PetLevel {
+        let actualLevel = level(for: pet)
+        let selectedRaw = selectedSkinLevels[pet.rawValue] ?? 1
+        let selected = PetLevel(rawValue: selectedRaw) ?? .basic
+        return selected > actualLevel ? actualLevel : selected
+    }
+
+    /// 设置指定宠物的皮肤等级
+    func setSelectedSkinLevel(_ level: PetLevel, for pet: PetType) {
+        let actualLevel = level(for: pet)
+        guard level <= actualLevel else { return }
+        selectedSkinLevels[pet.rawValue] = level.rawValue
+        saveSelectedSkinLevels()
+    }
+
+    /// 重置指定宠物的皮肤等级为实际等级
+    func resetSelectedSkinLevel(for pet: PetType) {
+        selectedSkinLevels.removeValue(forKey: pet.rawValue)
+        saveSelectedSkinLevels()
     }
 
     /// 获取指定宠物在当前等级的进度（0.0-1.0）
@@ -449,6 +488,7 @@ final class PetProgressManager {
     private let selectedKey = "vibe-island.selected-pet"
     private let enabledKey = "vibe-island.pet-enabled"
     private let petLevelMinutesKey = "vibe-island.pet-level-minutes"
+    private let selectedSkinLevelsKey = "vibe-island.selected-skin-levels"
     
     private func loadProgress() {
         totalCodingMinutes = defaults.integer(forKey: minutesKey)
@@ -461,6 +501,10 @@ final class PetProgressManager {
         // 加载宠物等级分钟数
         if let saved = defaults.dictionary(forKey: petLevelMinutesKey) as? [String: Int] {
             petLevelMinutes = saved
+        }
+        // 加载用户选择的皮肤等级
+        if let saved = defaults.dictionary(forKey: selectedSkinLevelsKey) as? [String: Int] {
+            selectedSkinLevels = saved
         }
     }
     
@@ -478,6 +522,10 @@ final class PetProgressManager {
 
     private func savePetLevelMinutes() {
         defaults.set(petLevelMinutes, forKey: petLevelMinutesKey)
+    }
+
+    private func saveSelectedSkinLevels() {
+        defaults.set(selectedSkinLevels, forKey: selectedSkinLevelsKey)
     }
 
     // MARK: - 目标设置持久化

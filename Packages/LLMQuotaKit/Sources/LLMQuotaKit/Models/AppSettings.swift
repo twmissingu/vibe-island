@@ -21,6 +21,7 @@ public struct AppSettings: Codable, Sendable {
     public var theme: AppTheme
     public var petEnabled: Bool
     public var selectedPetID: String
+    public var selectedPetLevel: Int  // 1-5 对应 PetLevel.basic-king
     public var petScaleFactor: Double
     public var pollingIntervalMinutes: Int
     public var launchAtLogin: Bool
@@ -45,6 +46,7 @@ public struct AppSettings: Codable, Sendable {
         theme: AppTheme = .glass,
         petEnabled: Bool = true,
         selectedPetID: String = "cat",
+        selectedPetLevel: Int = 1,
         petScaleFactor: Double = 1.0,
         pollingIntervalMinutes: Int = 5,
         launchAtLogin: Bool = false,
@@ -61,6 +63,7 @@ public struct AppSettings: Codable, Sendable {
         self.theme = theme
         self.petEnabled = petEnabled
         self.selectedPetID = selectedPetID
+        self.selectedPetLevel = min(max(selectedPetLevel, 1), 5)
         self.petScaleFactor = petScaleFactor
         self.pollingIntervalMinutes = min(max(pollingIntervalMinutes, 1), 60)
         self.launchAtLogin = launchAtLogin

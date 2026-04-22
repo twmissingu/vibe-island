@@ -19,6 +19,7 @@ struct PetView: View {
     
     let scale: CGFloat  // 像素缩放倍数
     let petId: String // 宠物ID
+    private let petLevel: PetLevel  // 皮肤等级
 
     init(petId: String = "cat", level: PetLevel = .basic, scale: CGFloat = 4.0) {
         // 根据petId和level加载对应的动画集
@@ -27,6 +28,13 @@ struct PetView: View {
         _petEngine = State(initialValue: PetEngine(state: .idle, animationSet: animationSet))
         self.scale = scale
         self.petId = petId
+        self.petLevel = level
+    }
+
+    // 支持 Int 类型的初始化
+    init(petId: String, level: Int, scale: CGFloat = 4.0) {
+        let petLevel = PetLevel(rawValue: level) ?? .basic
+        self.init(petId: petId, level: petLevel, scale: scale)
     }
     
     var body: some View {

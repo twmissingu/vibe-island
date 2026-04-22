@@ -28,10 +28,20 @@ struct SettingsView: View {
     
     // 宠物设置 - 仅展示已解锁宠物
     private var unlockedPets: [PetCatalog.PetInfo] {
-        // 解锁逻辑：默认解锁前3个宠物，后续可根据使用时长、成就等条件解锁更多
-        let defaultUnlockedIds: Set<String> = ["cat", "dog", "rabbit"]
-        return PetCatalog.allPets.filter { defaultUnlockedIds.contains($0.id) }
-        // 后续扩展：使用 .filter { viewModel.unlockedPetIds.contains($0.id) }
+        let allPetIds = PetType.allCases.map { $0.rawValue }
+        let progress = PetProgressManager.shared
+        return allPetIds.compactMap { id in
+            guard let pet = PetType(rawValue: id),
+                  progress.unlockedPets.contains(pet) else { return nil }
+            return PetCatalog.PetInfo(id: id, name: pet.displayName, systemImage: pet.systemImage)
+        }
+    }
+
+    // 已解锁的皮肤等级
+    private var unlockedLevels: [PetLevel] {
+        let progress = PetProgressManager.shared
+        let currentLevel = progress.level(for: progress.selectedPet)
+        return PetLevel.allCases.filter { level in level <= currentLevel }
     }
 
     // 上下文感知
@@ -153,7 +163,7 @@ struct SettingsView: View {
                 testSoundButtons
             }
 
-    // MARK: - 宠物设置
+    // MARK: - 宠物设置（增强版：含皮肤选择）
     Section(NSLocalizedString("settings.section.pet", comment: "Pixel Pet")) {
         Toggle(NSLocalizedString("settings.pet.enable", comment: "Enable Pixel Pet"), isOn: Binding(
             get: { viewModel.settings.petEnabled },
@@ -161,14 +171,7 @@ struct SettingsView: View {
         ))
 
         if viewModel.settings.petEnabled {
-            Picker(NSLocalizedString("settings.petImage", comment: "Pet Image"), selection: Binding(
-                get: { viewModel.settings.selectedPetID },
-                set: { viewModel.settings.selectedPetID = $0; saveSettings() }
-            )) {
-                ForEach(unlockedPets, id: \.id) { pet in
-                    Text(pet.name).tag(pet.id)
-                }
-            }
+            petSkinSelectorView
         }
     }
 
@@ -598,4 +601,124 @@ struct PetCatalog {
         PetInfo(id: "owl", name: NSLocalizedString("pet.owl", comment: "Owl"), systemImage: "moon"),
         PetInfo(id: "robot", name: NSLocalizedString("pet.robot", comment: "Robot"), systemImage: "robot"),
     ]
+}
+
+// MARK: - 宠物皮肤选择器视图
+
+private var petSkinSelectorView: some View {
+    VStack(alignment: .leading, spacing: 12) {
+        // 宠物选择
+        Picker(NSLocalizedString("settings.petImage", comment: "Pet Image"), selection: Binding(
+            get: { viewModel.settings.selectedPetID },
+            set: { 
+                viewModel.settings.selectedPetID = $0
+                savePetLevel()
+                saveSettings()
+            }
+        )) {
+            ForEach(unlockedPets, id: \.id) { pet in
+                HStack {
+                    Image(systemName: pet.systemImage)
+                    Text(pet.name)
+                }.tag(pet.id)
+            }
+        }
+
+        // 皮肤等级选择
+        VStack(alignment: .leading, spacing: 6) {
+            Text("皮肤等级")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+
+            // 皮肤等级网格
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 70))], spacing: 8) {
+                ForEach(unlockedLevels, id: \.self) { level in
+                    skinLevelButton(level)
+                }
+            }
+        }
+
+        // 等级进度条
+        levelProgressView
+    }
+}
+
+private func skinLevelButton(_ level: PetLevel) -> some View {
+    let isSelected = viewModel.settings.selectedPetLevel == level.rawValue
+    let canUnlock = canUnlockLevel(level)
+
+    return Button {
+        selectLevel(level)
+    } label: {
+        VStack(spacing: 4) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? Color.accentColor : Color.secondary.opacity(0.2))
+                    .frame(height: 50)
+
+                // 预览宠物
+                PetView(
+                    petId: viewModel.settings.selectedPetID,
+                    level: level,
+                    scale: 2.0
+                )
+                .allowsHitTesting(false)
+            }
+
+            Text(level.displayName)
+                .font(.system(size: 10))
+                .foregroundStyle(isSelected ? .accentColor : .secondary)
+        }
+    }
+    .buttonStyle(.plain)
+    .disabled(!canUnlock)
+    .opacity(canUnlock ? 1 : 0.5)
+}
+
+private var levelProgressView: some View {
+    let progress = PetProgressManager.shared
+    let selectedPet = PetType(rawValue: viewModel.settings.selectedPetID) ?? .cat
+    let level = progress.level(for: selectedPet)
+    let progressValue = progress.levelProgress(for: selectedPet)
+
+    return VStack(alignment: .leading, spacing: 4) {
+        HStack {
+            Text("\(level.displayName) 进度")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text("\(Int(progressValue * 100))%")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+
+        ProgressView(value: progressValue)
+            .tint(.accentColor)
+
+        if let remaining = progress.minutesToNextLevel(for: selectedPet), remaining > 0 {
+            Text("还需 \(remaining) 分钟升级")
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+        }
+    }
+}
+
+private func selectLevel(_ level: PetLevel) {
+    guard canUnlockLevel(level) else { return }
+    let selectedPet = PetType(rawValue: viewModel.settings.selectedPetID) ?? .cat
+    let progress = PetProgressManager.shared
+    progress.setSelectedSkinLevel(level, for: selectedPet)
+    viewModel.settings.selectedPetLevel = level.rawValue
+    saveSettings()
+}
+
+private func canUnlockLevel(_ level: PetLevel) -> Bool {
+    let progress = PetProgressManager.shared
+    let selectedPet = PetType(rawValue: viewModel.settings.selectedPetID) ?? .cat
+    let actualLevel = progress.level(for: selectedPet)
+    return actualLevel >= level
+}
+
+private func savePetLevel() {
+    PetProgressManager.shared.selectedPet = PetType(rawValue: viewModel.settings.selectedPetID) ?? .cat
 }
