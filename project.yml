@@ -24,7 +24,7 @@ schemes:
     build:
       targets:
         VibeIsland: all
-        VibeWidget: all
+        # VibeWidget: all  # disabled
         VibeIslandCLI: all
     run:
       config: Debug
@@ -64,21 +64,22 @@ targets:
           BUILD=$(git -C "$SRCROOT" rev-list --count HEAD 2>/dev/null || echo 1)
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "${BUILT_PRODUCTS_DIR}/${INFOPLIST_PATH}" 2>/dev/null || true
 
-  VibeWidget:
-    type: app-extension
-    platform: macOS
-    deploymentTarget: "14.0"
-    sources:
-      - path: Widget
-    dependencies:
-      - package: LLMQuotaKit
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.twmissingu.VibeIsland.Widget
-        SWIFT_VERSION: "6.0"
-        CODE_SIGN_STYLE: Automatic
-        INFOPLIST_FILE: Widget/Info.plist
-        CODE_SIGN_ENTITLEMENTS: Widget/VibeWidget.entitlements
+  # VibeWidget disabled for now - requires development signing
+  # VibeWidget:
+  #   type: app-extension
+  #   platform: macOS
+  #   deploymentTarget: "14.0"
+  #   sources:
+  #     - path: Widget
+  #   dependencies:
+  #     - package: LLMQuotaKit
+  #   settings:
+  #     base:
+  #       PRODUCT_BUNDLE_IDENTIFIER: com.twmissingu.VibeIsland.Widget
+  #       SWIFT_VERSION: "6.0"
+  #       CODE_SIGN_STYLE: Automatic
+  #       INFOPLIST_FILE: Widget/Info.plist
+  #       CODE_SIGN_ENTITLEMENTS: Widget/VibeWidget.entitlements
 
   LLMQuotaKit:
     type: framework
@@ -97,9 +98,6 @@ targets:
     deploymentTarget: "14.0"
     sources:
       - path: Sources/CLI
-        excludes:
-          - "**/SharedModels.swift"
-      - path: Sources/CLI/SharedModels.swift
     settings:
       base:
         PRODUCT_NAME: vibe-island

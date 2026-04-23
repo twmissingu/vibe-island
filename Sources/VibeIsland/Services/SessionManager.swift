@@ -29,7 +29,10 @@ enum TrackingMode: Equatable {
 /// 多工具聚合由 MultiToolAggregator 负责。
 @MainActor
 @Observable
-final class SessionManager {
+final class SessionManager: SessionAggregatable {
+    // MARK: SessionAggregatable 实现
+    var allSessions: [Session] { Array(sessions.values) }
+    func sessionStatus(_ session: Session) -> SessionState { session.status }
     // MARK: 单例
 
     static let shared = SessionManager()
@@ -64,25 +67,6 @@ final class SessionManager {
     /// 按优先级排序的会话列表
     var sortedSessions: [Session] {
         sessions.values.sorted { $0.status.priority < $1.status.priority }
-    }
-    /// 最高优先级的会话状态（用于 UI 展示）
-    var aggregateState: SessionState {
-        sessions.values
-            .map(\.status)
-            .min(by: { $0.priority < $1.priority })
-            ?? .idle
-    }
-    /// 活跃会话数量
-    var activeCount: Int {
-        sessions.filter { $0.value.status != .completed && $0.value.status != .idle }.count
-    }
-    /// 是否有需要用户操作的会话（等待权限）
-    var hasPendingPermission: Bool {
-        sessions.values.contains { $0.status == .waitingPermission }
-    }
-    /// 是否有错误会话
-    var hasError: Bool {
-        sessions.values.contains { $0.status == .error }
     }
 
     // MARK: 内部依赖

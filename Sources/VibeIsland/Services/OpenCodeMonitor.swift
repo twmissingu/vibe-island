@@ -91,7 +91,10 @@ enum OpenCodeMonitorSource: String, Sendable {
 /// 4. 最终兜底：pgrep 检测进程
 @MainActor
 @Observable
-final class OpenCodeMonitor {
+final class OpenCodeMonitor: SessionAggregatable {
+    // MARK: SessionAggregatable 实现
+    var allSessions: [OpenCodeSession] { sessions }
+    func sessionStatus(_ session: OpenCodeSession) -> SessionState { session.status.toSessionState }
 
     // MARK: 常量
 
@@ -128,23 +131,7 @@ final class OpenCodeMonitor {
     /// 监控是否已启动
     private(set) var isRunning = false
 
-    /// 最高优先级会话状态（用于 UI 展示）
-    var aggregateState: SessionState {
-        sessions
-            .map { $0.status.toSessionState }
-            .min(by: { $0.priority < $1.priority })
-            ?? .idle
-    }
 
-    /// 活跃会话数量
-    var activeCount: Int {
-        sessions.filter { $0.status != .completed && $0.status != .idle }.count
-    }
-
-    /// 是否有等待权限审批的会话
-    var hasPendingPermission: Bool {
-        sessions.contains { $0.status == .waiting }
-    }
 
     // MARK: 内部依赖
 

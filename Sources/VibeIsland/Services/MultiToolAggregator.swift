@@ -75,7 +75,10 @@ struct UnifiedSessionView: Identifiable, Equatable, Sendable {
 /// - @MainActor @Observable 支持 UI 更新
 @MainActor
 @Observable
-final class MultiToolAggregator {
+final class MultiToolAggregator: SessionAggregatable {
+    // MARK: SessionAggregatable 实现
+    var allSessions: [UnifiedSessionView] { unifiedSessions }
+    func sessionStatus(_ session: UnifiedSessionView) -> SessionState { session.status }
 
     // MARK: 常量
 
@@ -97,37 +100,17 @@ final class MultiToolAggregator {
     }
 
     /// 最高优先级状态（用于菜单栏/全局展示）
-    var topStatus: SessionState {
-        unifiedSessions
-            .map(\.status)
-            .min(by: { $0.priority < $1.priority })
-            ?? .idle
-    }
-
-    /// 活跃会话总数
-    var activeCount: Int {
-        unifiedSessions.filter { $0.status != .idle && $0.status != .completed }.count
-    }
+    var topStatus: SessionState { aggregateState }
 
     /// 各工具的活跃数量
     var countBySource: [ToolSource: Int] {
         var counts: [ToolSource: Int] = [:]
-        for source in ToolSource.allCases {
-            counts[source] = unifiedSessions.filter {
-                $0.source == source && $0.status != .idle && $0.status != .completed
-            }.count
+        for session in unifiedSessions {
+            if session.status != .idle && session.status != .completed {
+                counts[session.source, default: 0] += 1
+            }
         }
         return counts
-    }
-
-    /// 是否有等待权限审批的会话
-    var hasPendingPermission: Bool {
-        unifiedSessions.contains { $0.status == .waitingPermission }
-    }
-
-    /// 是否有错误会话
-    var hasError: Bool {
-        unifiedSessions.contains { $0.status == .error }
     }
 
     /// 聚合器是否已启动

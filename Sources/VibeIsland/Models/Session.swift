@@ -1,70 +1,89 @@
 import Foundation
 
+// MARK: - 会话错误
+
+public enum SessionError: LocalizedError, Sendable, Equatable {
+    case fileURLMissing
+    case fileNotFound(URL)
+    case decodeFailed(String)
+    case lockFailed(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .fileURLMissing: return "文件路径未设置"
+        case .fileNotFound(let url): return "文件不存在: \(url.path)"
+        case .decodeFailed(let msg): return "解析失败: \(msg)"
+        case .lockFailed(let msg): return "获取文件锁失败: \(msg)"
+        }
+    }
+}
+
+// MARK: - 文件锁工具
+
+public enum FileLock {
+    public static func withLock(at url: URL, body: () throws -> Void) throws {
+        let lockPath = url.path + ".lock"
+        let fd = open(lockPath, O_CREAT | O_WRONLY, 0o600)
+        guard fd >= 0 else {
+            throw SessionError.lockFailed(String(cString: strerror(errno)))
+        }
+        defer { close(fd) }
+        guard flock(fd, LOCK_EX) == 0 else {
+            throw SessionError.lockFailed(String(cString: strerror(errno)))
+        }
+        defer { flock(fd, LOCK_UN) }
+        try body()
+    }
+}
+
+// MARK: - 子代理信息
+
+public struct SubagentInfo: Codable, Equatable, Sendable {
+    public let agentId: String
+    public let agentType: String
+    public let startedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case agentId = "agent_id"
+        case agentType = "agent_type"
+        case startedAt = "started_at"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        agentId = try container.decode(String.self, forKey: .agentId)
+        agentType = try container.decodeIfPresent(String.self, forKey: .agentType) ?? "unknown"
+        startedAt = try container.decode(Date.self, forKey: .startedAt)
+    }
+
+    public init(agentId: String, agentType: String, startedAt: Date) {
+        self.agentId = agentId
+        self.agentType = agentType
+        self.startedAt = startedAt
+    }
+}
+
 // MARK: - 会话数据模型
 
-/// 单个会话完整数据模型，支持从 JSON 文件读写
-struct Session: Codable, Equatable, Sendable {
-    // MARK: 核心字段
-
-    /// 会话唯一标识
-    let sessionId: String
-    /// 当前工作目录
-    let cwd: String
-
-    // MARK: 状态
-
-    /// 当前会话状态
-    var status: SessionState
-    /// 最后活动时间
-    var lastActivity: Date
-
-    // MARK: 上下文信息
-
-    /// Git 分支名（如果可用）
-    var branch: String?
-    /// 来源标识
-    var source: String?
-    /// 会话名称
-    var sessionName: String?
-
-    // MARK: 最后操作快照
-
-    /// 最后使用的工具名
-    var lastTool: String?
-    /// 最后工具调用的详细输入（JSON 字符串）
-    var lastToolDetail: String?
-    /// 最后一条用户提示
-    var lastPrompt: String?
-    /// 当前通知消息
-    var notificationMessage: String?
-
-    // MARK: 子代理
-
-    /// 活跃的子代理列表
-    var activeSubagents: [SubagentInfo]
-
-    // MARK: PID 追踪（CLI 写入，用于进程检测和会话清理）
-
-    /// 父进程 ID
-    var pid: UInt32?
-    /// 父进程启动时间（用于检测 PID 复用）
-    var pidStartTime: TimeInterval?
-
-    // MARK: 上下文使用信息（由 ContextMonitor 解析 PreCompact 事件填充）
-
-    /// 上下文使用率 (0.0 - 1.0)
-    var contextUsage: Double?
-    /// 已使用的上下文 token 数
-    var contextTokensUsed: Int?
-    /// 总上下文 token 上限
-    var contextTokensTotal: Int?
-
-    // MARK: 文件路径
-
-    /// 对应的 JSON 文件路径
-    var fileURL: URL?
-
-    // MARK: Codable
+public struct Session: Codable, Equatable, Sendable {
+    public let sessionId: String
+    public let cwd: String
+    public var status: SessionState
+    public var lastActivity: Date
+    public var branch: String?
+    public var source: String?
+    public var sessionName: String?
+    public var lastTool: String?
+    public var lastToolDetail: String?
+    public var lastPrompt: String?
+    public var notificationMessage: String?
+    public var activeSubagents: [SubagentInfo]
+    public var pid: UInt32?
+    public var pidStartTime: TimeInterval?
+    public var contextUsage: Double?
+    public var contextTokensUsed: Int?
+    public var contextTokensTotal: Int?
+    public var fileURL: URL?
 
     enum CodingKeys: String, CodingKey {
         case sessionId, session_id
@@ -86,108 +105,7 @@ struct Session: Codable, Equatable, Sendable {
         case contextTokensTotal, context_tokens_total
     }
 
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        
-        // 支持驼峰和蛇形两种格式
-        sessionId = try Self.decodeFirst(container, key1: .sessionId, key2: .session_id) { c, k in
-            try c.decode(String.self, forKey: k)
-        }
-        
-        cwd = try container.decode(String.self, forKey: .cwd)
-        status = try container.decodeIfPresent(SessionState.self, forKey: .status) ?? .idle
-        
-        lastActivity = try Self.decodeFirst(container, key1: .lastActivity, key2: .last_activity) { c, k in
-            try c.decode(Date.self, forKey: k)
-        }
-        
-        branch = try container.decodeIfPresent(String.self, forKey: .branch)
-        source = try container.decodeIfPresent(String.self, forKey: .source)
-        
-        sessionName = try Self.decodeFirstOptional(container, key1: .sessionName, key2: .session_name) { c, k in
-            try c.decodeIfPresent(String.self, forKey: k)
-        }
-        lastTool = try Self.decodeFirstOptional(container, key1: .lastTool, key2: .last_tool) { c, k in
-            try c.decodeIfPresent(String.self, forKey: k)
-        }
-        lastToolDetail = try Self.decodeFirstOptional(container, key1: .lastToolDetail, key2: .last_tool_detail) { c, k in
-            try c.decodeIfPresent(String.self, forKey: k)
-        }
-        lastPrompt = try Self.decodeFirstOptional(container, key1: .lastPrompt, key2: .last_prompt) { c, k in
-            try c.decodeIfPresent(String.self, forKey: k)
-        }
-        notificationMessage = try Self.decodeFirstOptional(container, key1: .notificationMessage, key2: .notification_message) { c, k in
-            try c.decodeIfPresent(String.self, forKey: k)
-        }
-        activeSubagents = try Self.decodeFirstOptional(container, key1: .activeSubagents, key2: .active_subagents) { c, k in
-            try c.decodeIfPresent([SubagentInfo].self, forKey: k)
-        } ?? []
-        pid = try container.decodeIfPresent(UInt32.self, forKey: .pid)
-        
-        pidStartTime = try Self.decodeFirstOptional(container, key1: .pidStartTime, key2: .pid_start_time) { c, k in
-            try c.decodeIfPresent(TimeInterval.self, forKey: k)
-        }
-        
-        contextUsage = try Self.decodeFirstOptional(container, key1: .contextUsage, key2: .context_usage) { c, k in
-            try c.decodeIfPresent(Double.self, forKey: k)
-        }
-        contextTokensUsed = try Self.decodeFirstOptional(container, key1: .contextTokensUsed, key2: .context_tokens_used) { c, k in
-            try c.decodeIfPresent(Int.self, forKey: k)
-        }
-        contextTokensTotal = try Self.decodeFirstOptional(container, key1: .contextTokensTotal, key2: .context_tokens_total) { c, k in
-            try c.decodeIfPresent(Int.self, forKey: k)
-        }
-        fileURL = nil
-    }
-    
-    /// 尝试解码第一个可用的键（必需字段）
-    private static func decodeFirst<T: Decodable>(
-        _ container: KeyedDecodingContainer<CodingKeys>,
-        key1: CodingKeys,
-        key2: CodingKeys,
-        decode: (KeyedDecodingContainer<CodingKeys>, CodingKeys) throws -> T
-    ) throws -> T {
-        if let value = try container.decodeIfPresent(T.self, forKey: key1) {
-            return value
-        }
-        return try decode(container, key2)
-    }
-    
-    /// 尝试解码第一个可用的键（可选字段）
-    private static func decodeFirstOptional<T: Decodable>(
-        _ container: KeyedDecodingContainer<CodingKeys>,
-        key1: CodingKeys,
-        key2: CodingKeys,
-        decode: (KeyedDecodingContainer<CodingKeys>, CodingKeys) throws -> T?
-    ) throws -> T? {
-        if let value = try container.decodeIfPresent(T.self, forKey: key1) {
-            return value
-        }
-        return try decode(container, key2)
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(sessionId, forKey: .sessionId)
-        try container.encode(cwd, forKey: .cwd)
-        try container.encode(status, forKey: .status)
-        try container.encode(lastActivity, forKey: .lastActivity)
-        try container.encodeIfPresent(branch, forKey: .branch)
-        try container.encodeIfPresent(source, forKey: .source)
-        try container.encodeIfPresent(sessionName, forKey: .sessionName)
-        try container.encodeIfPresent(lastTool, forKey: .lastTool)
-        try container.encodeIfPresent(lastToolDetail, forKey: .lastToolDetail)
-        try container.encodeIfPresent(lastPrompt, forKey: .lastPrompt)
-        try container.encodeIfPresent(notificationMessage, forKey: .notificationMessage)
-        try container.encode(activeSubagents, forKey: .activeSubagents)
-        try container.encodeIfPresent(pid, forKey: .pid)
-        try container.encodeIfPresent(pidStartTime, forKey: .pidStartTime)
-        try container.encodeIfPresent(contextUsage, forKey: .contextUsage)
-        try container.encodeIfPresent(contextTokensUsed, forKey: .contextTokensUsed)
-        try container.encodeIfPresent(contextTokensTotal, forKey: .contextTokensTotal)
-    }
-
-    init(
+    public init(
         sessionId: String,
         cwd: String,
         status: SessionState = .idle,
@@ -227,19 +145,88 @@ struct Session: Codable, Equatable, Sendable {
         self.fileURL = fileURL
     }
 
-    // MARK: 事件处理
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        sessionId = try Self.decodeFirst(container, key1: .sessionId, key2: .session_id) { c, k in try c.decode(String.self, forKey: k) }
+        cwd = try container.decode(String.self, forKey: .cwd)
+        status = try container.decodeIfPresent(SessionState.self, forKey: .status) ?? .idle
+        lastActivity = try Self.decodeFirst(container, key1: .lastActivity, key2: .last_activity) { c, k in try c.decode(Date.self, forKey: k) }
+        branch = try container.decodeIfPresent(String.self, forKey: .branch)
+        source = try container.decodeIfPresent(String.self, forKey: .source)
+        sessionName = try Self.decodeFirstOptional(container, key1: .sessionName, key2: .session_name) { c, k in try c.decodeIfPresent(String.self, forKey: k) }
+        lastTool = try Self.decodeFirstOptional(container, key1: .lastTool, key2: .last_tool) { c, k in try c.decodeIfPresent(String.self, forKey: k) }
+        lastToolDetail = try Self.decodeFirstOptional(container, key1: .lastToolDetail, key2: .last_tool_detail) { c, k in try c.decodeIfPresent(String.self, forKey: k) }
+        lastPrompt = try Self.decodeFirstOptional(container, key1: .lastPrompt, key2: .last_prompt) { c, k in try c.decodeIfPresent(String.self, forKey: k) }
+        notificationMessage = try Self.decodeFirstOptional(container, key1: .notificationMessage, key2: .notification_message) { c, k in try c.decodeIfPresent(String.self, forKey: k) }
+        activeSubagents = try Self.decodeFirstOptional(container, key1: .activeSubagents, key2: .active_subagents) { c, k in try c.decodeIfPresent([SubagentInfo].self, forKey: k) } ?? []
+        pid = try container.decodeIfPresent(UInt32.self, forKey: .pid)
+        pidStartTime = try Self.decodeFirstOptional(container, key1: .pidStartTime, key2: .pid_start_time) { c, k in try c.decodeIfPresent(TimeInterval.self, forKey: k) }
+        contextUsage = try Self.decodeFirstOptional(container, key1: .contextUsage, key2: .context_usage) { c, k in try c.decodeIfPresent(Double.self, forKey: k) }
+        contextTokensUsed = try Self.decodeFirstOptional(container, key1: .contextTokensUsed, key2: .context_tokens_used) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
+        contextTokensTotal = try Self.decodeFirstOptional(container, key1: .contextTokensTotal, key2: .context_tokens_total) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
+        fileURL = nil
+    }
 
-    /// 根据 hook 事件更新会话状态
-    mutating func applyEvent(_ event: SessionEvent) {
+    private static func decodeFirst<T: Decodable>(_ container: KeyedDecodingContainer<CodingKeys>, key1: CodingKeys, key2: CodingKeys, decode: (KeyedDecodingContainer<CodingKeys>, CodingKeys) throws -> T) throws -> T {
+        if let value = try container.decodeIfPresent(T.self, forKey: key1) { return value }
+        return try decode(container, key2)
+    }
+
+    private static func decodeFirstOptional<T: Decodable>(_ container: KeyedDecodingContainer<CodingKeys>, key1: CodingKeys, key2: CodingKeys, decode: (KeyedDecodingContainer<CodingKeys>, CodingKeys) throws -> T?) throws -> T? {
+        if let value = try container.decodeIfPresent(T.self, forKey: key1) { return value }
+        return try decode(container, key2)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(sessionId, forKey: .session_id) // 输出蛇形键名保持兼容
+        try container.encode(cwd, forKey: .cwd)
+        try container.encode(status, forKey: .status)
+        try container.encode(lastActivity, forKey: .last_activity) // 输出蛇形键名保持兼容
+        try container.encodeIfPresent(branch, forKey: .branch)
+        try container.encodeIfPresent(source, forKey: .source)
+        try container.encodeIfPresent(sessionName, forKey: .session_name) // 输出蛇形键名保持兼容
+        try container.encodeIfPresent(lastTool, forKey: .last_tool) // 输出蛇形键名保持兼容
+        try container.encodeIfPresent(lastToolDetail, forKey: .last_tool_detail) // 输出蛇形键名保持兼容
+        try container.encodeIfPresent(lastPrompt, forKey: .last_prompt) // 输出蛇形键名保持兼容
+        try container.encodeIfPresent(notificationMessage, forKey: .notification_message) // 输出蛇形键名保持兼容
+        try container.encode(activeSubagents, forKey: .active_subagents) // 输出蛇形键名保持兼容
+        try container.encodeIfPresent(pid, forKey: .pid)
+        try container.encodeIfPresent(pidStartTime, forKey: .pid_start_time) // 输出蛇形键名保持兼容
+        try container.encodeIfPresent(contextUsage, forKey: .context_usage) // 输出蛇形键名保持兼容
+        try container.encodeIfPresent(contextTokensUsed, forKey: .context_tokens_used) // 输出蛇形键名保持兼容
+        try container.encodeIfPresent(contextTokensTotal, forKey: .context_tokens_total) // 输出蛇形键名保持兼容
+    }
+
+    public func writeToFile() throws {
+        guard let url = fileURL else { throw SessionError.fileURLMissing }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(self)
+        try data.write(to: url, options: .atomic)
+    }
+
+    public static func loadFromFile(url: URL) throws -> Session {
+        let data = try Data(contentsOf: url)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        var session = try decoder.decode(Session.self, from: data)
+        session.fileURL = url
+        return session
+    }
+}
+
+// MARK: - Session 事件处理
+
+extension Session {
+    /// 根据 hook 事件更新会话状态及相关字段
+    public mutating func applyEvent(_ event: SessionEvent) {
         lastActivity = event.receivedAt
-
-        // 状态转换
         status = SessionState.transition(from: status, event: event.hookEventName)
-
-        // 更新上下文
         source = event.source ?? source
         sessionName = event.sessionName ?? sessionName
-        notificationMessage = nil  // 默认清除
+        notificationMessage = nil
 
         switch event.hookEventName {
         case .userPromptSubmit:
@@ -271,7 +258,7 @@ struct Session: Codable, Equatable, Sendable {
             if let agentId = event.agentId {
                 let subagent = SubagentInfo(
                     agentId: agentId,
-                    agentType: event.agentType,
+                    agentType: event.agentType ?? "unknown",
                     startedAt: event.receivedAt
                 )
                 activeSubagents.append(subagent)
@@ -292,56 +279,13 @@ struct Session: Codable, Equatable, Sendable {
             break
         }
     }
-
-    // MARK: 文件读写
-
-    /// 将会话写入 JSON 文件
-    func writeToFile() throws {
-        guard let url = fileURL else {
-            throw SessionError.fileURLMissing
-        }
-
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(self)
-        try data.write(to: url, options: .atomic)
-    }
-
-    /// 从 JSON 文件读取会话
-    static func loadFromFile(url: URL) throws -> Session {
-        let data = try Data(contentsOf: url)
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        var session = try decoder.decode(Session.self, from: data)
-        session.fileURL = url
-        return session
-    }
 }
 
-// MARK: - 子代理信息
+// MARK: - Session 显示名称
 
-struct SubagentInfo: Codable, Equatable, Sendable {
-    let agentId: String
-    let agentType: String?
-    let startedAt: Date
-}
-
-// MARK: - 会话错误
-
-enum SessionError: LocalizedError {
-    case fileURLMissing
-    case fileNotFound(URL)
-    case decodeFailed(Error)
-
-    var errorDescription: String? {
-        switch self {
-        case .fileURLMissing:
-            return "文件路径未设置"
-        case .fileNotFound(let url):
-            return "文件不存在: \(url.path)"
-        case .decodeFailed(let error):
-            return "解析失败: \(error.localizedDescription)"
-        }
+extension Session {
+    /// 统一的显示名称
+    public var shortName: String {
+        sessionName ?? "\(source ?? "unknown"): \(cwd.split(separator: "/").last?.description ?? cwd)"
     }
 }

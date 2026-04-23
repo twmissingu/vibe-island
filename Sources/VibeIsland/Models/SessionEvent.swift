@@ -1,36 +1,25 @@
 import Foundation
 
-// MARK: - Hook 事件名称（与 Claude Code hook stdin JSON 格式对齐）
+// MARK: - Hook 事件名称
 
 /// 14 种 hook 事件类型，覆盖 Claude Code 生命周期
-enum SessionEventName: String, Codable, Sendable, CaseIterable {
-    // 会话生命周期
+public enum SessionEventName: String, Codable, Sendable, CaseIterable {
     case sessionStart = "SessionStart"
     case sessionEnd = "SessionEnd"
     case stop = "Stop"
     case sessionError = "SessionError"
-
-    // 用户交互
     case userPromptSubmit = "UserPromptSubmit"
     case permissionRequest = "PermissionRequest"
-
-    // 工具调用
     case preToolUse = "PreToolUse"
     case postToolUse = "PostToolUse"
     case postToolUseFailure = "PostToolUseFailure"
-
-    // 上下文压缩
     case preCompact = "PreCompact"
     case postCompact = "PostCompact"
-
-    // 子代理
     case subagentStart = "SubagentStart"
     case subagentStop = "SubagentStop"
-
-    // 通知（idle / permission / other 通过 notificationType 区分）
     case notification = "Notification"
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .sessionStart: return "会话开始"
         case .sessionEnd: return "会话结束"
@@ -48,11 +37,44 @@ enum SessionEventName: String, Codable, Sendable, CaseIterable {
         case .notification: return "通知"
         }
     }
+
+    public func toSessionState() -> SessionState {
+        switch self {
+        case .sessionStart: return .idle
+        case .userPromptSubmit, .preToolUse, .postToolUse: return .coding
+        case .stop: return .completed
+        case .notification: return .waiting
+        case .permissionRequest: return .waitingPermission
+        case .subagentStart, .subagentStop: return .thinking
+        case .preCompact, .postCompact: return .compacting
+        case .sessionError: return .error
+        case .postToolUseFailure: return .error
+        case .sessionEnd: return .idle
+        }
+    }
+
+    /// 事件类型分组
+    public var category: String {
+        switch self {
+        case .sessionStart, .sessionEnd, .stop, .sessionError:
+            return "Lifecycle"
+        case .userPromptSubmit, .permissionRequest:
+            return "User Interaction"
+        case .preToolUse, .postToolUse, .postToolUseFailure:
+            return "Tool"
+        case .preCompact, .postCompact:
+            return "Compaction"
+        case .subagentStart, .subagentStop:
+            return "Subagent"
+        case .notification:
+            return "Notification"
+        }
+    }
 }
 
 // MARK: - 通知类型
 
-enum NotificationType: String, Codable, Sendable {
+public enum NotificationType: String, Codable, Sendable {
     case idlePrompt = "idle_prompt"
     case permissionPrompt = "permission_prompt"
     case other = "other"
@@ -61,53 +83,27 @@ enum NotificationType: String, Codable, Sendable {
 // MARK: - Hook 事件数据模型
 
 /// Claude Code hook stdin JSON 格式
-/// 参考：https://docs.anthropic.com/en/docs/claude-code/settings#hooks
-struct SessionEvent: Codable, Sendable {
-    // MARK: 必需字段
-
-    /// 会话唯一标识
-    let sessionId: String
-    /// 当前工作目录
-    let cwd: String
-    /// hook 事件名称
-    let hookEventName: SessionEventName
-
-    // MARK: 可选字段
-
-    /// 来源标识
-    let source: String?
-    /// 会话名称
-    let sessionName: String?
-
-    // 用户提示
-    let prompt: String?
-
-    // 工具相关
-    let toolName: String?
-    let toolInput: [String: String]?
-    let title: String?
-
-    // 错误信息
-    let error: String?
-    let message: String?
-
-    // 通知
-    let notificationType: NotificationType?
-
-    // 子代理
-    let agentId: String?
-    let agentType: String?
-
-    // 其他
-    let transcriptPath: String?
-    let permissionMode: String?
-    let isInterrupt: Bool?
-
-    // MARK: 时间戳（由接收时填充）
-
-    let receivedAt: Date
-
-    // MARK: Codable
+public struct SessionEvent: Codable, Sendable {
+    public let sessionId: String
+    public let cwd: String
+    public let hookEventName: SessionEventName
+    public let source: String?
+    public let sessionName: String?
+    public let prompt: String?
+    public let toolName: String?
+    public let toolInput: [String: String]?
+    public let title: String?
+    public let error: String?
+    public let message: String?
+    public let notificationType: NotificationType?
+    public let agentId: String?
+    public let agentType: String?
+    public let transcriptPath: String?
+    public let permissionMode: String?
+    public let isInterrupt: Bool?
+    public let pid: UInt32?
+    public let pidStartTime: TimeInterval?
+    public let receivedAt: Date
 
     enum CodingKeys: String, CodingKey {
         case sessionId = "session_id"
@@ -127,9 +123,12 @@ struct SessionEvent: Codable, Sendable {
         case transcriptPath = "transcript_path"
         case permissionMode = "permission_mode"
         case isInterrupt = "is_interrupt"
+        case pid
+        case pidStartTime = "pid_start_time"
+        case receivedAt = "received_at"
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         sessionId = try container.decode(String.self, forKey: .sessionId)
         cwd = try container.decode(String.self, forKey: .cwd)
@@ -148,10 +147,12 @@ struct SessionEvent: Codable, Sendable {
         transcriptPath = try container.decodeIfPresent(String.self, forKey: .transcriptPath)
         permissionMode = try container.decodeIfPresent(String.self, forKey: .permissionMode)
         isInterrupt = try container.decodeIfPresent(Bool.self, forKey: .isInterrupt)
+        pid = try container.decodeIfPresent(UInt32.self, forKey: .pid)
+        pidStartTime = try container.decodeIfPresent(TimeInterval.self, forKey: .pidStartTime)
         receivedAt = Date()
     }
 
-    func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(sessionId, forKey: .sessionId)
         try container.encode(cwd, forKey: .cwd)
@@ -170,12 +171,12 @@ struct SessionEvent: Codable, Sendable {
         try container.encodeIfPresent(transcriptPath, forKey: .transcriptPath)
         try container.encodeIfPresent(permissionMode, forKey: .permissionMode)
         try container.encodeIfPresent(isInterrupt, forKey: .isInterrupt)
+        try container.encodeIfPresent(pid, forKey: .pid)
+        try container.encodeIfPresent(pidStartTime, forKey: .pidStartTime)
+        try container.encode(receivedAt, forKey: .receivedAt)
     }
 
-    // MARK: 测试专用初始化器
-
-    /// 内部初始化器，供测试使用
-    init(
+    public init(
         sessionId: String,
         cwd: String,
         hookEventName: SessionEventName,
@@ -193,6 +194,8 @@ struct SessionEvent: Codable, Sendable {
         transcriptPath: String? = nil,
         permissionMode: String? = nil,
         isInterrupt: Bool? = nil,
+        pid: UInt32? = nil,
+        pidStartTime: TimeInterval? = nil,
         receivedAt: Date = Date()
     ) {
         self.sessionId = sessionId
@@ -212,6 +215,8 @@ struct SessionEvent: Codable, Sendable {
         self.transcriptPath = transcriptPath
         self.permissionMode = permissionMode
         self.isInterrupt = isInterrupt
+        self.pid = pid
+        self.pidStartTime = pidStartTime
         self.receivedAt = receivedAt
     }
 }

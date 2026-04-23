@@ -273,7 +273,7 @@ final class PetProgressManagerTests: XCTestCase {
         notificationManager.clearNotifications()
 
         // 添加 6 条通知
-        for pet in [.cat, .dog, .rabbit, .hamster, .fox, .penguin] {
+        for pet in [PetType.cat, .dog, .rabbit, .hamster, .fox, .penguin] {
             let notification = PetUnlockNotification(pet: pet, unlockTime: Date())
             notificationManager.addNotification(notification)
         }

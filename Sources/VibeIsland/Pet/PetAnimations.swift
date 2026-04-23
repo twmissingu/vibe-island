@@ -1001,9 +1001,15 @@ extension PetAnimationSet {
         case .robot: base = .robot
         case .ghost: base = .ghost
         case .dragon: base = .dragon
+        case .hamster: base = .cat // 测试用，复用猫的动画
         }
         if level == .basic { return base }
         return base.withSkin(PetSkinPalette.palette(for: type, level: level))
+    }
+
+    /// 获取指定宠物和等级的调色板（测试便捷方法）
+    static func palette(for pet: PetType, level: PetLevel) -> PetSkinPalette {
+        PetSkinPalette.palette(for: pet, level: level)
     }
 }
 
@@ -1030,6 +1036,7 @@ struct PetSkinPalette {
         case .robot: return robotPalette(level)
         case .ghost: return ghostPalette(level)
         case .dragon: return dragonPalette(level)
+        case .hamster: return catPalette(level) // 测试用，复用猫的调色板
         }
     }
 

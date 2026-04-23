@@ -6,7 +6,10 @@ import Foundation
 /// 使用 DispatchSource 监听文件变化 + 防抖动 + 降级轮询兜底
 @MainActor
 @Observable
-final class SessionFileWatcher {
+final class SessionFileWatcher: SessionAggregatable {
+    // MARK: SessionAggregatable 实现
+    var allSessions: [Session] { Array(sessions.values) }
+    func sessionStatus(_ session: Session) -> SessionState { session.status }
     // MARK: 单例
     
     static let shared = SessionFileWatcher()
@@ -31,21 +34,9 @@ final class SessionFileWatcher {
     /// 监听是否已启动
     private(set) var isWatching = false
     
-    /// 聚合状态 - 返回最高优先级的会话状态
-    var aggregateState: SessionState {
-        guard !sessions.isEmpty else { return .idle }
-        return sessions.values
-            .map(\.status)
-            .sorted { $0.priority < $1.priority }
-            .first ?? .idle
-    }
-    
     /// 优先级最高的会话
     var topSession: Session? {
-        guard !sessions.isEmpty else { return nil }
-        return sessions.values
-            .sorted { $0.status.priority < $1.status.priority }
-            .first
+        sessions.values.min { $0.status.priority < $1.status.priority }
     }
 
     // MARK: 内部状态

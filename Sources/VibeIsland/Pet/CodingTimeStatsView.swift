@@ -244,6 +244,7 @@ struct CodingTimeStatsView: View {
         case .robot: return "🤖"
         case .ghost: return "👻"
         case .dragon: return "🐲"
+        case .hamster: return "🐹"
         }
     }
 

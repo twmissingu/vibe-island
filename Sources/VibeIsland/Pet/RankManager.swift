@@ -73,8 +73,8 @@ final class RankManager {
     static let shared = RankManager()
 
     // 用户当前排名数据
-    private(set) var userRank: [RankCategory: Int] = [:]
-    private(set) var userValue: [RankCategory: Int] = [:]
+    var userRank: [RankCategory: Int] = [:]
+    var userValue: [RankCategory: Int] = [:]
 
     private let defaults = UserDefaults.standard
 
@@ -175,7 +175,7 @@ final class RankManager {
 
     // MARK: - 私有方法
 
-    private func calculateRank(for value: Int, category: RankCategory) -> Int {
+    func calculateRank(for value: Int, category: RankCategory) -> Int {
         // 模拟排名计算：基于值的相对位置
         // 实际应用中，这个应该基于服务器返回的真实排名
         let thresholds: [Int]
@@ -197,7 +197,7 @@ final class RankManager {
         return thresholds.count + 1
     }
 
-    private func generateMockUsers(count: Int, category: RankCategory) -> [(name: String, value: Int)] {
+    func generateMockUsers(count: Int, category: RankCategory) -> [(name: String, value: Int)] {
         let names = [
             " coding wizard", "swift ninja", "ai craftsman", "dev master",
             "byte rider", "silicon sage", "code poet", "logic lord",
@@ -241,7 +241,7 @@ final class RankManager {
         }
     }
 
-    private func saveUserData() {
+    func saveUserData() {
         var rankData: [String: Int] = [:]
         var valueData: [String: Int] = [:]
 

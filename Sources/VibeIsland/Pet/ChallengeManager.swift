@@ -57,6 +57,7 @@ struct ChallengeProgress: Codable, Sendable {
     var currentValue: Int
     var isCompleted: Bool
     var claimedAt: Date?
+    var unlockedAt: Date?
 
     var progress: Double {
         let denom = max(1, targetValue)
@@ -101,7 +102,7 @@ final class ChallengeManager {
 
     // MARK: - 挑战生成模板
 
-    private static let dailyTemplates: [(type: ChallengeType, title: String, description: String, target: Int)] = [
+    static let dailyTemplates: [(type: ChallengeType, title: String, description: String, target: Int)] = [
         (.codingDuration, "编码 30 分钟", "今日编码 30 分钟", 30),
         (.codingDuration, "编码 1 小时", "今日编码 60 分钟", 60),
         (.codingDuration, "编码 2 小时", "今日编码 120 分钟", 120),
@@ -111,7 +112,7 @@ final class ChallengeManager {
         (.petUnlock, "解锁新宠物", "今日解锁新宠物", 1),
     ]
 
-    private static let weeklyTemplates: [(type: ChallengeType, title: String, description: String, target: Int)] = [
+    static let weeklyTemplates: [(type: ChallengeType, title: String, description: String, target: Int)] = [
         (.codingDuration, "周末编码达人", "本周编码 5 小时", 300),
         (.codingDuration, "周编码目标", "本周编码 10 小时", 600),
         (.codingDuration, "周编码大师", "本周编码 20 小时", 1200),
@@ -215,6 +216,7 @@ final class ChallengeManager {
 
         if value >= challenge.targetValue && !progress.isCompleted {
             progress.isCompleted = true
+            progress.unlockedAt = Date()
 
             Self.logger.info("✅ 挑战完成: \(challenge.title)")
 

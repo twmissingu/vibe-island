@@ -45,7 +45,7 @@ enum HookHandler {
         // Without this, concurrent hook processes (e.g. SubagentStart + PreToolUse
         // firing simultaneously) race: both read the old file, apply changes
         // independently, and the last writer wins — clobbering the first writer's changes.
-        try withSessionLock(at: sessionPath) {
+        try FileLock.withLock(at: sessionPath) {
             // 识别opencode进程，覆盖source
             let parentProcessName = processName(pid_t(pid))
             let isOpenCodeProcess = parentProcessName.lowercased().contains("opencode")
@@ -102,7 +102,7 @@ enum HookHandler {
         let pid = getParentPID()
         let sessionPath = sessionsDirectory.appendingPathComponent("\(pid).json")
 
-        try? withSessionLock(at: sessionPath) {
+        try? FileLock.withLock(at: sessionPath) {
             if var session = try? Session.loadFromFile(url: sessionPath) {
                 session.status = .completed
                 session.lastActivity = Date()

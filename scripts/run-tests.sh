@@ -13,7 +13,7 @@ echo ""
 
 # 1. 运行 Swift 脚本测试
 echo "📝 运行 Hook 格式测试..."
-swift Tests/hook_format_test.swift
+swift Tests/VibeIslandTests/hook_format_test.swift
 echo ""
 
 # 2. 运行 Xcode 测试（如果 Xcode 可用）
