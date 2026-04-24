@@ -33,21 +33,21 @@ public enum SessionState: String, Codable, Equatable, Sendable, CaseIterable {
 
     public var color: Color {
         switch self {
-        case .idle: return .black
-        case .thinking: return .yellow
-        case .coding: return .green
+        case .idle: return .gray
+        case .thinking: return .cyan
+        case .coding: return .blue
         case .waiting: return .orange
         case .waitingPermission: return .yellow
         case .completed: return .green
         case .error: return .red
-        case .compacting: return .orange
+        case .compacting: return .purple
         }
     }
 
     /// 是否需要闪烁指示
     public var isBlinking: Bool {
         switch self {
-        case .waitingPermission, .compacting: return true
+        case .waitingPermission, .compacting, .completed, .error: return true
         default: return false
         }
     }
@@ -56,16 +56,12 @@ public enum SessionState: String, Codable, Equatable, Sendable, CaseIterable {
 
     public static func transition(from current: SessionState, event: SessionEventName) -> SessionState {
         switch event {
-        case .sessionStart: return .thinking
-        case .userPromptSubmit: return .thinking
+        case .sessionStart: return .idle
+        case .userPromptSubmit: return .coding
         case .preToolUse:
-            if current == .thinking || current == .waiting || current == .waitingPermission {
-                return .coding
-            }
-            return current
+            return .waiting
         case .postToolUse:
-            if current == .coding { return .thinking }
-            return current
+            return .coding
         case .postToolUseFailure: return .error
         case .stop: return .completed
         case .notification: return current
@@ -73,51 +69,20 @@ public enum SessionState: String, Codable, Equatable, Sendable, CaseIterable {
         case .subagentStart, .subagentStop: return current
         case .preCompact: return .compacting
         case .postCompact:
-            if current == .compacting { return .thinking }
-            return current
+            return .completed
         case .sessionError: return .error
         case .sessionEnd: return .completed
         }
     }
 
-    // MARK: 优先级排序
-
-    /// 状态优先级（数值越小优先级越高）
-    public var priority: Int {
-        switch self {
-        case .waitingPermission: return 0
-        case .error: return 1
-        case .compacting: return 2
-        case .coding: return 3
-        case .thinking: return 4
-        case .waiting: return 5
-        case .completed: return 6
-        case .idle: return 7
-        }
-    }
-
+    /// 默认优先级（用于排序，不影响显示）
+    public var priority: Int { 0 }
+    
     // MARK: 渐变色
 
-    /// 渐变颜色数组（用于边框）
+    /// 渐变颜色数组（用于边框 - 默认灰色，不随状态变化）
     public var gradientColors: [Color] {
-        switch self {
-        case .idle:
-            return [.gray.opacity(0.5), .gray.opacity(0.3)]
-        case .thinking:
-            return [.yellow, .orange, .yellow.opacity(0.5)]
-        case .coding:
-            return [.green, .cyan, .green.opacity(0.5)]
-        case .waiting:
-            return [.orange, .yellow, .orange.opacity(0.5)]
-        case .waitingPermission:
-            return [.yellow, .white, .yellow.opacity(0.5)]
-        case .completed:
-            return [.green, .mint, .green.opacity(0.5)]
-        case .error:
-            return [.red, .pink, .red.opacity(0.5)]
-        case .compacting:
-            return [.orange, .yellow, .red.opacity(0.5)]
-        }
+        return [.gray.opacity(0.5), .gray.opacity(0.3)]
     }
 }
 

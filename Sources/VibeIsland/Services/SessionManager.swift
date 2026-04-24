@@ -46,27 +46,24 @@ final class SessionManager: SessionAggregatable {
         if case .manual(let id) = trackingMode { return id }
         return nil
     }
-    /// 当前跟踪的会话（自动模式下为最高优先级，手动模式下为固定的会话）
+    /// 当前跟踪的会话（自动模式下为 sortedSessions 第一个，手动模式下为固定的会话）
     var trackedSession: Session? {
         switch trackingMode {
         case .auto:
-            let activeSessions = sessions.values.filter { s in
-                s.status != .idle && s.status != .completed
-            }
-            if let highestPriority = activeSessions.sorted(by: { $0.status.priority < $1.status.priority }).first {
-                return highestPriority
-            }
-            // Fallback: most recently active
-            return sessions.values.sorted { $0.lastActivity > $1.lastActivity }.first
+            return sortedSessions.first
         case .manual(let sessionId):
             return sessions[sessionId]
         }
     }
+    /// 当前跟踪的会话状态（用于紧凑岛显示）
+    var trackedSessionState: SessionState {
+        trackedSession?.status ?? .idle
+    }
     /// 所有活跃会话（按 sessionId 索引）
     private(set) var sessions: [String: Session] = [:]
-    /// 按优先级排序的会话列表
+    /// 按最近活跃时间排序的会话列表
     var sortedSessions: [Session] {
-        sessions.values.sorted { $0.status.priority < $1.status.priority }
+        sessions.values.sorted { $0.lastActivity > $1.lastActivity }
     }
 
     // MARK: 内部依赖

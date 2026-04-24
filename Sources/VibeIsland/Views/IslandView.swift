@@ -90,7 +90,7 @@ struct CompactIslandView: View {
     }
 
     private var aggregateState: SessionState {
-        sessionManager.aggregateState
+        sessionManager.trackedSessionState
     }
 
     private var contextSnapshot: ContextUsageSnapshot? {
@@ -100,6 +100,14 @@ struct CompactIslandView: View {
     /// Whether the session state should blink
     private var shouldBlink: Bool {
         aggregateState.isBlinking
+    }
+    
+    /// 是否需要动画括号（等待权限/错误/压缩中/完成）
+    private var shouldAnimateBrackets: Bool {
+        switch aggregateState {
+        case .waitingPermission, .error, .compacting, .completed: return true
+        default: return false
+        }
     }
     
     /// Whether to animate brackets on state change
@@ -159,13 +167,15 @@ struct CompactIslandView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: topSession?.sessionId)
 
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: viewModel.settings.petEnabled)
-        .onChange(of: aggregateState) { _, _ in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                animateBrackets = true
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+        .onChange(of: aggregateState) { _, newState in
+            if shouldAnimateBrackets {
                 withAnimation(.easeInOut(duration: 0.15)) {
-                    animateBrackets = false
+                    animateBrackets = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        animateBrackets = false
+                    }
                 }
             }
         }

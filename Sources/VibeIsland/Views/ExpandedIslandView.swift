@@ -250,7 +250,8 @@ struct ExpandedIslandView: View {
     @ViewBuilder
     private var backgroundView: some View {
         let stateColor = aggregateState.color
-        let gradientColors = stateColor.stateGradientColors
+        // 固定灰色边框，不随状态变化
+        let borderColor = Color.gray
 
         switch viewModel.settings.theme {
         case .glass:
@@ -259,14 +260,14 @@ struct ExpandedIslandView: View {
                 VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
                     .opacity(0.7)
 
-                // 渐变边框
+                // 固定灰色渐变边框
                 RoundedRectangle(cornerRadius: 16)
                     .strokeBorder(
                         LinearGradient(
                             colors: [
-                                gradientColors.0.opacity(0.9),
-                                gradientColors.1.opacity(0.6),
-                                gradientColors.0.opacity(0.9)
+                                borderColor.opacity(0.5),
+                                borderColor.opacity(0.3),
+                                borderColor.opacity(0.5)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -281,9 +282,9 @@ struct ExpandedIslandView: View {
                     .strokeBorder(
                         LinearGradient(
                             colors: [
-                                gradientColors.0,
-                                gradientColors.1.opacity(0.7),
-                                gradientColors.0
+                                borderColor.opacity(0.5),
+                                borderColor.opacity(0.3),
+                                borderColor.opacity(0.5)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
