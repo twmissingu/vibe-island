@@ -116,19 +116,27 @@ struct ExpandedIslandView: View {
     @ViewBuilder
     private var quotaTab: some View {
         VStack(spacing: 8) {
-            // Context usage card (if available)
-            if let snapshot = contextSnapshot, snapshot.usageRatio > 0 {
-                ContextUsageCard(snapshot: snapshot)
-            }
+            // 内容区域（可滚动，当额度多时）
+            ScrollView {
+                VStack(spacing: 8) {
+                    // Context usage card (if available)
+                    if let snapshot = contextSnapshot, snapshot.usageRatio > 0 {
+                        ContextUsageCard(snapshot: snapshot)
+                    }
 
-            ForEach(viewModel.quotas) { quota in
-                QuotaCardView(quota: quota, theme: viewModel.settings.theme)
-            }
+                    ForEach(viewModel.quotas) { quota in
+                        QuotaCardView(quota: quota, theme: viewModel.settings.theme)
+                    }
 
-            if viewModel.quotas.isEmpty {
-                emptyState
+                    if viewModel.quotas.isEmpty {
+                        emptyState
+                    }
+                }
+                .frame(maxWidth: .infinity)
             }
+            .frame(maxHeight: .infinity)
 
+            // 固定在底部
             footer
         }
     }
@@ -138,9 +146,14 @@ struct ExpandedIslandView: View {
     @ViewBuilder
     private var sessionsTab: some View {
         VStack(spacing: 8) {
-            SessionListView()
-                .environment(viewModel)
-            Spacer()
+            // 会话列表（可滚动）
+            ScrollView {
+                SessionListView()
+                    .environment(viewModel)
+            }
+            .frame(maxHeight: .infinity)
+
+            // 固定在底部
             footer
         }
     }
@@ -150,32 +163,37 @@ struct ExpandedIslandView: View {
     @ViewBuilder
     private var contextTab: some View {
         VStack(spacing: 8) {
-            if let snapshot = contextSnapshot, snapshot.usageRatio > 0 {
+            // 上下文内容（可滚动）
+            ScrollView {
                 VStack(spacing: 8) {
-                    // 标题行
-                    HStack {
-                        Image(systemName: "brain.fill")
-                            .font(.system(size: 14))
-                            .foregroundStyle(.blue)
-                        Text("上下文使用")
-                            .font(.system(size: 12, weight: .semibold))
-                        Spacer()
+                    if let snapshot = contextSnapshot, snapshot.usageRatio > 0 {
+                        HStack {
+                            Image(systemName: "brain.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.blue)
+                            Text("上下文使用")
+                                .font(.system(size: 12, weight: .semibold))
+                            Spacer()
+                        }
+                        
+                        ContextUsageCard(snapshot: snapshot)
+                    } else {
+                        VStack(spacing: 8) {
+                            Image(systemName: "brain")
+                                .font(.system(size: 24))
+                                .foregroundStyle(.secondary)
+                            Text("暂无上下文数据")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
                     }
-                    
-                    ContextUsageCard(snapshot: snapshot)
                 }
-            } else {
-                VStack(spacing: 8) {
-                    Image(systemName: "brain")
-                        .font(.system(size: 24))
-                        .foregroundStyle(.secondary)
-                    Text("暂无上下文数据")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                .frame(height: 100)
+                .frame(maxWidth: .infinity)
             }
-            Spacer()
+            .frame(maxHeight: .infinity)
+
+            // 固定在底部
             footer
         }
     }
@@ -189,7 +207,7 @@ struct ExpandedIslandView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
         }
-        .frame(height: 100)
+        .frame(maxWidth: .infinity)
     }
 
     private var footer: some View {
