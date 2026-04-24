@@ -117,24 +117,30 @@ extension Notification.Name {
 struct DynamicIslandPanelContent: View {
     let contentView: AnyView
     @State private var isExpanded = false
-    
-    /// 灵动岛统一宽度
-    private var islandWidth: CGFloat {
-        DynamicIslandPanel.calculateNotchAwareWidth()
-    }
-    
+    @State private var compactWidth: CGFloat = DynamicIslandPanel.calculateNotchAwareWidth()
+
     var body: some View {
         VStack(spacing: 0) {
-            // 紧凑视图 - 水平居中
+            // 紧凑视图 - 保持自然宽度，居中
             contentView
                 .environment(\.isExpandedMode, false)
-                .frame(width: islandWidth, alignment: .center)
-            
-            // 展开视图 - 水平居中
+                .fixedSize(horizontal: true, vertical: false)
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(key: CompactWidthKey.self, value: geo.size.width)
+                    }
+                )
+                .onPreferenceChange(CompactWidthKey.self) { width in
+                    if width > 0 {
+                        compactWidth = width
+                    }
+                }
+
+            // 展开视图 - 与紧凑视图宽度一致
             if isExpanded {
                 contentView
                     .environment(\.isExpandedMode, true)
-                    .frame(width: islandWidth, alignment: .center)
+                    .frame(width: compactWidth > 0 ? compactWidth : DynamicIslandPanel.calculateNotchAwareWidth())
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
@@ -145,5 +151,12 @@ struct DynamicIslandPanelContent: View {
                 isExpanded = expanded
             }
         }
+    }
+}
+
+private struct CompactWidthKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
