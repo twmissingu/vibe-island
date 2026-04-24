@@ -167,15 +167,12 @@ struct CompactIslandView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: topSession?.sessionId)
 
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: viewModel.settings.petEnabled)
+        .animation(.easeInOut(duration: 0.15), value: animateBrackets)
         .onChange(of: aggregateState) { _, newState in
             if shouldAnimateBrackets {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    animateBrackets = true
-                }
+                animateBrackets = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        animateBrackets = false
-                    }
+                    animateBrackets = false
                 }
             }
         }
