@@ -118,24 +118,27 @@ struct DynamicIslandPanelContent: View {
     let contentView: AnyView
     @State private var isExpanded = false
     
+    /// 灵动岛统一宽度
+    private var islandWidth: CGFloat {
+        DynamicIslandPanel.calculateNotchAwareWidth()
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
-            // 紧凑视图始终在顶部
+            // 紧凑视图 - 水平居中
             contentView
                 .environment(\.isExpandedMode, false)
-                .frame(width: DynamicIslandPanel.calculateNotchAwareWidth(), height: nil)
-                .frame(maxWidth: .infinity)
+                .frame(width: islandWidth, alignment: .center)
             
-            // 展开视图在紧凑视图下方
+            // 展开视图 - 水平居中
             if isExpanded {
                 contentView
                     .environment(\.isExpandedMode, true)
-                    .frame(width: DynamicIslandPanel.calculateNotchAwareWidth(), height: 280)
-                    .frame(maxWidth: .infinity)
+                    .frame(width: islandWidth, alignment: .center)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .frame(maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onReceive(NotificationCenter.default.publisher(for: .panelExpandedStateChanged)) { notification in
             let expanded = notification.userInfo?["isExpanded"] as? Bool ?? false
             withAnimation(.easeInOut(duration: 0.25)) {

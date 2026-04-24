@@ -106,17 +106,17 @@ struct CompactIslandView: View {
     @State private var animateBrackets = false
 
     var body: some View {
-        // 获取系统刘海宽度和菜单栏高度
-        let systemNotchWidth = ScreenParameters.shared.notchWidth
+        // 获取菜单栏高度和刘海宽度
         let barHeight = ScreenParameters.shared.menuBarHeight
+        let notchWidth = ScreenParameters.shared.notchWidth
         // 宠物缩放：16px × scale ≤ barHeight，固定 1.2（16×1.2=19.2pt）
         let petScale: CGFloat = 1.2
         // 宠物区域宽度：预留动画溢出空间（shake±3pt + 旋转≈1pt + 余量）
         let indicatorWidth: CGFloat = 28
         // 非宠物元素的缩放比（基于原 44pt 布局）
         let uiScale = barHeight / 44.0
-        
-        HStack(spacing: 0) {
+
+        HStack(spacing: 8 * uiScale) {
             // Left parenthesis
             Text("(")
                 .foregroundColor(aggregateState.color)
@@ -124,13 +124,11 @@ struct CompactIslandView: View {
                 .baselineOffset(2 * uiScale)
                 .offset(x: animateBrackets ? -4.0 * uiScale : 0)
 
-            Spacer().frame(width: 8 * uiScale)
-
-            // Session indicator dot (left aligned)
+            // Session indicator dot
             sessionIndicatorDot
 
-            // Middle notch area - 使用系统刘海宽度
-            Spacer().frame(width: systemNotchWidth)
+            // 刘海占位 - 保证左右元素在刘海外侧显示
+            Spacer().frame(width: notchWidth)
 
             // Pet view with session state integration
             Group {
@@ -144,8 +142,6 @@ struct CompactIslandView: View {
                 }
             }
             .frame(width: indicatorWidth, height: barHeight)
-
-            Spacer().frame(width: 8 * uiScale)
 
             // Right parenthesis
             Text(")")
