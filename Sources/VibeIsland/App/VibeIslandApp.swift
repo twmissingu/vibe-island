@@ -1,5 +1,11 @@
 import SwiftUI
 
+// 通知名称：灵动岛状态变化
+extension Notification.Name {
+    static let islandStateDidChange = Notification.Name("islandStateDidChange")
+    static let toggleIslandState = Notification.Name("toggleIslandState")
+}
+
 @main
 struct VibeIslandApp: App {
     @State private var stateManager = StateManager()
@@ -14,6 +20,27 @@ struct VibeIslandApp: App {
                     setupPanel()
                     stateManager.startMonitoring()
                     checkOnboardingStatus()
+                    
+                    // 监听点击切换
+                    NotificationCenter.default.addObserver(
+                        forName: .toggleIslandState,
+                        object: nil,
+                        queue: .main
+                    ) { _ in
+                        // toggleIslandState() 内部会 post .islandStateDidChange，
+                        // 由下方 observer 统一处理 updateContentFrame，避免双重调用
+                        stateManager.toggleIslandState()
+                    }
+                    
+                    // 监听状态变化，更新panel大小
+                    NotificationCenter.default.addObserver(
+                        forName: .islandStateDidChange,
+                        object: nil,
+                        queue: .main
+                    ) { notification in
+                        let isExpanded = notification.userInfo?["isExpanded"] as? Bool ?? false
+                        panel?.updateContentFrame(isExpanded: isExpanded)
+                    }
                 }
                 .sheet(isPresented: $showOnboarding) {
                     OnboardingView()

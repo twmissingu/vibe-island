@@ -42,8 +42,9 @@ struct ExpandedIslandView: View {
             Divider()
                 .opacity(0.2)
 
-            // 标签内容
+            // 标签内容（固定高度，不因内容变化）
             tabContent
+                .frame(height: 280)
         }
         .padding(12)
         // No fixed width - let DynamicIslandPanel control width
@@ -59,12 +60,9 @@ struct ExpandedIslandView: View {
     // MARK: - 标签栏
 
     private var tabBar: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 4) {
             ForEach(ExpandedTab.allCases, id: \.self) { tab in
                 tabButton(tab)
-                if tab != ExpandedTab.allCases.last {
-                    Spacer()
-                }
             }
         }
         .padding(.bottom, 8)
@@ -76,22 +74,27 @@ struct ExpandedIslandView: View {
                 selectedTab = tab
             }
         } label: {
-            VStack(spacing: 4) {
+            HStack(spacing: 6) {
                 Image(systemName: tab.icon)
-                    .font(.system(size: 14))
+                    .font(.system(size: 13, weight: .medium))
                 Text(tab.rawValue)
-                    .font(.system(size: 10))
+                    .font(.system(size: 11, weight: .medium))
             }
-            .foregroundStyle(selectedTab == tab ? .blue : .secondary)
+            .foregroundStyle(selectedTab == tab ? .white : .secondary)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 6)
+            .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(selectedTab == tab ? Color.blue.opacity(0.15) : Color.clear)
+                    .fill(selectedTab == tab ? Color.blue : Color.gray.opacity(0.1))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(selectedTab == tab ? Color.blue.opacity(0.3) : Color.clear, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(tab.rawValue)
+        .contentShape(Rectangle())
     }
 
     // MARK: - 标签内容

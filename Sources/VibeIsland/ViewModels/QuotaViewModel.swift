@@ -296,6 +296,13 @@ final class StateManager {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             islandState = islandState == .compact ? .expanded : .compact
         }
+        // 通知 panel 更新大小
+        let isExpanded = islandState == .expanded
+        NotificationCenter.default.post(
+            name: .islandStateDidChange,
+            object: nil,
+            userInfo: ["isExpanded": isExpanded]
+        )
     }
 
     // MARK: - Provider Factory

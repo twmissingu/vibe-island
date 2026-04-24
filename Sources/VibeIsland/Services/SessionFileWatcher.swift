@@ -173,14 +173,12 @@ final class SessionFileWatcher: SessionAggregatable {
         let source = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fd,
             eventMask: [.write, .rename],
-            queue: DispatchQueue.global(qos: .userInitiated)
+            queue: DispatchQueue.main
         )
 
         source.setEventHandler { [weak self] in
-            Task { @MainActor in
-                guard let self = self else { return }
-                self.handleFileEvent(for: fileURL)
-            }
+            guard let self = self else { return }
+            self.handleFileEvent(for: fileURL)
         }
 
         source.setCancelHandler {

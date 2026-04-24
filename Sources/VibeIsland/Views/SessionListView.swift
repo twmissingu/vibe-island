@@ -130,12 +130,12 @@ struct SessionListView: View {
                 .padding(.horizontal, 4)
             }
 
-            // 会话列表
+            // 会话列表（最多显示5条）
             if sessionManager.sortedSessions.isEmpty {
                 emptyState
             } else {
                 VStack(spacing: 2) {
-                    ForEach(sessionManager.sortedSessions, id: \.sessionId) { session in
+                    ForEach(Array(sessionManager.sortedSessions.prefix(5)), id: \.sessionId) { session in
                         SessionRow(
                             session: session,
                             sessionId: session.sessionId,

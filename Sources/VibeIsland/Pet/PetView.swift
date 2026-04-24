@@ -20,21 +20,30 @@ struct PetView: View {
     let scale: CGFloat  // 像素缩放倍数
     let petId: String // 宠物ID
     private let petLevel: PetLevel  // 皮肤等级
+    /// 外部驱动的宠物状态（从 SessionState 映射而来）
+    let externalState: PetState
 
-    init(petId: String = "cat", level: PetLevel = .basic, scale: CGFloat = 4.0) {
+    init(petId: String = "cat", level: PetLevel = .basic, scale: CGFloat = 4.0, initialState: PetState = .idle) {
         // 根据petId和level加载对应的动画集
         let petType = PetType(rawValue: petId) ?? .cat
         let animationSet = PetAnimationSet.forPet(petType, level: level)
-        _petEngine = State(initialValue: PetEngine(state: .idle, animationSet: animationSet))
+        _petEngine = State(initialValue: PetEngine(state: initialState, animationSet: animationSet))
         self.scale = scale
         self.petId = petId
         self.petLevel = level
+        self.externalState = initialState
     }
 
     // 支持 Int 类型的初始化
-    init(petId: String, level: Int, scale: CGFloat = 4.0) {
+    init(petId: String, level: Int, scale: CGFloat = 4.0, initialState: PetState = .idle) {
         let petLevel = PetLevel(rawValue: level) ?? .basic
-        self.init(petId: petId, level: petLevel, scale: scale)
+        let petType = PetType(rawValue: petId) ?? .cat
+        let animationSet = PetAnimationSet.forPet(petType, level: petLevel)
+        _petEngine = State(initialValue: PetEngine(state: initialState, animationSet: animationSet))
+        self.scale = scale
+        self.petId = petId
+        self.petLevel = petLevel
+        self.externalState = initialState
     }
     
     var body: some View {
@@ -44,6 +53,10 @@ struct PetView: View {
             
             // 宠物渲染
             petCanvas
+        }
+        // 外部状态变化时同步到内部引擎
+        .onChange(of: externalState) { _, newState in
+            petEngine.state = newState
         }
         // 状态变化时触发物理效果
         .onChange(of: petEngine.state) { oldValue, newValue in
@@ -241,12 +254,12 @@ struct PetView: View {
     private func startAnimation() {
         animationTimer?.invalidate()
         let frames = petEngine.animationSet.frames(for: petEngine.state)
+        // 单帧状态无需帧动画定时器，但保留以支持状态切换后的帧重置
         guard frames.count > 1 else { return }
         
-        let petView = self
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { _ in
-            Task { @MainActor in
-                petView.currentFrameIndex = (petView.currentFrameIndex + 1) % frames.count
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [self] _ in
+            Task { @MainActor [self] in
+                self.currentFrameIndex = (self.currentFrameIndex + 1) % frames.count
             }
         }
     }

@@ -1,22 +1,72 @@
 import SwiftUI
 import LLMQuotaKit
 
+// 全局单例存储屏幕参数
+@MainActor
+@Observable
+final class ScreenParameters {
+    static let shared = ScreenParameters()
+    var notchWidth: CGFloat = 0
+    var screenHeight: CGFloat = 0
+    /// 菜单栏高度，通过屏幕可见区域差值计算
+    var menuBarHeight: CGFloat = 24.0
+    
+    private init() {
+        updateFromScreen()
+    }
+    
+    func updateFromScreen() {
+        if let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 24 }) 
+            ?? NSScreen.main {
+            if let leftArea = screen.auxiliaryTopLeftArea,
+               let rightArea = screen.auxiliaryTopRightArea {
+                notchWidth = screen.frame.width - leftArea.width - rightArea.width
+            }
+            screenHeight = screen.frame.height
+            // 菜单栏高度 = 屏幕总高度 - 可见区域顶部Y坐标
+            menuBarHeight = screen.frame.maxY - screen.visibleFrame.maxY
+            // 兜底：如果计算结果异常，使用系统默认值
+            if menuBarHeight < 10 { menuBarHeight = 24.0 }
+        }
+    }
+}
+
+// 自定义环境变量：控制紧凑/展开模式
+struct IsExpandedModeKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
+extension EnvironmentValues {
+    var isExpandedMode: Bool? {
+        get { self[IsExpandedModeKey.self] }
+        set { self[IsExpandedModeKey.self] = newValue }
+    }
+}
+
 struct IslandView: View {
     @Environment(StateManager.self) private var viewModel
+    @Environment(\.isExpandedMode) private var isExpandedMode
 
+    private var displayExpanded: Bool {
+        if let forced = isExpandedMode {
+            return forced
+        }
+        return viewModel.islandState == .expanded
+    }
+    
     var body: some View {
         Group {
-            switch viewModel.islandState {
-            case .compact:
-                CompactIslandView()
-                    .accessibilityIdentifier("compactIslandView")
-            case .expanded:
+            if displayExpanded {
                 ExpandedIslandView()
                     .accessibilityIdentifier("expandedIslandView")
+            } else {
+                CompactIslandView()
+                    .accessibilityIdentifier("compactIslandView")
             }
         }
         .onTapGesture {
-            viewModel.toggleIslandState()
+            // 通知切换
+            NotificationCenter.default.post(name: .toggleIslandState, object: nil)
         }
     }
 }
@@ -56,46 +106,57 @@ struct CompactIslandView: View {
     @State private var animateBrackets = false
 
     var body: some View {
+        // 获取系统刘海宽度和菜单栏高度
+        let systemNotchWidth = ScreenParameters.shared.notchWidth
+        let barHeight = ScreenParameters.shared.menuBarHeight
+        // 宠物缩放：16px × scale ≤ barHeight，固定 1.2（16×1.2=19.2pt）
+        let petScale: CGFloat = 1.2
+        // 宠物区域宽度：预留动画溢出空间（shake±3pt + 旋转≈1pt + 余量）
+        let indicatorWidth: CGFloat = 28
+        // 非宠物元素的缩放比（基于原 44pt 布局）
+        let uiScale = barHeight / 44.0
+        
         HStack(spacing: 0) {
             // Left parenthesis
             Text("(")
                 .foregroundColor(aggregateState.color)
-                .font(.system(size: 24, weight: .bold, design: .monospaced))
-                .baselineOffset(2)
-                .offset(x: animateBrackets ? -4.0 : 0)
+                .font(.system(size: 24 * uiScale, weight: .bold, design: .monospaced))
+                .baselineOffset(2 * uiScale)
+                .offset(x: animateBrackets ? -4.0 * uiScale : 0)
 
-            Spacer().frame(width: 8)
+            Spacer().frame(width: 8 * uiScale)
 
             // Session indicator dot (left aligned)
             sessionIndicatorDot
 
-            Spacer() // Middle notch area
+            // Middle notch area - 使用系统刘海宽度
+            Spacer().frame(width: systemNotchWidth)
 
-            // Pet view with session state integration (fixed width regardless of enable status)
+            // Pet view with session state integration
             Group {
                 if viewModel.settings.petEnabled {
                     let selectedPet = PetType(rawValue: viewModel.settings.selectedPetID) ?? .cat
                     let skinLevel = PetProgressManager.shared.selectedLevel(for: selectedPet)
-                    PetView(petId: viewModel.settings.selectedPetID, level: skinLevel, scale: 1.0)
+                    PetView(petId: viewModel.settings.selectedPetID, level: skinLevel, scale: petScale, initialState: Self.mapToPetState(aggregateState))
                         .modifier(SessionPetEffect(state: aggregateState))
                 } else {
                     Color.clear
                 }
             }
-            .frame(width: 20, height: 20) // Match pet view size to keep layout consistent
+            .frame(width: indicatorWidth, height: barHeight)
 
-            Spacer().frame(width: 8)
+            Spacer().frame(width: 8 * uiScale)
 
             // Right parenthesis
             Text(")")
                 .foregroundColor(aggregateState.color)
-                .font(.system(size: 24, weight: .bold, design: .monospaced))
-                .baselineOffset(2)
-                .offset(x: animateBrackets ? 4.0 : 0)
+                .font(.system(size: 24 * uiScale, weight: .bold, design: .monospaced))
+                .baselineOffset(2 * uiScale)
+                .offset(x: animateBrackets ? 4.0 * uiScale : 0)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(height: 44) // Fixed height only, width determined by parent panel
+        .padding(.horizontal, 16 * uiScale)
+        .padding(.vertical, 10 * uiScale)
+        .frame(height: barHeight) // 与菜单栏高度一致
         .background(backgroundView)
         .clipShape(Capsule())
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: aggregateState)
@@ -111,6 +172,21 @@ struct CompactIslandView: View {
                     animateBrackets = false
                 }
             }
+        }
+    }
+    
+    // MARK: - SessionState → PetState 映射
+
+    private static func mapToPetState(_ sessionState: SessionState) -> PetState {
+        switch sessionState {
+        case .idle: return .idle
+        case .thinking: return .thinking
+        case .coding: return .coding
+        case .waiting: return .waiting
+        case .waitingPermission: return .waiting
+        case .completed: return .celebrating
+        case .error: return .error
+        case .compacting: return .compacting
         }
     }
 
@@ -203,8 +279,10 @@ struct CompactIslandView: View {
 
     @ViewBuilder
     private var petView: some View {
-        PetView(scale: 1.0)
-            .frame(width: 20, height: 20)
+        let barHeight = ScreenParameters.shared.menuBarHeight
+        let petScale: CGFloat = 1.2
+        PetView(scale: petScale, initialState: Self.mapToPetState(aggregateState))
+            .frame(width: 28, height: barHeight)
             .modifier(SessionPetEffect(state: aggregateState))
     }
 
@@ -218,19 +296,21 @@ struct CompactIslandView: View {
 
     @ViewBuilder
     private var sessionIndicatorDot: some View {
+        let uiScale = ScreenParameters.shared.menuBarHeight / 44.0
         ZStack {
             // 外层发光
             Circle()
                 .fill(aggregateState.color.opacity(0.3))
-                .frame(width: 20, height: 20)
-                .blur(radius: 4)
+                .frame(width: 12 * uiScale, height: 12 * uiScale)
+                .blur(radius: 4 * uiScale)
             
             // 主圆点
             Circle()
                 .fill(aggregateState.color)
-                .frame(width: 12, height: 12)
-                .shadow(color: aggregateState.color.opacity(0.5), radius: 4, x: 0, y: 0)
+                .frame(width: 8 * uiScale, height: 8 * uiScale)
+                .shadow(color: aggregateState.color.opacity(0.5), radius: 3 * uiScale, x: 0, y: 0)
         }
+        .frame(width: 28, height: ScreenParameters.shared.menuBarHeight)
         .modifier(BlinkModifier(shouldBlink: shouldBlink))
     }
 
