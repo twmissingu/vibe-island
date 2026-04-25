@@ -110,24 +110,30 @@ final class StateManager {
 
     private func handleStateChange(from oldState: SessionState, to newState: SessionState) async {
         switch newState {
+        case .idle:
+            _ = await soundManager.play(.idle)
+            Self.logger.debug("状态变化: \(oldState.rawValue) → \(newState.rawValue)")
+        case .thinking:
+            _ = await soundManager.play(.thinking)
+            Self.logger.debug("状态变化: \(oldState.rawValue) → \(newState.rawValue)")
+        case .coding:
+            _ = await soundManager.play(.coding)
+            Self.logger.debug("状态变化: \(oldState.rawValue) → \(newState.rawValue)")
+        case .waiting:
+            _ = await soundManager.play(.waiting)
+            Self.logger.debug("状态变化: \(oldState.rawValue) → \(newState.rawValue), 播放等待提示音")
         case .waitingPermission:
             _ = await soundManager.play(.permissionRequest)
             Self.logger.debug("状态变化: \(oldState.rawValue) → \(newState.rawValue), 播放权限提示音")
-
-        case .error:
-            _ = await soundManager.play(.error)
-            Self.logger.debug("状态变化: \(oldState.rawValue) → \(newState.rawValue), 播放错误提示音")
-
         case .completed:
             _ = await soundManager.play(.completed)
             Self.logger.debug("状态变化: \(oldState.rawValue) → \(newState.rawValue), 播放完成提示音")
-
+        case .error:
+            _ = await soundManager.play(.error)
+            Self.logger.debug("状态变化: \(oldState.rawValue) → \(newState.rawValue), 播放错误提示音")
         case .compacting:
             _ = await soundManager.play(.compacting)
             Self.logger.debug("状态变化: \(oldState.rawValue) → \(newState.rawValue), 播放压缩提示音")
-
-        default:
-            break
         }
     }
 

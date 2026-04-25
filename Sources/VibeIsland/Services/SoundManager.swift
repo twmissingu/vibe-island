@@ -7,6 +7,14 @@ import OSLog
 
 /// 核心提示音类型
 enum SoundType: String, CaseIterable {
+    /// 空闲提示音
+    case idle
+    /// 思考提示音
+    case thinking
+    /// 编码提示音
+    case coding
+    /// 等待提示音
+    case waiting
     /// 审批请求提示音
     case permissionRequest
     /// 任务完成提示音
@@ -19,20 +27,28 @@ enum SoundType: String, CaseIterable {
     /// 对应的系统声音名称（NSSound 内置声音）
     var systemSoundName: String {
         switch self {
-        case .permissionRequest: "Glass"
-        case .completed: "Hero"
-        case .error: "Basso"
-        case .compacting: "Pop"
+        case .idle: return "Pop"
+        case .thinking: return "Pop"
+        case .coding: return "Pop"
+        case .waiting: return "Pop"
+        case .permissionRequest: return "Glass"
+        case .completed: return "Hero"
+        case .error: return "Basso"
+case .compacting: return "Pop"
         }
     }
 
     /// 自定义声音文件路径（相对于 Resources/Sounds 目录）
     var customSoundFileName: String? {
         switch self {
-        case .permissionRequest: "permission_request.aiff"
-        case .completed: "completed.aiff"
-        case .error: "error.aiff"
-        case .compacting: "compacting.aiff"
+        case .idle: return "idle.aiff"
+        case .thinking: return "thinking.aiff"
+        case .coding: return "coding.aiff"
+        case .waiting: return "waiting.aiff"
+        case .permissionRequest: return "permission_request.aiff"
+        case .completed: return "completed.aiff"
+        case .error: return "error.aiff"
+        case .compacting: return "compacting.aiff"
         }
     }
 }
