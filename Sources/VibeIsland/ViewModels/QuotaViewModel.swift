@@ -178,10 +178,35 @@ final class StateManager {
     }
 
     func isOpenCodeRunning() -> Bool {
-        OpenCodeMonitor.shared.isOpenCodeRunning()
+        if OpenCodeMonitor.shared.isPluginAvailable && !OpenCodeMonitor.shared.sessions.isEmpty {
+            return true
+        }
+        return isOpenCodeProcessRunning()
     }
 
-    /// 检查 OpenCode 插件是否已安装
+    /// 检测 OpenCode 进程是否运行（兜底方案）
+    private func isOpenCodeProcessRunning() -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+        process.arguments = ["-f", "opencode"]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        } catch {
+            return false
+        }
+    }
+
+    /// 检查 OpenCode 插件是否可用（目录存在）
+    func isOpenCodePluginAvailable() -> Bool {
+        OpenCodeMonitor.shared.isPluginAvailable
+    }
     func isOpenCodePluginInstalled() -> Bool {
         hookInstaller.isOpenCodePluginInstalled
     }

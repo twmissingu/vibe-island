@@ -69,32 +69,6 @@ final class OpenCodeMonitorTests: XCTestCase {
         XCTAssertNotEqual(OpenCodeStatus.idle, OpenCodeStatus.working)
     }
 
-    // MARK: - OpenCodeMonitorSource 枚举测试
-
-    /// 测试：数据源优先级顺序
-    func testOpenCodeMonitorSource_priority() {
-        // 优先级数值越小越高
-        XCTAssertLessThan(OpenCodeMonitorSource.plugin.priority, OpenCodeMonitorSource.sse.priority)
-        XCTAssertLessThan(OpenCodeMonitorSource.sse.priority, OpenCodeMonitorSource.file.priority)
-        XCTAssertLessThan(OpenCodeMonitorSource.file.priority, OpenCodeMonitorSource.process.priority)
-    }
-
-    /// 测试：各数据源优先级数值
-    func testOpenCodeMonitorSource_priorityValues() {
-        XCTAssertEqual(OpenCodeMonitorSource.plugin.priority, 0)
-        XCTAssertEqual(OpenCodeMonitorSource.sse.priority, 1)
-        XCTAssertEqual(OpenCodeMonitorSource.file.priority, 2)
-        XCTAssertEqual(OpenCodeMonitorSource.process.priority, 3)
-    }
-
-    /// 测试：数据源 rawValue
-    func testOpenCodeMonitorSource_rawValues() {
-        XCTAssertEqual(OpenCodeMonitorSource.plugin.rawValue, "plugin")
-        XCTAssertEqual(OpenCodeMonitorSource.sse.rawValue, "sse")
-        XCTAssertEqual(OpenCodeMonitorSource.file.rawValue, "file")
-        XCTAssertEqual(OpenCodeMonitorSource.process.rawValue, "process")
-    }
-
     // MARK: - OpenCodeSession 模型测试
 
     /// 测试：OpenCodeSession 基本初始化
@@ -130,7 +104,7 @@ final class OpenCodeMonitorTests: XCTestCase {
             currentTool: "Write",
             message: "正在写入文件",
             pid: 12345,
-            source: .sse
+            source: .plugin
         )
 
         XCTAssertEqual(session.sessionId, "full-session")
@@ -333,129 +307,13 @@ final class OpenCodeMonitorTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(session.lastActivity, beforeDate)
     }
 
-    // MARK: - SSE 事件解析测试
+// MARK: - TUI 输出解析测试
 
-    /// 测试：SSEEventWrapper 解析 session.created 事件
-    func testSSEEventWrapper_sessionCreated() {
-        let json = """
-        {
-            "payload": {
-                "type": "session.created",
-                "properties": {
-                    "sessionID": "sse-1",
-                    "cwd": "/tmp/sse-test"
-                }
-            }
-        }
-        """
-
-        let data = json.data(using: .utf8)!
-        let wrapper = try! JSONDecoder().decode(SSEEventWrapper.self, from: data)
-
-        XCTAssertEqual(wrapper.payload.type, "session.created")
-        XCTAssertEqual(wrapper.payload.properties.sessionID, "sse-1")
-        XCTAssertEqual(wrapper.payload.properties.cwd, "/tmp/sse-test")
-    }
-
-    /// 测试：SSEEventWrapper 解析 session.status 事件
-    func testSSEEventWrapper_sessionStatus() {
-        let json = """
-        {
-            "payload": {
-                "type": "session.status",
-                "properties": {
-                    "sessionID": "sse-2",
-                    "status": "working"
-                }
-            }
-        }
-        """
-
-        let data = json.data(using: .utf8)!
-        let wrapper = try! JSONDecoder().decode(SSEEventWrapper.self, from: data)
-
-        XCTAssertEqual(wrapper.payload.type, "session.status")
-        XCTAssertEqual(wrapper.payload.properties.status, "working")
-    }
-
-    /// 测试：SSEEventWrapper 解析 tool.executing 事件
-    func testSSEEventWrapper_toolExecuting() {
-        let json = """
-        {
-            "payload": {
-                "type": "tool.executing",
-                "properties": {
-                    "sessionID": "sse-3",
-                    "tool": "Read"
-                }
-            }
-        }
-        """
-
-        let data = json.data(using: .utf8)!
-        let wrapper = try! JSONDecoder().decode(SSEEventWrapper.self, from: data)
-
-        XCTAssertEqual(wrapper.payload.type, "tool.executing")
-        XCTAssertEqual(wrapper.payload.properties.tool, "Read")
-    }
-
-    /// 测试：SSEProperties 字段解析
-    func testSSEProperties_fieldParsing() {
-        let json = """
-        {
-            "sessionID": "props-1",
-            "id": "alt-id",
-            "cwd": "/props/cwd",
-            "status": "idle",
-            "tool": "Write",
-            "toolName": "Bash",
-            "content": "some content"
-        }
-        """
-
-        let data = json.data(using: .utf8)!
-        let props = try! JSONDecoder().decode(SSEProperties.self, from: data)
-
-        XCTAssertEqual(props.sessionID, "props-1")
-        XCTAssertEqual(props.id, "alt-id")
-        XCTAssertEqual(props.cwd, "/props/cwd")
-        XCTAssertEqual(props.status, "idle")
-        XCTAssertEqual(props.tool, "Write")
-        XCTAssertEqual(props.toolName, "Bash")
-        XCTAssertEqual(props.content, "some content")
-    }
-
-    /// 测试：SSEProperties 可选字段
-    func testSSEProperties_optionalFields() {
-        let json = """
-        {
-            "type": "unknown",
-            "properties": {}
-        }
-        """
-
-        let wrapperData = """
-        {
-            "payload": \(json)
-        }
-        """.data(using: .utf8)!
-
-        let wrapper = try! JSONDecoder().decode(SSEEventWrapper.self, from: wrapperData)
-        XCTAssertNil(wrapper.payload.properties.sessionID)
-        XCTAssertNil(wrapper.payload.properties.cwd)
-        XCTAssertNil(wrapper.payload.properties.status)
-    }
-
-    // MARK: - TUI 输出解析测试
-
-    /// 测试：pgrep 输出解析 - 单进程
-    func testPgrepOutput_singleProcess() {
-        // 此测试验证 OpenCodeMonitor 使用 pgrep 检测进程的机制
-        // 实际解析在 ProcessDetector 中完成
+    /// 测试：插件可用性检查
+    func testPluginAvailable_check() {
         let monitor = OpenCodeMonitor.shared
-        // 验证 isOpenCodeRunning 方法可以正常调用
-        _ = monitor.isOpenCodeRunning()
-        // 不验证具体返回值，因为取决于系统是否有 opencode 进程
+        // 验证 isPluginAvailable 属性可以正常访问
+        _ = monitor.isPluginAvailable
     }
 
     /// 测试：插件 session 文件 JSON 解析
@@ -564,27 +422,6 @@ final class OpenCodeMonitorTests: XCTestCase {
         XCTAssertEqual(OpenCodeMonitor.pluginSessionsDirectory, expected)
     }
 
-    /// 测试：nativeStoragePath 路径构造
-    func testNativeStoragePath() {
-        let expected = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".local")
-            .appendingPathComponent("share")
-            .appendingPathComponent("opencode")
-            .appendingPathComponent("storage")
-
-        XCTAssertEqual(OpenCodeMonitor.nativeStoragePath, expected)
-    }
-
-    /// 测试：defaultSSEPort 值
-    func testDefaultSSEPort() {
-        XCTAssertEqual(OpenCodeMonitor.defaultSSEPort, 4040)
-    }
-
-    /// 测试：defaultCheckInterval 值
-    func testDefaultCheckInterval() {
-        XCTAssertEqual(OpenCodeMonitor.defaultCheckInterval, 5.0)
-    }
-
     // MARK: - 插件安装脚本测试
 
     /// 测试：pluginInstallScript 非空
@@ -598,27 +435,6 @@ final class OpenCodeMonitorTests: XCTestCase {
         XCTAssertTrue(script.contains("PLUGIN_DIR"))
         XCTAssertTrue(script.contains("mkdir"))
         XCTAssertTrue(script.contains(".config/opencode/plugins"))
-    }
-
-    // MARK: - SSE 客户端测试
-
-    /// 测试：OpenCodeSSEClient 初始化
-    func testSSEClient_initialization() {
-        let client = OpenCodeSSEClient(port: 4040)
-        XCTAssertNotNil(client)
-    }
-
-    /// 测试：OpenCodeSSEClient 默认端口
-    func testSSEClient_defaultPort() {
-        let client = OpenCodeSSEClient()
-        XCTAssertNotNil(client)
-    }
-
-    /// 测试：OpenCodeSSEClient disconnect 清理缓冲区
-    func testSSEClient_disconnect() {
-        let client = OpenCodeSSEClient(port: 4041)
-        client.disconnect()
-        // disconnect 应清理 dataTask 和 buffer
     }
 
     // MARK: - 插件文件监听器测试
@@ -648,21 +464,6 @@ final class OpenCodeMonitorTests: XCTestCase {
         let instance1 = OpenCodeMonitor.shared
         let instance2 = OpenCodeMonitor.shared
         XCTAssertTrue(instance1 === instance2)
-    }
-
-    // MARK: - 辅助类型测试
-
-    /// 测试：Box 可变容器（私有类型，无法直接测试，验证相关功能即可）
-    func testBox_mutableContainer() {
-        // Box 是私有类型，无法直接访问
-        // 这里验证 isSSEReachable 方法中使用的 Box 功能
-        // 由于网络依赖，此测试仅验证方法存在
-    }
-
-    /// 测试：Box 泛型支持（私有类型，无法直接测试）
-    func testBox_genericSupport() {
-        // Box 是私有类型
-        // 验证相关功能正常工作即可
     }
 }
 

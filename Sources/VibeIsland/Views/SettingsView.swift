@@ -186,6 +186,18 @@ struct SettingsView: View {
                     get: { isToolEnabled(.openCode) },
                     set: { setToolEnabled(.openCode, $0) }
                 ))
+                .disabled(openCodePluginStatus != .installed)
+
+                if openCodePluginStatus != .installed {
+                    HStack {
+                        Image(systemName: "lock.shield")
+                            .foregroundStyle(.orange)
+                            .font(.system(size: 11))
+                        Text("需先安装插件")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
 
                 if !detectedTools.isEmpty {
                     HStack {
@@ -377,7 +389,7 @@ struct SettingsView: View {
                         .foregroundStyle(.green)
                 case .notInstalled:
                     Label(NSLocalizedString("settings.hook.notInstalled", comment: "Not Installed"), systemImage: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.red)
                 case .unknown:
                     ProgressView()
                         .scaleEffect(0.7)
