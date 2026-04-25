@@ -163,21 +163,21 @@ struct ExpandedIslandView: View {
     @ViewBuilder
     private var contextTab: some View {
         VStack(spacing: 8) {
-            // 上下文内容（可滚动）
+            // 上下文内容（可滚动，按lastActivity排序）
             ScrollView {
-                VStack(spacing: 8) {
-                    if let snapshot = contextSnapshot, snapshot.usageRatio > 0 {
-                        HStack {
-                            Image(systemName: "brain.fill")
-                                .font(.system(size: 14))
-                                .foregroundStyle(.blue)
-                            Text("上下文使用")
-                                .font(.system(size: 12, weight: .semibold))
-                            Spacer()
+                VStack(spacing: 6) {
+                    ForEach(Array(sessionManager.sortedSessions), id: \.sessionId) { session in
+                        if let snapshot = contextMonitor.snapshot(for: session.sessionId),
+                           snapshot.usageRatio > 0 {
+                            sessionContextRow(session: session, snapshot: snapshot)
                         }
-                        
-                        ContextUsageCard(snapshot: snapshot)
-                    } else {
+                    }
+                    
+                    // 无上下文数据
+                    let sessionsWithContext = sessionManager.sortedSessions.compactMap { session in
+                        contextMonitor.snapshot(for: session.sessionId)
+                    }
+                    if sessionsWithContext.isEmpty {
                         VStack(spacing: 8) {
                             Image(systemName: "brain")
                                 .font(.system(size: 24))
@@ -187,6 +187,7 @@ struct ExpandedIslandView: View {
                                 .foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity)
+                        .padding(.vertical, 20)
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -197,7 +198,50 @@ struct ExpandedIslandView: View {
             footer
         }
     }
-
+    
+    // MARK: - 会话上下文行
+    
+    private func sessionContextRow(session: Session, snapshot: ContextUsageSnapshot) -> some View {
+        let contextText: String
+        if let used = snapshot.tokensUsed, let total = snapshot.tokensTotal {
+            contextText = "\(snapshot.usagePercent)% (\(formatTokens(used))/\(formatTokens(total)))"
+        } else {
+            contextText = "\(snapshot.usagePercent)%"
+        }
+        
+        return HStack {
+            Text(session.sessionName ?? shortenedCwd(session.cwd))
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            Text(contextText)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(sessionManager.aggregateState.color)
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.white.opacity(0.05))
+        )
+    }
+    
+    private func shortenedCwd(_ cwd: String) -> String {
+        let components = cwd.split(separator: "/")
+        guard components.count > 3 else { return cwd }
+        return ".../" + components.suffix(2).joined(separator: "/")
+    }
+    
+    private func formatTokens(_ tokens: Int) -> String {
+        if tokens >= 1000 {
+            return String(format: "%.0fK", Double(tokens) / 1000.0)
+        }
+return "\(tokens)"
+    }
+    
     private var emptyState: some View {
         VStack(spacing: 8) {
             Image(systemName: "key.fill")

@@ -69,6 +69,11 @@ final class ContextMonitor {
     /// 所有会话的上下文使用快照
     private(set) var snapshots: [String: ContextUsageSnapshot] = [:]
 
+    /// 获取指定会话的上下文快照
+    func snapshot(for sessionId: String) -> ContextUsageSnapshot? {
+        snapshots[sessionId]
+    }
+
     /// 最高优先级的上下文使用快照（用于 UI 展示）
     var topSnapshot: ContextUsageSnapshot? {
         snapshots.values

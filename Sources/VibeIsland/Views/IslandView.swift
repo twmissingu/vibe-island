@@ -97,6 +97,15 @@ struct CompactIslandView: View {
         contextMonitor.topSnapshot
     }
 
+    /// 当前会话的上下文使用百分比
+    private var sessionContextPercent: String? {
+        guard let session = topSession,
+              let snapshot = contextMonitor.snapshot(for: session.sessionId) else {
+            return nil
+        }
+        return "\(snapshot.usagePercent)%"
+    }
+
     /// Whether the session state should blink
     private var shouldBlink: Bool {
         aggregateState.isBlinking
@@ -294,26 +303,33 @@ struct CompactIslandView: View {
     private var backgroundView: some View {
         Color.black
     }
-    // MARK: - 发光效果状态指示器
+    // MARK: - 上下文使用率指示器（替代圆点）
 
     @ViewBuilder
     private var sessionIndicatorDot: some View {
         let uiScale = ScreenParameters.shared.menuBarHeight / 44.0
-        ZStack {
-            // 外层发光
-            Circle()
-                .fill(aggregateState.color.opacity(0.3))
-                .frame(width: 12 * uiScale, height: 12 * uiScale)
-                .blur(radius: 4 * uiScale)
-            
-            // 主圆点
-            Circle()
-                .fill(aggregateState.color)
-                .frame(width: 8 * uiScale, height: 8 * uiScale)
-                .shadow(color: aggregateState.color.opacity(0.5), radius: 3 * uiScale, x: 0, y: 0)
+        
+        if let percent = sessionContextPercent {
+            Text(percent)
+                .font(.system(size: 10 * uiScale, weight: .bold, design: .monospaced))
+                .foregroundColor(aggregateState.color)
+                .frame(width: 28, height: ScreenParameters.shared.menuBarHeight)
+                .modifier(BlinkModifier(shouldBlink: shouldBlink))
+        } else {
+            ZStack {
+                Circle()
+                    .fill(aggregateState.color.opacity(0.3))
+                    .frame(width: 12 * uiScale, height: 12 * uiScale)
+                    .blur(radius: 4 * uiScale)
+                
+                Circle()
+                    .fill(aggregateState.color)
+                    .frame(width: 8 * uiScale, height: 8 * uiScale)
+                    .shadow(color: aggregateState.color.opacity(0.5), radius: 3 * uiScale, x: 0, y: 0)
+            }
+            .frame(width: 28, height: ScreenParameters.shared.menuBarHeight)
+            .modifier(BlinkModifier(shouldBlink: shouldBlink))
         }
-        .frame(width: 28, height: ScreenParameters.shared.menuBarHeight)
-        .modifier(BlinkModifier(shouldBlink: shouldBlink))
     }
 
     // MARK: - 波纹动画效果
