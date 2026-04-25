@@ -163,29 +163,36 @@ struct ExpandedIslandView: View {
     @ViewBuilder
     private var contextTab: some View {
         VStack(spacing: 8) {
-            // 单个卡片 - 使用 trackedSession（与 Compact Island 一致）
-            if let session = sessionManager.trackedSession {
-                // 优先从 snapshot 获取
-                if let snapshot = contextMonitor.snapshot(for: session.sessionId),
-                   snapshot.usageRatio > 0 {
-                    ContextUsageCard(session: session, snapshot: snapshot)
+            // 卡片内容（可滚动）
+            ScrollView {
+                VStack(spacing: 8) {
+                    // 单个卡片 - 使用 trackedSession（与 Compact Island 一致）
+                    if let session = sessionManager.trackedSession {
+                        // 优先从 snapshot 获取
+                        if let snapshot = contextMonitor.snapshot(for: session.sessionId),
+                           snapshot.usageRatio > 0 {
+                            ContextUsageCard(session: session, snapshot: snapshot)
+                        }
+                        // 回退：用 Session 模型的 contextUsage
+                        else if let usage = session.contextUsage, usage > 0 {
+                            let fallbackSnapshot = ContextUsageSnapshot(
+                                sessionId: session.sessionId,
+                                usageRatio: usage,
+                                tokensUsed: session.contextTokensUsed,
+                                tokensTotal: session.contextTokensTotal,
+                                timestamp: Date()
+                            )
+                            ContextUsageCard(session: session, snapshot: fallbackSnapshot)
+                        } else {
+                            emptyContextView
+                        }
+                    } else {
+                        emptyContextView
+                    }
                 }
-                // 回退：用 Session 模型的 contextUsage
-                else if let usage = session.contextUsage, usage > 0 {
-                    let fallbackSnapshot = ContextUsageSnapshot(
-                        sessionId: session.sessionId,
-                        usageRatio: usage,
-                        tokensUsed: session.contextTokensUsed,
-                        tokensTotal: session.contextTokensTotal,
-                        timestamp: Date()
-                    )
-                    ContextUsageCard(session: session, snapshot: fallbackSnapshot)
-                } else {
-                    emptyContextView
-                }
-            } else {
-                emptyContextView
+                .frame(maxWidth: .infinity)
             }
+            .frame(maxHeight: .infinity)
 
             // 固定在底部
             footer

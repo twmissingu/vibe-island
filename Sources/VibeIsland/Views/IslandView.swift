@@ -86,7 +86,7 @@ struct CompactIslandView: View {
     }
 
     private var topSession: Session? {
-        sessionManager.sortedSessions.first
+        sessionManager.trackedSession
     }
 
     private var aggregateState: SessionState {
