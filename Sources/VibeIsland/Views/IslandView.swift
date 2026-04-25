@@ -110,8 +110,8 @@ struct CompactIslandView: View {
         }
     }
     
-    /// Whether to animate brackets on state change
-    @State private var animateBrackets = false
+    /// 括号动画服务
+    @State private var bracketAnimation = BracketAnimationService()
 
     var body: some View {
         // 获取菜单栏高度和刘海宽度
@@ -130,7 +130,7 @@ struct CompactIslandView: View {
                 .foregroundColor(aggregateState.color)
                 .font(.system(size: 24 * uiScale, weight: .bold, design: .monospaced))
                 .baselineOffset(2 * uiScale)
-                .offset(x: animateBrackets ? -4.0 * uiScale : 0)
+                .offset(x: bracketAnimation.isExpanded ? -4.0 * uiScale : 0)
 
             // Session indicator dot
             sessionIndicatorDot
@@ -156,7 +156,7 @@ struct CompactIslandView: View {
                 .foregroundColor(aggregateState.color)
                 .font(.system(size: 24 * uiScale, weight: .bold, design: .monospaced))
                 .baselineOffset(2 * uiScale)
-                .offset(x: animateBrackets ? 4.0 * uiScale : 0)
+                .offset(x: bracketAnimation.isExpanded ? 4.0 * uiScale : 0)
         }
         .padding(.horizontal, 16 * uiScale)
         .padding(.vertical, 10 * uiScale)
@@ -167,13 +167,12 @@ struct CompactIslandView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: topSession?.sessionId)
 
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: viewModel.settings.petEnabled)
-        .animation(.easeInOut(duration: 0.15), value: animateBrackets)
-        .onChange(of: aggregateState) { _, newState in
+        .animation(.easeInOut(duration: 1.0), value: bracketAnimation.isExpanded)
+        .onChange(of: aggregateState) { _, _ in
             if shouldAnimateBrackets {
-                animateBrackets = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    animateBrackets = false
-                }
+                bracketAnimation.start()
+            } else {
+                bracketAnimation.stop()
             }
         }
     }
