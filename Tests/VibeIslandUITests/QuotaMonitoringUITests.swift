@@ -70,7 +70,8 @@ final class QuotaMonitoringUITests: XCTestCase {
 
         // 切换到上下文标签
         app.buttons["上下文"].tap()
-        XCTAssertTrue(app.staticTexts["上下文使用"].exists || app.staticTexts["暂无上下文数据"].exists, "应显示上下文标签内容")
+        // 新版显示会话标题或 cwd，不再是固定文本 "上下文使用"
+        XCTAssertTrue(app.staticTexts["暂无上下文数据"].exists || app.scrollViews.count > 0, "应显示上下文标签内容")
 
         // 切换回额度标签
         app.buttons["额度"].tap()

@@ -177,12 +177,21 @@ struct CompactIslandView: View {
         let uiScale = barHeight / 44.0
 
         HStack(spacing: 8 * uiScale) {
-            // Left parenthesis
-            Text("(")
-                .foregroundColor(aggregateState.color)
-                .font(.system(size: 24 * uiScale, weight: .bold, design: .monospaced))
-                .baselineOffset(2 * uiScale)
-                .offset(x: bracketAnimation.isExpanded ? -4.0 * uiScale : 0)
+            // Left parenthesis with glow (blur + shadow)
+            ZStack {
+                Text("(")
+                    .foregroundColor(aggregateState.color.opacity(0.4))
+                    .font(.system(size: 24 * uiScale, weight: .bold, design: .monospaced))
+                    .baselineOffset(2 * uiScale)
+                    .blur(radius: 3 * uiScale)
+                
+                Text("(")
+                    .foregroundColor(aggregateState.color)
+                    .font(.system(size: 24 * uiScale, weight: .bold, design: .monospaced))
+                    .baselineOffset(2 * uiScale)
+                    .shadow(color: aggregateState.color.opacity(0.6), radius: 3 * uiScale)
+            }
+            .offset(x: bracketAnimation.isExpanded ? -4.0 * uiScale : 0)
 
             // Session indicator dot
             sessionIndicatorDot
@@ -203,12 +212,21 @@ struct CompactIslandView: View {
             }
             .frame(width: indicatorWidth, height: barHeight)
 
-            // Right parenthesis
-            Text(")")
-                .foregroundColor(aggregateState.color)
-                .font(.system(size: 24 * uiScale, weight: .bold, design: .monospaced))
-                .baselineOffset(2 * uiScale)
-                .offset(x: bracketAnimation.isExpanded ? 4.0 * uiScale : 0)
+            // Right parenthesis with glow (blur + shadow)
+            ZStack {
+                Text(")")
+                    .foregroundColor(aggregateState.color.opacity(0.4))
+                    .font(.system(size: 24 * uiScale, weight: .bold, design: .monospaced))
+                    .baselineOffset(2 * uiScale)
+                    .blur(radius: 3 * uiScale)
+                
+                Text(")")
+                    .foregroundColor(aggregateState.color)
+                    .font(.system(size: 24 * uiScale, weight: .bold, design: .monospaced))
+                    .baselineOffset(2 * uiScale)
+                    .shadow(color: aggregateState.color.opacity(0.6), radius: 3 * uiScale)
+            }
+            .offset(x: bracketAnimation.isExpanded ? 4.0 * uiScale : 0)
         }
         .padding(.horizontal, 16 * uiScale)
         .padding(.vertical, 10 * uiScale)
@@ -387,7 +405,7 @@ if sessionContextPercent != nil {
                     .shadow(color: aggregateState.color.opacity(0.5), radius: 3 * uiScale, x: 0, y: 0)
             }
             .frame(width: 28, height: ScreenParameters.shared.menuBarHeight)
-            .modifier(BlinkModifier(shouldBlink: shouldBlink))
+            .modifier(BlinkModifier(shouldBlink: shouldBlink, blinkInterval: aggregateState == .completed ? 1.0 : 0))
         }
     }
 
@@ -469,7 +487,7 @@ struct BlinkModifier: ViewModifier {
 
     private func startBlink() {
         withAnimation(.easeInOut(duration: blinkInterval / 2).repeatForever(autoreverses: true)) {
-            opacity = 0.2
+            opacity = 0.5
         }
     }
 }

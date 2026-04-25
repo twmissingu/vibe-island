@@ -165,6 +165,7 @@ struct ContextUsageIndicator: View {
 
 /// 在 ExpandedIslandView 中使用的完整上下文详情卡片
 struct ContextUsageCard: View {
+    let session: Session
     let snapshot: ContextUsageSnapshot
 
     var body: some View {
@@ -175,8 +176,10 @@ struct ContextUsageCard: View {
                     .font(.system(size: 12))
                     .foregroundStyle(statusColor)
 
-                Text("上下文使用")
+                Text(session.sessionName ?? shortenedCwd(session.cwd))
                     .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
 
                 Spacer()
 
@@ -226,10 +229,14 @@ struct ContextUsageCard: View {
     }
 
     private var statusColor: Color {
-        if snapshot.isCritical { return .red }
-        if snapshot.isWarning { return .orange }
-        if snapshot.usageRatio >= 0.5 { return .yellow }
-        return .green
+        let percent = snapshot.usagePercent
+        if percent < 40 {
+            return .green
+        } else if percent < 70 {
+            return .orange
+        } else {
+            return .red
+        }
     }
 
     private func detailRow(_ label: String, value: String) -> some View {
@@ -250,5 +257,11 @@ struct ContextUsageCard: View {
             return String(format: "%.1fK", Double(count) / 1_000)
         }
         return "\(count)"
+    }
+
+    private func shortenedCwd(_ cwd: String) -> String {
+        let components = cwd.split(separator: "/")
+        guard components.count > 3 else { return cwd }
+        return ".../" + components.suffix(2).joined(separator: "/")
     }
 }

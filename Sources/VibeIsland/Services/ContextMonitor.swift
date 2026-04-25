@@ -178,9 +178,7 @@ final class ContextMonitor {
     
     /// 从会话文件直接获取 context_usage
     func fetchContextUsageFromFile(sessionId: String) {
-        let sessionsDir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".vibe-island")
-            .appendingPathComponent("sessions")
+        let sessionsDir = SessionFileWatcher.sessionsDirectory
         
         // 查找匹配的 session 文件（pid 或 session_id）
         guard let enumerator = FileManager.default.enumerator(

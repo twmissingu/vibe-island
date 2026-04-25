@@ -44,12 +44,18 @@ final class ContextUsageUITests: XCTestCase {
 
     /// 测试：ContextUsageCard 应成功初始化
     func testContextUsageCard_initializes() {
+        let session = Session(
+            sessionId: "test-session",
+            cwd: "/test/path",
+            lastActivity: Date()
+        )
         let snapshot = makeSnapshot(
+            sessionId: "test-session",
             tokensUsed: 50_000,
             tokensTotal: 200_000,
             usageRatio: 0.25
         )
-        let card = ContextUsageCard(snapshot: snapshot)
+        let card = ContextUsageCard(session: session, snapshot: snapshot)
         XCTAssertNotNil(card, "ContextUsageCard 应成功初始化")
     }
 

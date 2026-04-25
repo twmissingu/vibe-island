@@ -34,6 +34,11 @@ struct ExpandedIslandView: View {
         contextMonitor.topSnapshot
     }
 
+    private var contextSession: Session? {
+        guard let snapshot = contextSnapshot else { return nil }
+        return sessionManager.sessions[snapshot.sessionId]
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // 标签页切换
@@ -54,6 +59,9 @@ struct ExpandedIslandView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView()
                 .environment(viewModel)
+        }
+        .task {
+            fetchAllSessionContexts()
         }
     }
 
@@ -113,15 +121,15 @@ struct ExpandedIslandView: View {
 
     // MARK: - 额度标签
 
-    @ViewBuilder
+@ViewBuilder
     private var quotaTab: some View {
         VStack(spacing: 8) {
             // 内容区域（可滚动，当额度多时）
             ScrollView {
                 VStack(spacing: 8) {
                     // Context usage card (if available)
-                    if let snapshot = contextSnapshot, snapshot.usageRatio > 0 {
-                        ContextUsageCard(snapshot: snapshot)
+                    if let snapshot = contextSnapshot, let session = contextSession, snapshot.usageRatio > 0 {
+                        ContextUsageCard(session: session, snapshot: snapshot)
                     }
 
                     ForEach(viewModel.quotas) { quota in
@@ -139,6 +147,9 @@ struct ExpandedIslandView: View {
             // 固定在底部
             footer
         }
+        .task {
+            fetchAllSessionContexts()
+        }
     }
 
     // MARK: - 会话标签
@@ -155,6 +166,9 @@ struct ExpandedIslandView: View {
 
             // 固定在底部
             footer
+        }
+        .task {
+            fetchAllSessionContexts()
         }
     }
 
