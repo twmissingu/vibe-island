@@ -91,15 +91,15 @@ final class StateManager {
             var lastState: SessionState = .idle
 
             while !Task.isCancelled {
-                let currentState = sessionWatcher.aggregateState
+                let currentState = SessionManager.shared.aggregateState
 
                 if currentState != lastState {
-                    await handleStateChange(from: lastState, to: currentState)
+                    await self.handleStateChange(from: lastState, to: currentState)
                     lastState = currentState
                 }
 
                 // 处理所有活跃会话的上下文监控
-                for session in sessionWatcher.sessions.values {
+                for session in SessionManager.shared.sessions.values {
                     contextMonitor.handleSessionUpdate(session)
                 }
 
