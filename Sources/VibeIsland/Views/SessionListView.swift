@@ -2,8 +2,7 @@ import SwiftUI
 
 // MARK: - 会话列表视图
 
-/// 显示所有活跃会话列表，支持点击选择要跟踪的会话
-/// 支持"自动"模式（默认，跟踪最高优先级）
+/// 显示活跃会话列表，支持点击选择要高亮显示的会话
 struct SessionListView: View {
     @Environment(StateManager.self) private var viewModel
     private var sessionManager: SessionManager { .shared }
@@ -11,28 +10,15 @@ struct SessionListView: View {
     /// 会话行组件
     private struct SessionRow: View {
         let session: Session
-        let sessionId: String
-        let isTracked: Bool
-        let isAutoMode: Bool
+        let isSelected: Bool
         let onSelect: () -> Void
 
         var body: some View {
             Button(action: onSelect) {
-                HStack(spacing: 6) {
-                    // 状态图标 + 名称
-                    HStack(spacing: 3) {
-                        Image(systemName: session.status.icon)
-                            .font(.system(size: 11))
-                            .foregroundStyle(session.status.color)
-                        Text(session.status.displayName)
-                            .font(.system(size: 10))
-                            .foregroundStyle(session.status.color)
-                    }
-                    .frame(width: 72, alignment: .leading)
-
+                HStack(spacing: 4) {
                     // 会话名
                     Text(session.sessionName ?? shortenedCwd(session.cwd))
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -40,28 +26,39 @@ struct SessionListView: View {
 
                     // 工具来源
                     Text(toolSourceName(for: session))
-                        .font(.system(size: 9))
+                        .font(.system(size: 9, design: .monospaced))
                         .foregroundStyle(.secondary)
-                        .frame(width: 44, alignment: .trailing)
+                        .frame(width: 50, alignment: .trailing)
 
-                    // 跟踪指示器
-                    if isTracked {
-                        Image(systemName: isAutoMode ? "arrow.triangle.2.circlepath" : "pin.fill")
+                    // 状态图标 + 名称
+                    HStack(spacing: 2) {
+                        Image(systemName: session.status.icon)
                             .font(.system(size: 9))
-                            .foregroundStyle(.blue)
-                    } else {
-                        Color.clear.frame(width: 9, height: 9)
+                            .foregroundStyle(session.status.color)
+                        Text(session.status.statusName)
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(session.status.color)
                     }
+                    .frame(width: 70, alignment: .trailing)
                 }
                 .padding(.vertical, 6)
                 .padding(.horizontal, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
                 .background(
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(isTracked ? Color.blue.opacity(0.15) : Color.clear)
+                        .fill(isSelected ? Color.blue.opacity(0.15) : Color.gray.opacity(0.08))
                 )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(
+                            isSelected ? Color.blue.opacity(0.6) : Color.gray.opacity(0.15),
+                            lineWidth: isSelected ? 1.5 : 0.5
+                        )
+                )
+                .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
             }
             .buttonStyle(.plain)
-            .contentShape(Rectangle())
         }
 
         /// 根据会话来源返回工具名称
@@ -82,125 +79,90 @@ struct SessionListView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // 头部：模式切换
-            HStack {
-                Text("会话")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                // 自动/手动切换按钮
-                Button {
-                    sessionManager.toggleTrackingMode()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: sessionManager.trackingMode.isAuto ? "arrow.triangle.2.circlepath" : "pin.fill")
-                            .font(.system(size: 10))
-                        Text(sessionManager.trackingMode.isAuto ? "自动" : "固定")
-                            .font(.system(size: 10))
-                    }
-                    .foregroundStyle(.blue)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 4)
-
-            // 自动模式指示
-            if sessionManager.trackingMode.isAuto {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                    Text("自动跟踪最高优先级会话")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
-                }
-                .padding(.horizontal, 4)
-            } else if let pinnedId = sessionManager.pinnedSessionId,
-                      let pinnedSession = sessionManager.session(id: pinnedId) {
-                HStack(spacing: 6) {
-                    Image(systemName: "pin.fill")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.blue)
-                    Text("已固定: \(pinnedSession.sessionName ?? pinnedSession.sessionId)")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.blue)
-                }
-                .padding(.horizontal, 4)
-            }
-
-            // 会话列表（最多显示5条）
             if sessionManager.sortedSessions.isEmpty {
                 emptyState
             } else {
-                VStack(spacing: 2) {
-                    ForEach(Array(sessionManager.sortedSessions.prefix(5)), id: \.sessionId) { session in
-                        SessionRow(
-                            session: session,
-                            sessionId: session.sessionId,
-                            isTracked: isSessionTracked(session),
-                            isAutoMode: sessionManager.trackingMode.isAuto,
-                            onSelect: {
-                                selectSession(session)
-                            }
-                        )
-                    }
+                ForEach(Array(sessionManager.sortedSessions.prefix(8)), id: \.sessionId) { session in
+                    SessionRow(
+                        session: session,
+                        isSelected: isSessionSelected(session),
+                        onSelect: {
+                            selectSession(session)
+                        }
+                    )
                 }
             }
         }
-        .padding(8)
+        .padding(.horizontal, 4)
     }
 
     // MARK: - 辅助方法
 
-    private func isSessionTracked(_ session: Session) -> Bool {
-        if sessionManager.trackingMode.isAuto {
-            // 自动模式下，最高优先级会话被视为"跟踪"
-            guard let top = sessionManager.sortedSessions.first else { return false }
-            return top.sessionId == session.sessionId
-        } else {
-            return session.sessionId == sessionManager.pinnedSessionId
+    private func isSessionSelected(_ session: Session) -> Bool {
+        switch sessionManager.trackingMode {
+        case .auto:
+            return false
+        case .manual(let sessionId):
+            return sessionId == session.sessionId
         }
     }
 
     private func selectSession(_ session: Session) {
-        // 如果点击的已经是当前跟踪的会话，不做任何操作
-        if session.sessionId == sessionManager.trackedSession?.sessionId {
-            return
+        switch sessionManager.trackingMode {
+        case .auto:
+            sessionManager.setTrackingModeManual(sessionId: session.sessionId)
+        case .manual(let sessionId):
+            if sessionId == session.sessionId {
+                sessionManager.toggleTrackingMode()
+            } else {
+                sessionManager.setTrackingModeManual(sessionId: session.sessionId)
+            }
         }
-        sessionManager.setTrackingModeManual(sessionId: session.sessionId)
     }
 
     @ViewBuilder
     private var emptyState: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             Image(systemName: "terminal")
-                .font(.system(size: 20))
+                .font(.system(size: 16))
                 .foregroundStyle(.tertiary)
-            Text("暂无活跃会话")
-                .font(.system(size: 11))
+            Text("No active sessions")
+                .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
+        .padding(.vertical, 20)
     }
 }
 
 // MARK: - SessionState 扩展
 
 extension SessionState {
+    /// 状态名称（英文）
+    var statusName: String {
+        switch self {
+        case .idle: return "Idle"
+        case .thinking: return "Thinking"
+        case .coding: return "Coding"
+        case .waiting: return "Waiting"
+        case .waitingPermission: return "Permission"
+        case .completed: return "Completed"
+        case .error: return "Error"
+        case .compacting: return "Compacting"
+        }
+    }
+
     /// 状态对应的 SF Symbol 图标
     var icon: String {
         switch self {
-        case .idle: return "checkmark.circle.fill"
+        case .idle: return "moon.fill"
         case .thinking: return "brain.fill"
-        case .coding: return "hammer.fill"
+        case .coding: return "terminal.fill"
         case .waiting: return "text.bubble.fill"
         case .waitingPermission: return "lock.shield.fill"
         case .completed: return "checkmark.circle.fill"
-        case .error: return "exclamationmark.triangle.fill"
-        case .compacting: return "arrow.up.arrow.down.circle.fill"
+        case .error: return "xmark.circle.fill"
+        case .compacting: return "shippingbox.fill"
         }
     }
 }
