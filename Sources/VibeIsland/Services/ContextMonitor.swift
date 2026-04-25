@@ -175,6 +175,71 @@ final class ContextMonitor {
         )
         updateSnapshot(sessionId: sessionId, snapshot: snapshot)
     }
+    
+    /// 从会话文件直接获取 context_usage
+    func fetchContextUsageFromFile(sessionId: String) {
+        let sessionsDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".vibe-island")
+            .appendingPathComponent("sessions")
+        
+        // 查找匹配的 session 文件（pid 或 session_id）
+        guard let enumerator = FileManager.default.enumerator(
+            at: sessionsDir,
+            includingPropertiesForKeys: nil
+        ) else { return }
+        
+        for case let fileURL as URL in enumerator {
+            guard fileURL.pathExtension == "json" else { continue }
+            
+            do {
+                let data = try Data(contentsOf: fileURL)
+                guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
+                
+                // 检查 session_id 匹配
+                let fileSessionId = json["session_id"] as? String
+                let filePid = json["pid"] as? Int
+                
+                let matches: Bool
+                if let fsId = fileSessionId {
+                    matches = fsId == sessionId || fsId.contains(sessionId)
+                } else if let pid = filePid {
+                    let opencodeId = "opencode-\(pid)"
+                    matches = String(pid) == sessionId || sessionId.hasPrefix("opencode-") && opencodeId == sessionId
+                } else {
+                    matches = false
+                }
+                
+                guard matches else { continue }
+                
+                // 提取 context_usage
+                if let usage = json["context_usage"] as? Double {
+                    let tokensUsed = json["context_tokens_used"] as? Int
+                    let tokensTotal = json["context_tokens_total"] as? Int
+                    
+                    setContextUsage(
+                        sessionId: sessionId,
+                        usage: usage,
+                        tokensUsed: tokensUsed,
+                        tokensTotal: tokensTotal
+                    )
+                    Self.logger.debug("从文件获取上下文 usage: \(sessionId) = \(usage)")
+                    return
+                }
+                
+                // 回退：从 notificationMessage 解析
+                if let message = json["notification_message"] as? String {
+                    if let snapshot = parseContextUsage(from: message, sessionId: sessionId) {
+                        updateSnapshot(sessionId: sessionId, snapshot: snapshot)
+                        Self.logger.debug("从 notificationMessage 解析上下文: \(sessionId) = \(snapshot.usagePercent)%")
+                        return
+                    }
+                }
+                
+            } catch {
+                continue
+            }
+        }
+    }
 
     /// 清除指定会话的上下文快照
     func clearSnapshot(for sessionId: String) {

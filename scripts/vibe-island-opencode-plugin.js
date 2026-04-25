@@ -95,7 +95,8 @@ export const vibeIsland = async ({ directory }) => {
 
   const sessionId = `opencode-${process.pid}`;
   let sessionName = null;
-
+  let modelContextLimit = 200000; // default to 200K
+  
   function basePayload() {
     return {
       session_id: sessionId,
@@ -109,12 +110,21 @@ export const vibeIsland = async ({ directory }) => {
   callHook(hookBin, "SessionStart", basePayload());
 
   return {
+    // ---- Chat params: capture model context limit ----
+    "chat.params": async ({ params }) => {
+      if (params?.model?.limit?.context) {
+        modelContextLimit = params.model.limit.context;
+      }
+    },
+
     // ---- Session lifecycle events ----
     event: async ({ event }) => {
       if (!event || !event.type) return;
 
       switch (event.type) {
         case "session.created":
+          // Reset model context limit for new session
+          modelContextLimit = 200000;
           callHook(hookBin, "SessionStart", basePayload());
           break;
 
@@ -165,7 +175,7 @@ export const vibeIsland = async ({ directory }) => {
       }
     },
 
-    // ---- Chat events ----
+    // ---- Message events: track token usage ----
     "chat.message": async (_input, output) => {
       const prompt =
         output?.message?.content ||
@@ -174,6 +184,37 @@ export const vibeIsland = async ({ directory }) => {
       callHook(hookBin, "UserPromptSubmit", {
         ...basePayload(),
         ...(prompt && { prompt }),
+      });
+    },
+
+    "chat.complete": async (_input, output) => {
+      // Track context usage after each assistant response
+      const message = output?.message;
+      if (!message) return;
+      
+      const tokens = message.tokens;
+      if (!tokens) return;
+      
+      // Calculate total context usage
+      const inputTokens = tokens.input || 0;
+      const outputTokens = tokens.output || 0;
+      const reasoningTokens = tokens.reasoning || 0;
+      const cacheRead = tokens.cache?.read || 0;
+      const cacheWrite = tokens.cache?.write || 0;
+      
+      const totalTokens = inputTokens + outputTokens + reasoningTokens + cacheRead + cacheWrite;
+      const usagePercent = modelContextLimit > 0 
+        ? Math.round((totalTokens / modelContextLimit) * 100)
+        : 0;
+      
+      // Send context usage info with the message
+      const contextMsg = `Context usage: ${usagePercent}% (${totalTokens}/${modelContextLimit} tokens)`;
+      callHook(hookBin, "UserPromptSubmit", {
+        ...basePayload(),
+        prompt: contextMsg,
+        context_usage: usagePercent / 100,
+        context_tokens_used: totalTokens,
+        context_tokens_total: modelContextLimit,
       });
     },
 

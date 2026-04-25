@@ -165,6 +165,9 @@ public struct SessionEvent: Codable, Sendable {
     public let transcriptPath: String?
     public let permissionMode: String?
     public let isInterrupt: Bool?
+    public let contextUsage: Double?
+    public let contextTokensUsed: Int?
+    public let contextTokensTotal: Int?
     public let receivedAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -185,6 +188,9 @@ public struct SessionEvent: Codable, Sendable {
         case transcriptPath = "transcript_path"
         case permissionMode = "permission_mode"
         case isInterrupt = "is_interrupt"
+        case contextUsage = "context_usage"
+        case contextTokensUsed = "context_tokens_used"
+        case contextTokensTotal = "context_tokens_total"
     }
 
     public init(from decoder: Decoder) throws {
@@ -206,6 +212,9 @@ public struct SessionEvent: Codable, Sendable {
         transcriptPath = try container.decodeIfPresent(String.self, forKey: .transcriptPath)
         permissionMode = try container.decodeIfPresent(String.self, forKey: .permissionMode)
         isInterrupt = try container.decodeIfPresent(Bool.self, forKey: .isInterrupt)
+        contextUsage = try container.decodeIfPresent(Double.self, forKey: .contextUsage)
+        contextTokensUsed = try container.decodeIfPresent(Int.self, forKey: .contextTokensUsed)
+        contextTokensTotal = try container.decodeIfPresent(Int.self, forKey: .contextTokensTotal)
         receivedAt = Date()
     }
 }

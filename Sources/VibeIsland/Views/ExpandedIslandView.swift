@@ -163,26 +163,23 @@ struct ExpandedIslandView: View {
     @ViewBuilder
     private var contextTab: some View {
         VStack(spacing: 8) {
-            // 上下文内容（可滚动，按lastActivity排序）
+            // 上下文内容（可滚动，按lastActivity排序，最多8个）
             ScrollView {
                 VStack(spacing: 6) {
-                    ForEach(Array(sessionManager.sortedSessions), id: \.sessionId) { session in
-                        if let snapshot = contextMonitor.snapshot(for: session.sessionId),
-                           snapshot.usageRatio > 0 {
-                            sessionContextRow(session: session, snapshot: snapshot)
-                        }
+                    // 显示所有会话（包括没有 context_usage 的）
+                    let allSessions = Array(sessionManager.sortedSessions.prefix(8))
+                    
+                    ForEach(allSessions, id: \.sessionId) { session in
+                        sessionRow(session: session)
                     }
                     
-                    // 无上下文数据
-                    let sessionsWithContext = sessionManager.sortedSessions.compactMap { session in
-                        contextMonitor.snapshot(for: session.sessionId)
-                    }
-                    if sessionsWithContext.isEmpty {
+                    // 无会话数据
+                    if allSessions.isEmpty {
                         VStack(spacing: 8) {
                             Image(systemName: "brain")
                                 .font(.system(size: 24))
                                 .foregroundStyle(.secondary)
-                            Text("暂无上下文数据")
+                            Text("暂无会话数据")
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
                         }
@@ -197,9 +194,79 @@ struct ExpandedIslandView: View {
             // 固定在底部
             footer
         }
+        .onAppear {
+            fetchAllSessionContexts()
+        }
     }
     
-    // MARK: - 会话上下文行
+    // 批量获取所有会话的 context_usage
+    private func fetchAllSessionContexts() {
+        let sessions = Array(sessionManager.sortedSessions.prefix(8))
+        for session in sessions {
+            contextMonitor.fetchContextUsageFromFile(sessionId: session.sessionId)
+        }
+    }
+    
+    // MARK: - 会话行（无 context_usage 显示）
+    
+    private func sessionRow(session: Session) -> some View {
+        let contextPercent = getContextPercent(for: session)
+        let contextColor = getContextColor(percent: contextPercent)
+        
+        let contextText: String
+        if contextPercent > 0 {
+            if let used = session.contextTokensUsed, let total = session.contextTokensTotal {
+                contextText = "\(contextPercent)% (\(formatTokens(used))/\(formatTokens(total)))"
+            } else {
+                contextText = "\(contextPercent)%"
+            }
+        } else {
+            contextText = "--"
+        }
+        
+        return HStack {
+            Text(session.sessionName ?? shortenedCwd(session.cwd))
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            Text(contextText)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundColor(contextColor)
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.white.opacity(0.05))
+        )
+    }
+    
+    // 根据会话获取 context 百分比
+    private func getContextPercent(for session: Session) -> Int {
+        if let usage = session.contextUsage, usage > 0 {
+            return Int(usage * 100)
+        }
+        if let snapshot = contextMonitor.snapshot(for: session.sessionId), snapshot.usageRatio > 0 {
+            return snapshot.usagePercent
+        }
+        return 0
+    }
+    
+    // 根据百分比获取颜色（<40% 绿色，40%-70% 橙色，>70% 红色）
+    private func getContextColor(percent: Int) -> Color {
+        if percent < 40 {
+            return .green
+        } else if percent < 70 {
+            return .orange
+        } else {
+            return .red
+        }
+    }
+    
+    // MARK: - 会话上下文行（带快照）
     
     private func sessionContextRow(session: Session, snapshot: ContextUsageSnapshot) -> some View {
         let contextText: String

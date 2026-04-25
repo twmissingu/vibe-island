@@ -99,11 +99,54 @@ struct CompactIslandView: View {
 
     /// 当前会话的上下文使用百分比
     private var sessionContextPercent: String? {
-        guard let session = topSession,
-              let snapshot = contextMonitor.snapshot(for: session.sessionId) else {
-            return nil
+        guard let percent = contextPercentInt else { return nil }
+        return "\(percent)%"
+    }
+    
+    /// 当前会话的上下文使用率（0-100 整数）
+    private var contextPercentInt: Int? {
+        guard let session = topSession else { return nil }
+        
+        // 优先从快照获取
+        if let snapshot = contextMonitor.snapshot(for: session.sessionId), snapshot.usageRatio > 0 {
+            return snapshot.usagePercent
         }
-        return "\(snapshot.usagePercent)%"
+        
+        // 回退到 Session 模型的 contextUsage 字段
+        if let usage = session.contextUsage, usage > 0 {
+            return Int(usage * 100)
+        }
+        
+        return nil
+    }
+    
+    /// 上下文百分比的颜色（<40% 绿色，40%-70% 橙色，>70% 红色）
+    private var contextPercentColor: Color {
+        guard let percent = contextPercentInt else { return .gray }
+        if percent < 40 {
+            return .green
+        } else if percent < 70 {
+            return .orange
+        } else {
+            return .red
+        }
+    }
+    
+    /// 上下文百分比是否需要闪烁
+    private var shouldBlinkContext: Bool {
+        guard let percent = contextPercentInt else { return false }
+        return percent >= 40
+    }
+    
+    /// 上下文百分比闪烁间隔（40%-70% 为 1s，>70% 为 0.5s）
+    private var contextBlinkInterval: Double {
+        guard let percent = contextPercentInt else { return 0 }
+        if percent >= 70 {
+            return 0.5
+        } else if percent >= 40 {
+            return 1.0
+        }
+        return 0
     }
 
     /// Whether the session state should blink
@@ -309,12 +352,28 @@ struct CompactIslandView: View {
     private var sessionIndicatorDot: some View {
         let uiScale = ScreenParameters.shared.menuBarHeight / 44.0
         
-        if let percent = sessionContextPercent {
-            Text(percent)
-                .font(.system(size: 10 * uiScale, weight: .bold, design: .monospaced))
-                .foregroundColor(aggregateState.color)
-                .frame(width: 28, height: ScreenParameters.shared.menuBarHeight)
-                .modifier(BlinkModifier(shouldBlink: shouldBlink))
+if sessionContextPercent != nil {
+            let color = contextPercentColor
+            let contextNeedsBlink = shouldBlinkContext
+            let contextBlinkInterval = contextBlinkInterval
+            
+            ZStack {
+                // Glow layer
+                Text(sessionContextPercent ?? "")
+                    .font(.system(size: 12 * uiScale, weight: .bold, design: .monospaced))
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(color.opacity(0.3))
+                    .blur(radius: 2 * uiScale)
+                
+                // Main text
+                Text(sessionContextPercent ?? "")
+                    .font(.system(size: 12 * uiScale, weight: .bold, design: .monospaced))
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(color)
+                    .shadow(color: color.opacity(0.6), radius: 3 * uiScale, x: 0, y: 0)
+            }
+            .frame(width: 28, height: ScreenParameters.shared.menuBarHeight)
+            .modifier(BlinkModifier(shouldBlink: contextNeedsBlink, blinkInterval: contextBlinkInterval))
         } else {
             ZStack {
                 Circle()
@@ -381,10 +440,9 @@ struct RippleAnimationView: View {
 
 // MARK: - Blink Modifier
 
-// MARK: - Blink Modifier
-
 struct BlinkModifier: ViewModifier {
     let shouldBlink: Bool
+    var blinkInterval: Double = 0
     @State private var opacity: Double = 1.0
 
     func body(content: Content) -> some View {
@@ -397,6 +455,11 @@ struct BlinkModifier: ViewModifier {
                     opacity = 1.0
                 }
             }
+            .onChange(of: blinkInterval) { _, newInterval in
+                if shouldBlink && newInterval > 0 {
+                    startBlink()
+                }
+            }
             .onAppear {
                 if shouldBlink {
                     startBlink()
@@ -405,7 +468,7 @@ struct BlinkModifier: ViewModifier {
     }
 
     private func startBlink() {
-        withAnimation(.easeInOut(duration: 0.4).repeatForever(autoreverses: true)) {
+        withAnimation(.easeInOut(duration: blinkInterval / 2).repeatForever(autoreverses: true)) {
             opacity = 0.2
         }
     }

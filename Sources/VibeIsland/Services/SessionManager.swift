@@ -130,6 +130,9 @@ final class SessionManager: SessionAggregatable {
         // 启动上下文监控
         contextMonitor.start()
         
+        // 启动 context usage 定时刷新
+        startContextUsageTicker()
+        
         // 启动编码时长追踪
         CodingTimeTracker.shared.start()
         CodingTimeTracker.shared.tick()
@@ -142,7 +145,9 @@ final class SessionManager: SessionAggregatable {
     func stop() {
         hasSetup = false
         codingTimeTicker?.cancel()
+        contextUsageTicker?.cancel()
         codingTimeTicker = nil
+        contextUsageTicker = nil
         fileWatcher.stopWatching()
         contextMonitor.stop()
         CodingTimeTracker.shared.stop()
@@ -152,7 +157,10 @@ final class SessionManager: SessionAggregatable {
     
     /// 编码时长定时更新（每 30 秒）
     @ObservationIgnored private var codingTimeTicker: Task<Void, Never>?
-
+    
+    /// Context usage 定时刷新（每 60 秒 = 1 分钟）
+    @ObservationIgnored private var contextUsageTicker: Task<Void, Never>?
+    
     private func startCodingTimeTicker() {
         codingTimeTicker?.cancel()
         codingTimeTicker = Task {
@@ -167,10 +175,41 @@ final class SessionManager: SessionAggregatable {
             }
         }
     }
+    
+    private func startContextUsageTicker() {
+        contextUsageTicker?.cancel()
+        contextUsageTicker = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                guard !Task.isCancelled else { break }
+                await MainActor.run {
+                    self.fetchActiveSessionContext()
+                }
+            }
+        }
+    }
 
     /// 手动刷新所有会话
     func refresh() {
         fileWatcher.refreshAll()
+        
+        // 刷新 active 会话的 context_usage
+        fetchActiveSessionContext()
+    }
+    
+    /// 获取 active 会话的 context_usage（手动模式 pinned 会话 或自动模式 top 会话）
+    private func fetchActiveSessionContext() {
+        let targetSessionId: String?
+        
+        switch trackingMode {
+        case .manual(let sessionId):
+            targetSessionId = sessionId
+        case .auto:
+            targetSessionId = sortedSessions.first?.sessionId
+        }
+        
+        guard let sessionId = targetSessionId else { return }
+        contextMonitor.fetchContextUsageFromFile(sessionId: sessionId)
     }
 
     // MARK: 会话更新
@@ -333,7 +372,7 @@ final class SessionManager: SessionAggregatable {
         return "\(prefix) \(total) 活跃 (\(detail))"
     }
 
-    // MARK: 跟踪模式切换
+// MARK: 跟踪模式切换
 
     /// 切换到自动跟踪模式
     func setTrackingModeAuto() {
@@ -342,6 +381,10 @@ final class SessionManager: SessionAggregatable {
         viewModel?.settings.sessionTrackingMode = "auto"
         viewModel?.settings.pinnedSessionId = nil
         saveSettings()
+        // 立即获取 top 会话的 context_usage
+        if let session = sortedSessions.first {
+            contextMonitor.fetchContextUsageFromFile(sessionId: session.sessionId)
+        }
         Self.logger.info("切换到自动跟踪模式")
     }
 
@@ -349,13 +392,15 @@ final class SessionManager: SessionAggregatable {
     /// - Parameter sessionId: 要固定的会话 ID
     func setTrackingModeManual(sessionId: String) {
         trackingMode = .manual(sessionId: sessionId)
+        // 立即获取新会话的 context_usage
+        contextMonitor.fetchContextUsageFromFile(sessionId: sessionId)
         // 持久化到设置
         viewModel?.settings.sessionTrackingMode = "manual"
         viewModel?.settings.pinnedSessionId = sessionId
         saveSettings()
         Self.logger.info("切换到手动跟踪模式: \(sessionId)")
     }
-
+    
     /// 切换自动/手动模式（用于快捷切换按钮）
     func toggleTrackingMode() {
         switch trackingMode {
@@ -368,7 +413,7 @@ final class SessionManager: SessionAggregatable {
             setTrackingModeAuto()
         }
     }
-
+    
     /// 从设置中恢复跟踪模式
     func restoreTrackingMode() {
         let mode = viewModel?.settings.sessionTrackingMode ?? "auto"
@@ -378,7 +423,7 @@ final class SessionManager: SessionAggregatable {
             trackingMode = .auto
         }
     }
-
+    
     // MARK: - StateManager 引用（用于持久化设置）
 
     /// StateManager 引用，用于访问和保存设置

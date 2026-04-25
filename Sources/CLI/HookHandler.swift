@@ -71,9 +71,15 @@ enum HookHandler {
             session.sessionName = event.sessionName ?? session.sessionName
             session.notificationMessage = event.message
 
-            // Parse and persist context usage from PreCompact message
-            if event.hookEventName == .preCompact, let message = event.message {
-                parseAndStoreContextUsage(message, into: &session)
+            // Parse and persist context usage from PreCompact message or UserPromptSubmit (for token tracking)
+            if event.hookEventName == .preCompact || event.hookEventName == .userPromptSubmit {
+                if let usage = event.contextUsage {
+                    session.contextUsage = usage
+                    session.contextTokensUsed = event.contextTokensUsed
+                    session.contextTokensTotal = event.contextTokensTotal
+                } else if let message = event.message {
+                    parseAndStoreContextUsage(message, into: &session)
+                }
             }
 
             // Ensure PID tracking is always current
