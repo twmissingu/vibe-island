@@ -9,7 +9,7 @@ final class BracketAnimationService {
     private var timer: Timer?
     private var isRunning = false
     
-    func start(interval: TimeInterval = 2.0) {
+    func start(interval: TimeInterval = 0.2) {
         guard !isRunning else { return }
         isRunning = true
         isExpanded = true
