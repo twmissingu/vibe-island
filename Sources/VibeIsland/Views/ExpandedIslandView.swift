@@ -30,15 +30,6 @@ struct ExpandedIslandView: View {
         }
     }
 
-    private var contextSnapshot: ContextUsageSnapshot? {
-        contextMonitor.topSnapshot
-    }
-
-    private var contextSession: Session? {
-        guard let snapshot = contextSnapshot else { return nil }
-        return sessionManager.sessions[snapshot.sessionId]
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             // 标签页切换
@@ -55,7 +46,7 @@ struct ExpandedIslandView: View {
         // No fixed width - let DynamicIslandPanel control width
         .background(backgroundView)
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: contextSnapshot)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: sessionManager.sortedSessions.first?.sessionId)
         .sheet(isPresented: $showSettings) {
             SettingsView()
                 .environment(viewModel)
@@ -127,11 +118,6 @@ struct ExpandedIslandView: View {
             // 内容区域（可滚动，当额度多时）
             ScrollView {
                 VStack(spacing: 8) {
-                    // Context usage card (if available)
-                    if let snapshot = contextSnapshot, let session = contextSession, snapshot.usageRatio > 0 {
-                        ContextUsageCard(session: session, snapshot: snapshot)
-                    }
-
                     ForEach(viewModel.quotas) { quota in
                         QuotaCardView(quota: quota, theme: viewModel.settings.theme)
                     }
@@ -177,40 +163,50 @@ struct ExpandedIslandView: View {
     @ViewBuilder
     private var contextTab: some View {
         VStack(spacing: 8) {
-            // 上下文内容（可滚动，按lastActivity排序，最多8个）
-            ScrollView {
-                VStack(spacing: 6) {
-                    // 显示所有会话（包括没有 context_usage 的）
-                    let allSessions = Array(sessionManager.sortedSessions.prefix(8))
-                    
-                    ForEach(allSessions, id: \.sessionId) { session in
-                        sessionRow(session: session)
-                    }
-                    
-                    // 无会话数据
-                    if allSessions.isEmpty {
-                        VStack(spacing: 8) {
-                            Image(systemName: "brain")
-                                .font(.system(size: 24))
-                                .foregroundStyle(.secondary)
-                            Text("暂无会话数据")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
-                    }
+            // 单个卡片 - 使用 trackedSession（与 Compact Island 一致）
+            if let session = sessionManager.trackedSession {
+                // 优先从 snapshot 获取
+                if let snapshot = contextMonitor.snapshot(for: session.sessionId),
+                   snapshot.usageRatio > 0 {
+                    ContextUsageCard(session: session, snapshot: snapshot)
                 }
-                .frame(maxWidth: .infinity)
+                // 回退：用 Session 模型的 contextUsage
+                else if let usage = session.contextUsage, usage > 0 {
+                    let fallbackSnapshot = ContextUsageSnapshot(
+                        sessionId: session.sessionId,
+                        usageRatio: usage,
+                        tokensUsed: session.contextTokensUsed,
+                        tokensTotal: session.contextTokensTotal,
+                        timestamp: Date()
+                    )
+                    ContextUsageCard(session: session, snapshot: fallbackSnapshot)
+                } else {
+                    emptyContextView
+                }
+            } else {
+                emptyContextView
             }
-            .frame(maxHeight: .infinity)
 
             // 固定在底部
             footer
         }
-        .onAppear {
-            fetchAllSessionContexts()
+        .task {
+            sessionManager.refresh()
+            try? await Task.sleep(for: .milliseconds(300))
         }
+    }
+
+    private var emptyContextView: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "brain")
+                .font(.system(size: 24))
+                .foregroundStyle(.secondary)
+            Text("暂无会话数据")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
     }
     
     // 批量获取所有会话的 context_usage
