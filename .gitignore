@@ -41,6 +41,7 @@ Packages/LLMQuotaKit/build/
 # Temporary files
 *.tmp
 *.log
+*.refresh
 
 # Sisyphus (automated testing framework)
 .sisyphus/

@@ -1,4 +1,5 @@
 import Foundation
+import LLMQuotaKit
 
 // MARK: - Hook 事件名称
 
@@ -18,6 +19,7 @@ public enum SessionEventName: String, Codable, Sendable, CaseIterable {
     case subagentStart = "SubagentStart"
     case subagentStop = "SubagentStop"
     case notification = "Notification"
+    case refreshContext = "RefreshContext"
 
     public var displayName: String {
         switch self {
@@ -35,6 +37,7 @@ public enum SessionEventName: String, Codable, Sendable, CaseIterable {
         case .subagentStart: return "子代理启动"
         case .subagentStop: return "子代理停止"
         case .notification: return "通知"
+        case .refreshContext: return "刷新上下文"
         }
     }
 
@@ -50,6 +53,7 @@ public enum SessionEventName: String, Codable, Sendable, CaseIterable {
         case .sessionError: return .error
         case .postToolUseFailure: return .error
         case .sessionEnd: return .idle
+        case .refreshContext: return .coding
         }
     }
 
@@ -68,6 +72,8 @@ public enum SessionEventName: String, Codable, Sendable, CaseIterable {
             return "Subagent"
         case .notification:
             return "Notification"
+        case .refreshContext:
+            return "Context"
         }
     }
 }
@@ -103,6 +109,13 @@ public struct SessionEvent: Codable, Sendable {
     public let isInterrupt: Bool?
     public let pid: UInt32?
     public let pidStartTime: TimeInterval?
+    public let contextUsage: Double?
+    public let contextTokensUsed: Int?
+    public let contextTokensTotal: Int?
+    public let contextInputTokens: Int?
+    public let contextOutputTokens: Int?
+    public let contextReasoningTokens: Int?
+    public let toolUsage: [ToolUsage]?
     public let receivedAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -125,6 +138,13 @@ public struct SessionEvent: Codable, Sendable {
         case isInterrupt = "is_interrupt"
         case pid
         case pidStartTime = "pid_start_time"
+        case contextUsage = "context_usage"
+        case contextTokensUsed = "context_tokens_used"
+        case contextTokensTotal = "context_tokens_total"
+        case contextInputTokens = "context_input_tokens"
+        case contextOutputTokens = "context_output_tokens"
+        case contextReasoningTokens = "context_reasoning_tokens"
+        case toolUsage = "tool_usage"
         case receivedAt = "received_at"
     }
 
@@ -149,6 +169,13 @@ public struct SessionEvent: Codable, Sendable {
         isInterrupt = try container.decodeIfPresent(Bool.self, forKey: .isInterrupt)
         pid = try container.decodeIfPresent(UInt32.self, forKey: .pid)
         pidStartTime = try container.decodeIfPresent(TimeInterval.self, forKey: .pidStartTime)
+        contextUsage = try container.decodeIfPresent(Double.self, forKey: .contextUsage)
+        contextTokensUsed = try container.decodeIfPresent(Int.self, forKey: .contextTokensUsed)
+        contextTokensTotal = try container.decodeIfPresent(Int.self, forKey: .contextTokensTotal)
+        contextInputTokens = try container.decodeIfPresent(Int.self, forKey: .contextInputTokens)
+        contextOutputTokens = try container.decodeIfPresent(Int.self, forKey: .contextOutputTokens)
+        contextReasoningTokens = try container.decodeIfPresent(Int.self, forKey: .contextReasoningTokens)
+        toolUsage = try container.decodeIfPresent([ToolUsage].self, forKey: .toolUsage)
         receivedAt = Date()
     }
 
@@ -173,6 +200,13 @@ public struct SessionEvent: Codable, Sendable {
         try container.encodeIfPresent(isInterrupt, forKey: .isInterrupt)
         try container.encodeIfPresent(pid, forKey: .pid)
         try container.encodeIfPresent(pidStartTime, forKey: .pidStartTime)
+        try container.encodeIfPresent(contextUsage, forKey: .contextUsage)
+        try container.encodeIfPresent(contextTokensUsed, forKey: .contextTokensUsed)
+        try container.encodeIfPresent(contextTokensTotal, forKey: .contextTokensTotal)
+        try container.encodeIfPresent(contextInputTokens, forKey: .contextInputTokens)
+        try container.encodeIfPresent(contextOutputTokens, forKey: .contextOutputTokens)
+        try container.encodeIfPresent(contextReasoningTokens, forKey: .contextReasoningTokens)
+        try container.encodeIfPresent(toolUsage, forKey: .toolUsage)
         try container.encode(receivedAt, forKey: .receivedAt)
     }
 
@@ -196,6 +230,13 @@ public struct SessionEvent: Codable, Sendable {
         isInterrupt: Bool? = nil,
         pid: UInt32? = nil,
         pidStartTime: TimeInterval? = nil,
+        contextUsage: Double? = nil,
+        contextTokensUsed: Int? = nil,
+        contextTokensTotal: Int? = nil,
+        contextInputTokens: Int? = nil,
+        contextOutputTokens: Int? = nil,
+        contextReasoningTokens: Int? = nil,
+        toolUsage: [ToolUsage]? = nil,
         receivedAt: Date = Date()
     ) {
         self.sessionId = sessionId
@@ -217,6 +258,13 @@ public struct SessionEvent: Codable, Sendable {
         self.isInterrupt = isInterrupt
         self.pid = pid
         self.pidStartTime = pidStartTime
+        self.contextUsage = contextUsage
+        self.contextTokensUsed = contextTokensUsed
+        self.contextTokensTotal = contextTokensTotal
+        self.contextInputTokens = contextInputTokens
+        self.contextOutputTokens = contextOutputTokens
+        self.contextReasoningTokens = contextReasoningTokens
+        self.toolUsage = toolUsage
         self.receivedAt = receivedAt
     }
 }

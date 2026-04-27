@@ -1,5 +1,6 @@
 import Foundation
 import OSLog
+import LLMQuotaKit
 
 // MARK: - 阈值常量
 
@@ -21,6 +22,14 @@ struct ContextUsageSnapshot: Equatable, Sendable {
     let tokensUsed: Int?
     /// 总 token 上限
     let tokensTotal: Int?
+    /// 输入 token 数
+    let inputTokens: Int?
+    /// 输出 token 数
+    let outputTokens: Int?
+    /// 思考 token 数
+    let reasoningTokens: Int?
+    /// 工具使用列表
+    let toolUsage: [ToolUsage]?
     /// 快照时间
     let timestamp: Date
 
@@ -153,6 +162,10 @@ final class ContextMonitor {
                 usageRatio: usage,
                 tokensUsed: session.contextTokensUsed,
                 tokensTotal: session.contextTokensTotal,
+                inputTokens: session.contextInputTokens,
+                outputTokens: session.contextOutputTokens,
+                reasoningTokens: session.contextReasoningTokens,
+                toolUsage: session.toolUsage,
                 timestamp: session.lastActivity
             )
             updateSnapshot(sessionId: session.sessionId, snapshot: snapshot)
@@ -164,13 +177,21 @@ final class ContextMonitor {
         sessionId: String,
         usage: Double,
         tokensUsed: Int? = nil,
-        tokensTotal: Int? = nil
+        tokensTotal: Int? = nil,
+        inputTokens: Int? = nil,
+        outputTokens: Int? = nil,
+        reasoningTokens: Int? = nil,
+        toolUsage: [ToolUsage]? = nil
     ) {
         let snapshot = ContextUsageSnapshot(
             sessionId: sessionId,
             usageRatio: max(0, min(1, usage)),
             tokensUsed: tokensUsed,
             tokensTotal: tokensTotal,
+            inputTokens: inputTokens,
+            outputTokens: outputTokens,
+            reasoningTokens: reasoningTokens,
+            toolUsage: toolUsage,
             timestamp: Date()
         )
         updateSnapshot(sessionId: sessionId, snapshot: snapshot)
@@ -213,12 +234,24 @@ final class ContextMonitor {
                 if let usage = json["context_usage"] as? Double {
                     let tokensUsed = json["context_tokens_used"] as? Int
                     let tokensTotal = json["context_tokens_total"] as? Int
+                    let inputTokens = json["context_input_tokens"] as? Int
+                    let outputTokens = json["context_output_tokens"] as? Int
+                    let reasoningTokens = json["context_reasoning_tokens"] as? Int
+                    let toolUsageRaw = json["tool_usage"] as? [[String: Any]]
+                    let toolUsage = toolUsageRaw?.compactMap { dict -> ToolUsage? in
+                        guard let name = dict["name"] as? String, let count = dict["count"] as? Int else { return nil }
+                        return ToolUsage(name: name, count: count)
+                    }
                     
                     setContextUsage(
                         sessionId: sessionId,
                         usage: usage,
                         tokensUsed: tokensUsed,
-                        tokensTotal: tokensTotal
+                        tokensTotal: tokensTotal,
+                        inputTokens: inputTokens,
+                        outputTokens: outputTokens,
+                        reasoningTokens: reasoningTokens,
+                        toolUsage: toolUsage
                     )
                     Self.logger.debug("从文件获取上下文 usage: \(sessionId) = \(usage)")
                     return
@@ -288,6 +321,10 @@ final class ContextMonitor {
             usageRatio: usageRatio,
             tokensUsed: tokensUsed,
             tokensTotal: tokensTotal,
+            inputTokens: nil,
+            outputTokens: nil,
+            reasoningTokens: nil,
+            toolUsage: nil,
             timestamp: Date()
         )
     }

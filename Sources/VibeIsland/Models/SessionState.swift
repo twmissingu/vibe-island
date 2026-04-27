@@ -72,6 +72,7 @@ public enum SessionState: String, Codable, Equatable, Sendable, CaseIterable {
             return .completed
         case .sessionError: return .error
         case .sessionEnd: return .completed
+        case .refreshContext: return .coding
         }
     }
 

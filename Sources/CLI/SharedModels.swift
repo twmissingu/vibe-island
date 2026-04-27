@@ -1,4 +1,5 @@
 import Foundation
+import LLMQuotaKit
 
 // MARK: - 文件锁工具
 
@@ -67,6 +68,7 @@ public enum SessionState: String, Codable, Equatable, Sendable, CaseIterable {
             return current
         case .sessionError: return .error
         case .sessionEnd: return .completed
+        case .refreshContext: return .coding
         }
     }
 
@@ -101,6 +103,7 @@ public enum SessionEventName: String, Codable, Sendable, CaseIterable {
     case subagentStart = "SubagentStart"
     case subagentStop = "SubagentStop"
     case notification = "Notification"
+    case refreshContext = "RefreshContext"
 
     public var displayName: String {
         switch self {
@@ -118,6 +121,7 @@ public enum SessionEventName: String, Codable, Sendable, CaseIterable {
         case .subagentStart: return "子代理启动"
         case .subagentStop: return "子代理停止"
         case .notification: return "通知"
+        case .refreshContext: return "刷新上下文"
         }
     }
 
@@ -133,6 +137,7 @@ public enum SessionEventName: String, Codable, Sendable, CaseIterable {
         case .sessionError: return .error
         case .postToolUseFailure: return .error
         case .sessionEnd: return .idle
+        case .refreshContext: return .coding
         }
     }
 }
@@ -168,6 +173,10 @@ public struct SessionEvent: Codable, Sendable {
     public let contextUsage: Double?
     public let contextTokensUsed: Int?
     public let contextTokensTotal: Int?
+    public let contextInputTokens: Int?
+    public let contextOutputTokens: Int?
+    public let contextReasoningTokens: Int?
+    public let toolUsage: [ToolUsage]?
     public let receivedAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -191,6 +200,10 @@ public struct SessionEvent: Codable, Sendable {
         case contextUsage = "context_usage"
         case contextTokensUsed = "context_tokens_used"
         case contextTokensTotal = "context_tokens_total"
+        case contextInputTokens = "context_input_tokens"
+        case contextOutputTokens = "context_output_tokens"
+        case contextReasoningTokens = "context_reasoning_tokens"
+        case toolUsage = "tool_usage"
     }
 
     public init(from decoder: Decoder) throws {
@@ -215,6 +228,10 @@ public struct SessionEvent: Codable, Sendable {
         contextUsage = try container.decodeIfPresent(Double.self, forKey: .contextUsage)
         contextTokensUsed = try container.decodeIfPresent(Int.self, forKey: .contextTokensUsed)
         contextTokensTotal = try container.decodeIfPresent(Int.self, forKey: .contextTokensTotal)
+        contextInputTokens = try container.decodeIfPresent(Int.self, forKey: .contextInputTokens)
+        contextOutputTokens = try container.decodeIfPresent(Int.self, forKey: .contextOutputTokens)
+        contextReasoningTokens = try container.decodeIfPresent(Int.self, forKey: .contextReasoningTokens)
+        toolUsage = try container.decodeIfPresent([ToolUsage].self, forKey: .toolUsage)
         receivedAt = Date()
     }
 }
@@ -284,6 +301,10 @@ public struct Session: Codable, Equatable, Sendable {
     public var contextUsage: Double?
     public var contextTokensUsed: Int?
     public var contextTokensTotal: Int?
+    public var contextInputTokens: Int?
+    public var contextOutputTokens: Int?
+    public var contextReasoningTokens: Int?
+    public var toolUsage: [ToolUsage]?
     public var fileURL: URL?
 
     enum CodingKeys: String, CodingKey {
@@ -304,6 +325,10 @@ public struct Session: Codable, Equatable, Sendable {
         case contextUsage, context_usage
         case contextTokensUsed, context_tokens_used
         case contextTokensTotal, context_tokens_total
+        case contextInputTokens, context_input_tokens
+        case contextOutputTokens, context_output_tokens
+        case contextReasoningTokens, context_reasoning_tokens
+        case toolUsage, tool_usage
     }
 
     public init(
@@ -324,6 +349,10 @@ public struct Session: Codable, Equatable, Sendable {
         contextUsage: Double? = nil,
         contextTokensUsed: Int? = nil,
         contextTokensTotal: Int? = nil,
+        contextInputTokens: Int? = nil,
+        contextOutputTokens: Int? = nil,
+        contextReasoningTokens: Int? = nil,
+        toolUsage: [ToolUsage]? = nil,
         fileURL: URL? = nil
     ) {
         self.sessionId = sessionId
@@ -343,6 +372,10 @@ public struct Session: Codable, Equatable, Sendable {
         self.contextUsage = contextUsage
         self.contextTokensUsed = contextTokensUsed
         self.contextTokensTotal = contextTokensTotal
+        self.contextInputTokens = contextInputTokens
+        self.contextOutputTokens = contextOutputTokens
+        self.contextReasoningTokens = contextReasoningTokens
+        self.toolUsage = toolUsage
         self.fileURL = fileURL
     }
 
@@ -366,6 +399,10 @@ public struct Session: Codable, Equatable, Sendable {
         contextUsage = try Self.decodeFirstOptional(container, key1: .contextUsage, key2: .context_usage) { c, k in try c.decodeIfPresent(Double.self, forKey: k) }
         contextTokensUsed = try Self.decodeFirstOptional(container, key1: .contextTokensUsed, key2: .context_tokens_used) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
         contextTokensTotal = try Self.decodeFirstOptional(container, key1: .contextTokensTotal, key2: .context_tokens_total) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
+        contextInputTokens = try Self.decodeFirstOptional(container, key1: .contextInputTokens, key2: .context_input_tokens) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
+        contextOutputTokens = try Self.decodeFirstOptional(container, key1: .contextOutputTokens, key2: .context_output_tokens) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
+        contextReasoningTokens = try Self.decodeFirstOptional(container, key1: .contextReasoningTokens, key2: .context_reasoning_tokens) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
+        toolUsage = try Self.decodeFirstOptional(container, key1: .toolUsage, key2: .tool_usage) { c, k in try c.decodeIfPresent([ToolUsage].self, forKey: k) }
         fileURL = nil
     }
 
@@ -398,6 +435,10 @@ public struct Session: Codable, Equatable, Sendable {
         try container.encodeIfPresent(contextUsage, forKey: .context_usage) // 输出蛇形键名保持兼容
         try container.encodeIfPresent(contextTokensUsed, forKey: .context_tokens_used) // 输出蛇形键名保持兼容
         try container.encodeIfPresent(contextTokensTotal, forKey: .context_tokens_total) // 输出蛇形键名保持兼容
+        try container.encodeIfPresent(contextInputTokens, forKey: .context_input_tokens) // 输出蛇形键名保持兼容
+        try container.encodeIfPresent(contextOutputTokens, forKey: .context_output_tokens) // 输出蛇形键名保持兼容
+        try container.encodeIfPresent(contextReasoningTokens, forKey: .context_reasoning_tokens) // 输出蛇形键名保持兼容
+        try container.encodeIfPresent(toolUsage, forKey: .tool_usage) // 输出蛇形键名保持兼容
     }
 
     public func writeToFile() throws {

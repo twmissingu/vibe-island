@@ -376,6 +376,10 @@ final class SessionManager: SessionAggregatable {
 
     /// 切换到自动跟踪模式
     func setTrackingModeAuto() {
+        // 清理之前的手动跟踪会话的 refresh 文件
+        if case .manual(let sessionId) = trackingMode {
+            cleanupRefreshFile(sessionId: sessionId)
+        }
         trackingMode = .auto
         // 持久化到设置
         viewModel?.settings.sessionTrackingMode = "auto"
@@ -388,10 +392,31 @@ final class SessionManager: SessionAggregatable {
         Self.logger.info("切换到自动跟踪模式")
     }
 
+    /// 清理 .refresh 标记文件
+    private func cleanupRefreshFile(sessionId: String) {
+        let sessionsDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".vibe-island/sessions")
+        let refreshFile = sessionsDir.appendingPathComponent("\(sessionId).refresh")
+        try? FileManager.default.removeItem(at: refreshFile)
+    }
+
     /// 切换到手动跟踪模式，固定指定会话
     /// - Parameter sessionId: 要固定的会话 ID
     func setTrackingModeManual(sessionId: String) {
+        // 清理之前的手动跟踪会话的 refresh 文件
+        if case .manual(let oldSessionId) = trackingMode, oldSessionId != sessionId {
+            cleanupRefreshFile(sessionId: oldSessionId)
+        }
+        
         trackingMode = .manual(sessionId: sessionId)
+
+        // 创建刷新标记文件，触发插件同步最新上下文
+        let sessionsDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".vibe-island/sessions")
+        try? FileManager.default.createDirectory(at: sessionsDir, withIntermediateDirectories: true)
+        let refreshFile = sessionsDir.appendingPathComponent("\(sessionId).refresh")
+        try? "".write(to: refreshFile, atomically: true, encoding: .utf8)
+        
         // 立即获取新会话的 context_usage
         contextMonitor.fetchContextUsageFromFile(sessionId: sessionId)
         // 持久化到设置

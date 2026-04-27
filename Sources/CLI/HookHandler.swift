@@ -72,11 +72,15 @@ enum HookHandler {
             session.notificationMessage = event.message
 
             // Parse and persist context usage from PreCompact message or UserPromptSubmit (for token tracking)
-            if event.hookEventName == .preCompact || event.hookEventName == .userPromptSubmit {
+            if event.hookEventName == .preCompact || event.hookEventName == .userPromptSubmit || event.hookEventName == .refreshContext {
                 if let usage = event.contextUsage {
                     session.contextUsage = usage
                     session.contextTokensUsed = event.contextTokensUsed
                     session.contextTokensTotal = event.contextTokensTotal
+                    session.contextInputTokens = event.contextInputTokens
+                    session.contextOutputTokens = event.contextOutputTokens
+                    session.contextReasoningTokens = event.contextReasoningTokens
+                    session.toolUsage = event.toolUsage
                 } else if let message = event.message {
                     parseAndStoreContextUsage(message, into: &session)
                 }

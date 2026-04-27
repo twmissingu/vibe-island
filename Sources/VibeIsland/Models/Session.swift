@@ -1,4 +1,5 @@
 import Foundation
+import LLMQuotaKit
 
 // MARK: - 会话错误
 
@@ -83,6 +84,10 @@ public struct Session: Codable, Equatable, Sendable {
     public var contextUsage: Double?
     public var contextTokensUsed: Int?
     public var contextTokensTotal: Int?
+    public var contextInputTokens: Int?
+    public var contextOutputTokens: Int?
+    public var contextReasoningTokens: Int?
+    public var toolUsage: [ToolUsage]?
     public var fileURL: URL?
 
     enum CodingKeys: String, CodingKey {
@@ -103,6 +108,10 @@ public struct Session: Codable, Equatable, Sendable {
         case contextUsage, context_usage
         case contextTokensUsed, context_tokens_used
         case contextTokensTotal, context_tokens_total
+        case contextInputTokens, context_input_tokens
+        case contextOutputTokens, context_output_tokens
+        case contextReasoningTokens, context_reasoning_tokens
+        case toolUsage, tool_usage
     }
 
     public init(
@@ -123,6 +132,10 @@ public struct Session: Codable, Equatable, Sendable {
         contextUsage: Double? = nil,
         contextTokensUsed: Int? = nil,
         contextTokensTotal: Int? = nil,
+        contextInputTokens: Int? = nil,
+        contextOutputTokens: Int? = nil,
+        contextReasoningTokens: Int? = nil,
+        toolUsage: [ToolUsage]? = nil,
         fileURL: URL? = nil
     ) {
         self.sessionId = sessionId
@@ -142,6 +155,10 @@ public struct Session: Codable, Equatable, Sendable {
         self.contextUsage = contextUsage
         self.contextTokensUsed = contextTokensUsed
         self.contextTokensTotal = contextTokensTotal
+        self.contextInputTokens = contextInputTokens
+        self.contextOutputTokens = contextOutputTokens
+        self.contextReasoningTokens = contextReasoningTokens
+        self.toolUsage = toolUsage
         self.fileURL = fileURL
     }
 
@@ -164,6 +181,10 @@ public struct Session: Codable, Equatable, Sendable {
         contextUsage = try Self.decodeFirstOptional(container, key1: .contextUsage, key2: .context_usage) { c, k in try c.decodeIfPresent(Double.self, forKey: k) }
         contextTokensUsed = try Self.decodeFirstOptional(container, key1: .contextTokensUsed, key2: .context_tokens_used) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
         contextTokensTotal = try Self.decodeFirstOptional(container, key1: .contextTokensTotal, key2: .context_tokens_total) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
+        contextInputTokens = try Self.decodeFirstOptional(container, key1: .contextInputTokens, key2: .context_input_tokens) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
+        contextOutputTokens = try Self.decodeFirstOptional(container, key1: .contextOutputTokens, key2: .context_output_tokens) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
+        contextReasoningTokens = try Self.decodeFirstOptional(container, key1: .contextReasoningTokens, key2: .context_reasoning_tokens) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
+        toolUsage = try Self.decodeFirstOptional(container, key1: .toolUsage, key2: .tool_usage) { c, k in try c.decodeIfPresent([ToolUsage].self, forKey: k) }
         fileURL = nil
     }
 
@@ -196,6 +217,10 @@ public struct Session: Codable, Equatable, Sendable {
         try container.encodeIfPresent(contextUsage, forKey: .context_usage) // 输出蛇形键名保持兼容
         try container.encodeIfPresent(contextTokensUsed, forKey: .context_tokens_used) // 输出蛇形键名保持兼容
         try container.encodeIfPresent(contextTokensTotal, forKey: .context_tokens_total) // 输出蛇形键名保持兼容
+        try container.encodeIfPresent(contextInputTokens, forKey: .context_input_tokens)
+        try container.encodeIfPresent(contextOutputTokens, forKey: .context_output_tokens)
+        try container.encodeIfPresent(contextReasoningTokens, forKey: .context_reasoning_tokens)
+        try container.encodeIfPresent(toolUsage, forKey: .tool_usage)
     }
 
     public func writeToFile() throws {
@@ -275,7 +300,7 @@ extension Session {
         case .postCompact:
             notificationMessage = "上下文已压缩"
 
-        case .sessionStart, .sessionEnd, .stop:
+        case .sessionStart, .sessionEnd, .stop, .refreshContext:
             break
         }
     }

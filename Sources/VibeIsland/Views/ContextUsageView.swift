@@ -1,4 +1,5 @@
 import SwiftUI
+import LLMQuotaKit
 
 // MARK: - 上下文使用显示视图
 
@@ -170,12 +171,8 @@ struct ContextUsageCard: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            // 标题行
+            // 标题行：会话名 + 持续时间
             HStack {
-                Image(systemName: snapshot.isCritical ? "exclamationmark.triangle.fill" : "brain.fill")
-                    .font(.system(size: 12))
-                    .foregroundStyle(statusColor)
-
                 Text(session.sessionName ?? shortenedCwd(session.cwd))
                     .font(.system(size: 12, weight: .semibold))
                     .lineLimit(1)
@@ -183,12 +180,12 @@ struct ContextUsageCard: View {
 
                 Spacer()
 
-                Text("\(snapshot.usagePercent)%")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(statusColor)
+                Text(sessionDuration)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
             }
 
-            // 进度条
+            // 进度条：包含百分比
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule()
@@ -198,21 +195,64 @@ struct ContextUsageCard: View {
                         .fill(statusColor.gradient)
                         .frame(width: geo.size.width * min(snapshot.usageRatio, 1.0))
                 }
+                .overlay(alignment: .trailing) {
+                    Text("\(snapshot.usagePercent)%")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(statusColor)
+                }
             }
             .frame(height: 8)
 
-            // 详情行
-            HStack {
-                if let used = snapshot.tokensUsed, let total = snapshot.tokensTotal {
-                    detailRow("已用", value: formatTokenCount(used))
+            // Token 概览行
+            if let used = snapshot.tokensUsed, let total = snapshot.tokensTotal {
+                HStack {
+                    tokenCell("USED", value: used)
                     Spacer()
-                    detailRow("总量", value: formatTokenCount(total))
+                    tokenCell("TOTAL", value: total)
                     Spacer()
                     if let remaining = snapshot.tokensRemaining {
-                        detailRow("剩余", value: formatTokenCount(remaining))
+                        tokenCell("REMAIN", value: remaining)
                     }
-                } else {
-                    detailRow("使用率", value: "\(snapshot.usagePercent)%")
+                }
+            }
+
+            // Token 分类行
+            if hasCategoryTokens {
+                HStack {
+                    if let input = snapshot.inputTokens, input > 0 {
+                        tokenCell("INPUT", value: input)
+                        Spacer()
+                    }
+                    if let output = snapshot.outputTokens, output > 0 {
+                        tokenCell("OUTPUT", value: output)
+                        Spacer()
+                    }
+                    if let reasoning = snapshot.reasoningTokens, reasoning > 0 {
+                        tokenCell("REASONING", value: reasoning)
+                    }
+                }
+            }
+
+            // 工具使用行
+            if let tools = snapshot.toolUsage, !tools.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("TOOL USAGE")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.secondary)
+
+                    ForEach(tools, id: \.name) { tool in
+                        HStack {
+                            Text(tool.name.uppercased())
+                                .font(.system(size: 10))
+                                .foregroundStyle(.primary)
+
+                            Spacer()
+
+                            Text("\(tool.count) (\(toolPercent(tool)))")
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
         }
@@ -239,15 +279,50 @@ struct ContextUsageCard: View {
         }
     }
 
-    private func detailRow(_ label: String, value: String) -> some View {
-        HStack(spacing: 4) {
+    private var sessionDuration: String {
+        guard let startTime = session.pidStartTime else { return "--:--" }
+        let elapsed = Date().timeIntervalSince1970 - startTime
+        let hours = Int(elapsed) / 3600
+        let minutes = (Int(elapsed) % 3600) / 60
+
+        return String(format: "%02d:%02d", hours, minutes)
+    }
+
+    private var hasCategoryTokens: Bool {
+        let input = snapshot.inputTokens ?? 0
+        let output = snapshot.outputTokens ?? 0
+        let reasoning = snapshot.reasoningTokens ?? 0
+        return input > 0 || output > 0 || reasoning > 0
+    }
+
+    private var totalToolCount: Int {
+        snapshot.toolUsage?.reduce(0) { $0 + $1.count } ?? 0
+    }
+
+    private func toolPercent(_ tool: ToolUsage) -> Int {
+        let total = totalToolCount
+        guard total > 0 else { return 0 }
+        return Int(Double(tool.count) / Double(total) * 100)
+    }
+
+    private func tokenCell(_ label: String, value: Int) -> some View {
+        VStack(spacing: 2) {
             Text(label)
-                .font(.system(size: 10))
+                .font(.system(size: 9, weight: .medium))
                 .foregroundStyle(.secondary)
-            Text(value)
-                .font(.system(size: 10, design: .monospaced))
+            Text(formatTokenCompact(value))
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
                 .foregroundStyle(.primary)
         }
+    }
+
+    private func formatTokenCompact(_ count: Int) -> String {
+        if count >= 1_000_000 {
+            return String(format: "%.1fM", Double(count) / 1_000_000)
+        } else if count >= 1_000 {
+            return String(format: "%.0fK", Double(count) / 1_000)
+        }
+        return "\(count)"
     }
 
     private func formatTokenCount(_ count: Int) -> String {

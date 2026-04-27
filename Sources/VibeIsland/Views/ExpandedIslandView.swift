@@ -180,6 +180,10 @@ struct ExpandedIslandView: View {
                                 usageRatio: usage,
                                 tokensUsed: session.contextTokensUsed,
                                 tokensTotal: session.contextTokensTotal,
+                                inputTokens: session.contextInputTokens,
+                                outputTokens: session.contextOutputTokens,
+                                reasoningTokens: session.contextReasoningTokens,
+                                toolUsage: session.toolUsage,
                                 timestamp: Date()
                             )
                             ContextUsageCard(session: session, snapshot: fallbackSnapshot)

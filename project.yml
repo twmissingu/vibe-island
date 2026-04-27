@@ -98,6 +98,8 @@ targets:
     deploymentTarget: "14.0"
     sources:
       - path: Sources/CLI
+    dependencies:
+      - package: LLMQuotaKit
     settings:
       base:
         PRODUCT_NAME: vibe-island
