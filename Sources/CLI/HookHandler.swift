@@ -79,22 +79,22 @@ enum HookHandler {
                     session.contextTokensUsed = event.contextTokensUsed
                     session.contextTokensTotal = event.contextTokensTotal
                     session.contextInputTokens = event.contextInputTokens
-                session.contextOutputTokens = event.contextOutputTokens
-                session.contextReasoningTokens = event.contextReasoningTokens
-                session.toolUsage = event.toolUsage
-                session.skillUsage = event.skillUsage
-            } else if let message = event.message {
-                parseAndStoreContextUsage(message, into: &session)
-            }
-            
-            // Always update tool and skill usage if present in event
-            // (handles cases where event is processed outside the if let block above)
-            if let toolUsage = event.toolUsage {
-                session.toolUsage = toolUsage
-            }
-            if let skillUsage = event.skillUsage {
-                session.skillUsage = skillUsage
-            }
+                    session.contextOutputTokens = event.contextOutputTokens
+                    session.contextReasoningTokens = event.contextReasoningTokens
+                    session.toolUsage = event.toolUsage
+                    session.skillUsage = event.skillUsage
+                } else if let message = event.message {
+                    parseAndStoreContextUsage(message, into: &session)
+                }
+                
+                // Always update tool and skill usage if present in event
+                // (handles cases where event is processed outside the if let block above)
+                if let toolUsage = event.toolUsage {
+                    session.toolUsage = toolUsage
+                }
+                if let skillUsage = event.skillUsage {
+                    session.skillUsage = skillUsage
+                }
             }
 
             // Ensure PID tracking is always current

@@ -136,6 +136,7 @@ struct ExpandedIslandView: View {
                                 outputTokens: session.contextOutputTokens,
                                 reasoningTokens: session.contextReasoningTokens,
                                 toolUsage: session.toolUsage,
+                                skillUsage: session.skillUsage,
                                 timestamp: Date()
                             )
                             ContextUsageCard(session: session, snapshot: snapshot)
