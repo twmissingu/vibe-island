@@ -17,7 +17,7 @@ struct SessionListView: View {
             Button(action: onSelect) {
                 HStack(spacing: 4) {
                     // 会话名
-                    Text(session.sessionName ?? shortenedCwd(session.cwd))
+                    Text(session.sessionName ?? session.cwd.shortenedCwd())
                         .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
@@ -25,7 +25,7 @@ struct SessionListView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     // 工具来源
-                    Text(toolSourceName(for: session))
+                    Text(session.toolDisplayName)
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .frame(width: 50, alignment: .trailing)
@@ -59,21 +59,6 @@ struct SessionListView: View {
                 .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
             }
             .buttonStyle(.plain)
-        }
-
-        /// 根据会话来源返回工具名称
-        private func toolSourceName(for session: Session) -> String {
-            switch session.source {
-            case "opencode": return "OpenCode"
-            default: return "Claude"
-            }
-        }
-
-        /// 缩短工作目录路径
-        private func shortenedCwd(_ cwd: String) -> String {
-            let components = cwd.split(separator: "/")
-            guard components.count > 3 else { return cwd }
-            return ".../" + components.suffix(2).joined(separator: "/")
         }
     }
 

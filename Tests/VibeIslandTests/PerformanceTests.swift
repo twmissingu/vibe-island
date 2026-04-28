@@ -85,23 +85,18 @@ final class PerformanceTests: XCTestCase {
         XCTAssertEqual(manager.sessions.count, 100)
     }
 
-    // MARK: MultiToolAggregator 排序性能
+    // MARK: Session 排序性能
 
-    func testMultiToolSortPerformance() {
-        // 预先生成测试数据避免编译器类型检查问题
-        var sessions: [UnifiedSessionView] = []
+    func testSessionSortPerformance() {
+        var sessions: [Session] = []
         for index in 0..<1000 {
             let statusIdx = index % SessionState.allCases.count
             let status = SessionState.allCases[statusIdx]
-            let source: ToolSource = index % 3 == 0 ? .claudeCode : (index % 3 == 1 ? .openCode : .codex)
-            let session = UnifiedSessionView(
-                id: "session-\(index)",
-                source: source,
-                originalSessionId: "orig-\(index)",
+            let session = Session(
+                sessionId: "session-\(index)",
                 cwd: "/tmp/test-\(index)",
                 status: status,
-                lastActivity: Date(),
-                activeSubagentCount: 0
+                lastActivity: Date()
             )
             sessions.append(session)
         }

@@ -794,6 +794,24 @@ function normalizeToolInput(args) {
   return result;
 }
 
+function extractUsage(output) {
+  const usage = output?.usage || output?.message?.usage;
+  if (!usage || typeof usage !== "object") return {};
+  const result = {};
+  if (typeof usage.input_tokens === "number") result.context_input_tokens = usage.input_tokens;
+  if (typeof usage.output_tokens === "number") result.context_output_tokens = usage.output_tokens;
+  if (typeof usage.cache_read_input_tokens === "number") result.context_input_tokens = (result.context_input_tokens || 0) + usage.cache_read_input_tokens;
+  // OpenCode exposes total context limit via model info
+  const totalTokens = output?.model_context_limit || output?.context_limit || null;
+  if (totalTokens) {
+    result.context_tokens_total = totalTokens;
+    const usedTokens = (result.context_input_tokens || 0) + (result.context_output_tokens || 0);
+    result.context_tokens_used = usedTokens;
+    result.context_usage = Math.min(usedTokens / totalTokens, 1.0);
+  }
+  return result;
+}
+
 function callHook(hookBin, eventName, payload) {
   try {
     const json = JSON.stringify({ ...payload, hook_event_name: eventName });
@@ -827,7 +845,8 @@ export const vibeIsland = async ({ directory }) => {
     },
     "chat.message": async (_input, output) => {
       const prompt = output?.message?.content || output?.content || (typeof output?.text === "string" ? output.text : null);
-      callHook(hookBin, "UserPromptSubmit", { ...basePayload(), ...(prompt && { prompt }) });
+      const usageData = extractUsage(output);
+      callHook(hookBin, "UserPromptSubmit", { ...basePayload(), ...(prompt && { prompt }), ...usageData });
     },
     "tool.execute.before": async (_input, output) => {
       const tool = normalizeTool(output?.tool || _input?.tool);

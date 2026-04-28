@@ -27,7 +27,6 @@ final class StateManager {
     let processDetector = ProcessDetector.shared
     let contextMonitor = ContextMonitor.shared
 
-    private var stateObservationTask: Task<Void, Never>?
     private static let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "com.twissingu.VibeIsland",
         category: "StateManager"
@@ -44,8 +43,11 @@ final class StateManager {
         // 设置 SessionManager 的 StateManager 引用（用于持久化跟踪模式）
         SessionManager.shared.viewModel = self
 
-        // 启动多工具聚合器（包含 Claude Code、OpenCode）
-        MultiToolAggregator.shared.start()
+        // 启动 SessionManager（Claude Code 会话监控）
+        SessionManager.shared.start()
+
+        // 启动 OpenCode 监控（会话自动注册到 SessionManager）
+        OpenCodeMonitor.shared.start()
 
         // 启动额度轮询
         startPolling()
@@ -63,12 +65,14 @@ final class StateManager {
     }
 
     func stopMonitoring() {
-        // 停止多工具聚合器
-        MultiToolAggregator.shared.stop()
+        // 停止 OpenCode 监控
+        OpenCodeMonitor.shared.stop()
+
+        // 停止 SessionManager
+        SessionManager.shared.stop()
 
         // 停止状态观察
-        stateObservationTask?.cancel()
-        stateObservationTask = nil
+        SessionManager.shared.onAggregateStateChanged = nil
 
         // 停止上下文监控
         contextMonitor.stop()
@@ -85,25 +89,11 @@ final class StateManager {
     // MARK: - 状态变化监听
 
     private func startStateObservation() {
-        stateObservationTask?.cancel()
-        stateObservationTask = Task { [weak self] in
-            guard let self else { return }
-            var lastState: SessionState = .idle
-
-            while !Task.isCancelled {
-                let currentState = SessionManager.shared.aggregateState
-
-                if currentState != lastState {
-                    await self.handleStateChange(from: lastState, to: currentState)
-                    lastState = currentState
-                }
-
-                // 处理所有活跃会话的上下文监控
-                for session in SessionManager.shared.sessions.values {
-                    contextMonitor.handleSessionUpdate(session)
-                }
-
-                try? await Task.sleep(for: .milliseconds(200))
+        // 通过 SessionManager 回调响应聚合状态变化（替代 200ms 轮询）
+        // Task 包装是必要的：handleStateChange 内部 await soundManager.play
+        SessionManager.shared.onAggregateStateChanged = { [weak self] oldState, newState in
+            Task { [weak self] in
+                await self?.handleStateChange(from: oldState, to: newState)
             }
         }
     }

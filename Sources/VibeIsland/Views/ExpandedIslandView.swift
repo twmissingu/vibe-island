@@ -51,9 +51,6 @@ struct ExpandedIslandView: View {
             SettingsView()
                 .environment(viewModel)
         }
-        .task {
-            fetchAllSessionContexts()
-        }
     }
 
     // MARK: - 标签栏
@@ -133,9 +130,6 @@ struct ExpandedIslandView: View {
             // 固定在底部
             footer
         }
-        .task {
-            fetchAllSessionContexts()
-        }
     }
 
     // MARK: - 会话标签
@@ -153,9 +147,6 @@ struct ExpandedIslandView: View {
             // 固定在底部
             footer
         }
-        .task {
-            fetchAllSessionContexts()
-        }
     }
 
     // MARK: - 上下文标签
@@ -163,10 +154,8 @@ struct ExpandedIslandView: View {
     @ViewBuilder
     private var contextTab: some View {
         VStack(spacing: 8) {
-            // 卡片内容（可滚动）
             ScrollView {
                 VStack(spacing: 8) {
-                    // 单个卡片 - 使用 trackedSession（与 Compact Island 一致）
                     if let session = sessionManager.trackedSession {
                         // 优先从 snapshot 获取
                         if let snapshot = contextMonitor.snapshot(for: session.sessionId),
@@ -188,7 +177,8 @@ struct ExpandedIslandView: View {
                             )
                             ContextUsageCard(session: session, snapshot: fallbackSnapshot)
                         } else {
-                            emptyContextView
+                            // 有会话但无上下文数据 → 展示会话基本信息
+                            SessionInfoCard(session: session)
                         }
                     } else {
                         emptyContextView
@@ -198,12 +188,15 @@ struct ExpandedIslandView: View {
             }
             .frame(maxHeight: .infinity)
 
-            // 固定在底部
             footer
         }
         .task {
-            sessionManager.refresh()
-            try? await Task.sleep(for: .milliseconds(300))
+            fetchAllSessionContexts()
+        }
+        .onChange(of: sessionManager.trackedSession?.sessionId) { _, newId in
+            if let id = newId {
+                contextMonitor.fetchContextUsageFromFile(sessionId: id)
+            }
         }
     }
 
@@ -220,115 +213,16 @@ struct ExpandedIslandView: View {
         .padding(.vertical, 20)
     }
     
-    // 批量获取所有会话的 context_usage
+    // 批量获取所有会话的 context_usage（建索引一次，避免 O(M×N) 文件读取）
     private func fetchAllSessionContexts() {
         let sessions = Array(sessionManager.sortedSessions.prefix(8))
+        guard !sessions.isEmpty else { return }
+        let index = contextMonitor.buildSessionFileIndex()
         for session in sessions {
-            contextMonitor.fetchContextUsageFromFile(sessionId: session.sessionId)
+            contextMonitor.fetchContextUsageFromFile(sessionId: session.sessionId, index: index)
         }
     }
     
-    // MARK: - 会话行（无 context_usage 显示）
-    
-    private func sessionRow(session: Session) -> some View {
-        let contextPercent = getContextPercent(for: session)
-        let contextColor = getContextColor(percent: contextPercent)
-        
-        let contextText: String
-        if contextPercent > 0 {
-            if let used = session.contextTokensUsed, let total = session.contextTokensTotal {
-                contextText = "\(contextPercent)% (\(formatTokens(used))/\(formatTokens(total)))"
-            } else {
-                contextText = "\(contextPercent)%"
-            }
-        } else {
-            contextText = "--"
-        }
-        
-        return HStack {
-            Text(session.sessionName ?? shortenedCwd(session.cwd))
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            
-            Text(contextText)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundColor(contextColor)
-        }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.white.opacity(0.05))
-        )
-    }
-    
-    // 根据会话获取 context 百分比
-    private func getContextPercent(for session: Session) -> Int {
-        if let usage = session.contextUsage, usage > 0 {
-            return Int(usage * 100)
-        }
-        if let snapshot = contextMonitor.snapshot(for: session.sessionId), snapshot.usageRatio > 0 {
-            return snapshot.usagePercent
-        }
-        return 0
-    }
-    
-    // 根据百分比获取颜色（<40% 绿色，40%-70% 橙色，>70% 红色）
-    private func getContextColor(percent: Int) -> Color {
-        if percent < 40 {
-            return .green
-        } else if percent < 70 {
-            return .orange
-        } else {
-            return .red
-        }
-    }
-    
-    // MARK: - 会话上下文行（带快照）
-    
-    private func sessionContextRow(session: Session, snapshot: ContextUsageSnapshot) -> some View {
-        let contextText: String
-        if let used = snapshot.tokensUsed, let total = snapshot.tokensTotal {
-            contextText = "\(snapshot.usagePercent)% (\(formatTokens(used))/\(formatTokens(total)))"
-        } else {
-            contextText = "\(snapshot.usagePercent)%"
-        }
-        
-        return HStack {
-            Text(session.sessionName ?? shortenedCwd(session.cwd))
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            
-            Text(contextText)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(sessionManager.aggregateState.color)
-        }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.white.opacity(0.05))
-        )
-    }
-    
-    private func shortenedCwd(_ cwd: String) -> String {
-        let components = cwd.split(separator: "/")
-        guard components.count > 3 else { return cwd }
-        return ".../" + components.suffix(2).joined(separator: "/")
-    }
-    
-    private func formatTokens(_ tokens: Int) -> String {
-        if tokens >= 1000 {
-            return String(format: "%.0fK", Double(tokens) / 1000.0)
-        }
-return "\(tokens)"
-    }
     
     private var emptyState: some View {
         VStack(spacing: 8) {

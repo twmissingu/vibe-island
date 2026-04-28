@@ -1,73 +1,85 @@
 # AGENTS.md — Vibe Island Developer Instructions
 
-**Branch:** main | **Platform:** macOS 14.0+ | **Swift:** 6.0
+**Platform:** macOS 14.0+ | **Swift:** 6.0 | **No external dependencies**
 
 ## CORE COMMANDS
 
 ```bash
-# First-time dev setup
-./scripts/dev-setup.sh
+./scripts/dev-setup.sh              # first-time setup (checks deps, generates project, type-checks CLI)
+xcodegen generate                    # after ANY change to project.yml
+./scripts/run-tests.sh              # run all tests (hook format test + Xcode unit tests)
+./scripts/build-release.sh          # clean Release build + DMG
 
-# After changing project.yml (NEVER edit .xcodeproj manually)
-xcodegen generate
-
-# Run all tests
-./scripts/run-tests.sh
-
-# CLI typecheck (no Xcode needed)
+# CLI typecheck (no Xcode needed — must cd into Sources/CLI)
 cd Sources/CLI && swiftc -typecheck -target arm64-apple-macosx14.0 vibe-island.swift HookHandler.swift SharedModels.swift
 
-# Test single method
+# Xcode tests
+xcodebuild test -scheme VibeIsland -destination 'platform=macOS' -only-testing:VibeIslandTests
 xcodebuild test -scheme VibeIsland -destination 'platform=macOS' -only-testing:VibeIslandTests/TestClass/testMethodName
 ```
 
+## TESTING QUIRKS
+
+- `run-tests.sh` runs `hook_format_test.swift` as a **standalone Swift script** (`swift Tests/.../hook_format_test.swift`) **before** xcodebuild — it is NOT an XCTest
+- `hook_format_test.swift` and `dispatch_source_test.swift` are **excluded** from the Xcode test target in `project.yml`
+- Tests use `@testable import VibeIsland`; create test instances via `SessionManager.makeForTesting()`
+- UI tests live in `Tests/VibeIslandUITests/`
+
+## BUILD TARGETS (from project.yml)
+
+| Target | Type | Key Info |
+|--------|------|----------|
+| **VibeIsland** | macOS App | Menu bar agent (LSUIElement=true), depends on LLMQuotaKit |
+| **VibeIslandCLI** | CLI Tool | Product name `vibe-island`; invoked by Claude Code hooks via stdin JSON |
+| **LLMQuotaKit** | Framework | Local SPM package at `Packages/LLMQuotaKit/` |
+| **VibeWidget** | App Extension | **Disabled** — commented out in project.yml |
+
 ## WHERE TO LOOK
+
 | Task | Location | Notes |
 |------|----------|-------|
-| Add new LLM quota provider | `Packages/LLMQuotaKit/Sources/LLMQuotaKit/Providers/` | Implement QuotaProvider protocol |
-| Modify session tracking | `Sources/VibeIsland/Services/` | SessionManager, MultiToolAggregator |
+| Add new LLM quota provider | `Packages/LLMQuotaKit/Sources/LLMQuotaKit/Providers/` | Implement `QuotaProvider` protocol; add case to `ProviderType` in `Models/QuotaInfo.swift` |
+| Modify session tracking | `Sources/VibeIsland/Services/` | SessionManager |
 | Change Dynamic Island UI | `Sources/VibeIsland/Views/` + `Sources/VibeIsland/Window/` | IslandView + DynamicIslandPanel |
 | Add pixel pet animation | `Sources/VibeIsland/Pet/` | PetAnimations, PetEngine |
-| Modify CLI hook handling | `Sources/CLI/` | vibe-island.swift + HookHandler |
-| Run tests | `Tests/VibeIslandTests/` | Unit, integration, UI tests |
+| Modify CLI hook handling | `Sources/CLI/` | vibe-island.swift + HookHandler + SharedModels (shared with app) |
 | Change project structure | `project.yml` | Regenerate with `xcodegen generate` |
 
-## LLMQuotaKit ARCHITECTURE (Shared Framework)
-The `LLMQuotaKit` framework contains all reusable quota-related functionality:
-- **Providers/**: 5 LLM provider implementations (MiniMax, MiMo, Ark, Kimi, Zai) + base `QuotaProvider` protocol
-- **Models/**: Shared data models (`QuotaInfo`, `QuotaError`, `ProviderType`)
-- **Storage/**: Secure keychain storage for API keys + app group shared defaults
-- **Networking/**: Shared `NetworkClient` with 15s timeout and standardized error handling
+## LLMQuotaKit STRUCTURE
 
-To add a new provider:
-1. Create new file in `Providers/` implementing `QuotaProvider` protocol
-2. Add your provider to `ProviderType` enum in `Models/QuotaInfo.swift`
-3. Implement `validateKey()` for connectivity check and `fetchQuota()` for quota retrieval
+- **Providers/**: 5 implementations (MiniMax, MiMo, Ark, Kimi, Zai) + `QuotaProvider` protocol
+- **Models/**: `QuotaInfo`, `QuotaError`, `ProviderType`, `AppSettings`, `ProviderConfig`
+- **Storage/**: Secure keychain storage for API keys + app group shared defaults
+- **Networking/**: Shared `NetworkClient` with 15s timeout
 
 ## CONVENTIONS
-- **Project generation**: Always edit `project.yml` then run `xcodegen generate`; **NEVER edit .xcodeproj manually**
-- **Concurrency**: All singletons must be marked `@MainActor`; entire codebase uses Swift 6 concurrency safe
-- **Architecture pattern**: MVVM + @Observable for all view-related code
-- **IPC safety**: All session file operations (read/write) must use `flock` locking
-- **Comments**: Chinese comments are preferred; group code with `MARK:` comments
-- **State priority**: Always maintain priority order: Approval > Error > Compression > Coding > Thinking > Waiting > Completed > Idle
 
-## ANTI-PATTERNS (THIS PROJECT)
-1. ❌ **NEVER edit .xcodeproj files manually** — they are fully generated from `project.yml`
-2. ❌ **DO NOT commit .xcodeproj to git** — they are gitignored by design
-3. ❌ **NEVER crash OpenCode in hook/plugin code** — all error handling must be best-effort
-4. ❌ **DO NOT write session files without flock locking** — concurrency safety is required
-5. ❌ **NEVER rely on PID alone for session tracking** — always validate process launch time
-6. ❌ **DO NOT add @Observable properties that are never read without @ObservationIgnored** — causes Swift compiler warnings
+- **Project generation**: Always edit `project.yml` then `xcodegen generate`; **NEVER edit .xcodeproj manually**
+- **Concurrency**: All singletons `@MainActor`; Swift 6 strict concurrency
+- **Architecture**: MVVM + `@Observable`; dependency injection via `.environment`
+- **IPC safety**: All session file I/O must use `flock` locking
+- **Comments**: Chinese comments preferred; group code with `MARK:`
+- **State priority**: Approval > Error > Compression > Coding > Thinking > Waiting > Completed > Idle
 
-## UNIQUE STYLES
-- **OpenCode monitoring**: 4-level fallback architecture (Plugin Hook → SSE event stream → File monitoring → Process detection) for maximum reliability across different usage patterns
-- **Aggregate state**: Automatically displays highest priority state across all active sessions from all tools
-- **Blinking indicators**: States requiring user attention (waiting permission, context compression) use blinking indicators vs constant color
-- **Dual-language**: Full English/Simplified Chinese localization via standard `.lproj` directories
+## ANTI-PATTERNS
 
-## NOTES
-- **App group identifier**: `group.com.twmissingu.VibeIsland` (used for shared storage between app, CLI, widget)
-- **Bundle ID prefix**: `com.twmissingu` for all targets
-- **LSUIElement**: Main app runs as agent with no dock icon
-- **OpenCode plugin**: Install via `./scripts/install-opencode-plugin.sh` for best monitoring quality
+1. **NEVER edit .xcodeproj manually** — fully generated from `project.yml`
+2. **DO NOT commit .xcodeproj** — gitignored by design
+3. **NEVER crash OpenCode in hook/plugin code** — all error handling must be best-effort
+4. **DO NOT write session files without flock locking** — concurrency safety required
+5. **NEVER rely on PID alone for session tracking** — always validate process launch time
+6. **DO NOT add unread @Observable properties without @ObservationIgnored** — Swift compiler warnings
+
+## ARCHITECTURE NOTES
+
+- **CLI ↔ App IPC**: CLI writes `~/.vibe-island/sessions/<pid>.json`; app reads via `SessionFileWatcher` (DispatchSource)
+- **OpenCode monitoring**: 4-level fallback (Plugin Hook → SSE event stream → File monitoring → Process detection)
+- **SessionManager**: Manages all tool sessions (Claude Code via CLI hook, OpenCode via OpenCodeMonitor sync); island always shows highest-priority state
+- **Blinking indicators**: Attention-needed states (approval, compression) blink; others are constant color
+- **Localization**: `en.lproj` + `zh-Hans.lproj` in `Sources/VibeIsland/Resources/`
+
+## IDENTIFIERS
+
+- App group: `group.com.twmissingu.VibeIsland`
+- Bundle ID prefix: `com.twmissingu`
+- OpenCode plugin: `./scripts/install-opencode-plugin.sh`

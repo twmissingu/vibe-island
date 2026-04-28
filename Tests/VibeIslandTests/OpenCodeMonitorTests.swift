@@ -114,7 +114,7 @@ final class OpenCodeMonitorTests: XCTestCase {
         XCTAssertEqual(session.currentTool, "Write")
         XCTAssertEqual(session.message, "正在写入文件")
         XCTAssertEqual(session.pid, 12345)
-        XCTAssertEqual(session.source, .sse)
+        XCTAssertEqual(session.source, .plugin)
     }
 
     /// 测试：OpenCodeSession Equatable
@@ -205,7 +205,7 @@ final class OpenCodeMonitorTests: XCTestCase {
             currentTool: nil,
             message: nil,
             pid: nil,
-            source: .process
+            source: .plugin
         )
 
         let converted = session.toSession()
@@ -368,7 +368,7 @@ final class OpenCodeMonitorTests: XCTestCase {
     /// 测试：初始数据源为 process
     func testInitialDataSource() {
         let monitor = OpenCodeMonitor.shared
-        XCTAssertEqual(monitor.currentSource, .process)
+        XCTAssertEqual(monitor.currentSource, .plugin)
     }
 
     /// 测试：初始会话列表为空

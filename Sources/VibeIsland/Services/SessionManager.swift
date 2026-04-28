@@ -25,8 +25,8 @@ enum TrackingMode: Equatable {
 /// - Claude Code：通过文件 hook（SessionFileWatcher）
 /// - OpenCode：通过 OpenCodeMonitor（四级降级）
 ///
-/// SessionManager 主要管理 Claude Code 会话，
-/// 多工具聚合由 MultiToolAggregator 负责。
+/// SessionManager 统一管理所有工具会话（Claude Code + OpenCode）。
+/// OpenCode 会话通过 registerExternalSession 注册。
 @MainActor
 @Observable
 final class SessionManager: SessionAggregatable {
@@ -61,10 +61,10 @@ final class SessionManager: SessionAggregatable {
     }
     /// 所有活跃会话（按 sessionId 索引）
     private(set) var sessions: [String: Session] = [:]
-    /// 按最近活跃时间排序的会话列表
-    var sortedSessions: [Session] {
-        sessions.values.sorted { $0.lastActivity > $1.lastActivity }
-    }
+    /// 按最近活跃时间排序的会话列表（缓存，mutation 时失效）
+    private(set) var sortedSessions: [Session] = []
+    /// aggregateState 变化回调（由 StateManager 设置，用于播放提示音）
+    var onAggregateStateChanged: ((SessionState, SessionState) -> Void)?
 
     // MARK: 内部依赖
 
@@ -99,16 +99,19 @@ final class SessionManager: SessionAggregatable {
     /// 测试专用：注入会话到 sessions 字典
     func injectSessionForTesting(_ session: Session) {
         sessions[session.sessionId] = session
+        recomputeSortedSessions()
     }
 
     /// 测试专用：移除会话
     func removeSessionForTesting(_ sessionId: String) {
         sessions.removeValue(forKey: sessionId)
+        recomputeSortedSessions()
     }
 
     /// 测试专用：清除所有会话（不触发 contextMonitor）
     func clearSessionsForTesting() {
         sessions.removeAll()
+        sortedSessions = []
     }
 
     // MARK: 生命周期
@@ -152,6 +155,7 @@ final class SessionManager: SessionAggregatable {
         contextMonitor.stop()
         CodingTimeTracker.shared.stop()
         sessions.removeAll()
+        sortedSessions = []
         Self.logger.info("SessionManager 已停止")
     }
     
@@ -214,36 +218,48 @@ final class SessionManager: SessionAggregatable {
 
     // MARK: 会话更新
 
-    /// 更新单个会话状态
+    /// 更新单个会话状态（文件回调入口）
     private func updateSession(_ sessionId: String, _ session: Session) {
+        let oldState = aggregateState
         sessions[sessionId] = session
+        recomputeSortedSessions()
 
         // 同步到上下文监控
         contextMonitor.handleSessionUpdate(session)
-        
+
         // 同步到编码时长追踪器
         CodingTimeTracker.shared.handleSessionStateChange(sessionId: sessionId, state: session.status)
-        
+
         // 同步到宠物进度管理器
         Task { @MainActor in
             PetProgressManager.shared.addCodingMinutes(CodingTimeTracker.shared.todayCodingMinutes)
         }
+
+        // 检测聚合状态变化，触发回调（播放提示音）
+        let newState = aggregateState
+        if newState != oldState {
+            onAggregateStateChanged?(oldState, newState)
+        }
     }
 
     /// 注册外部工具的会话（OpenCode 等）
-    /// - Parameter session: 外部工具会话
+    /// - Parameter session: 外部工具会话（sessionId 已由调用方加前缀，如 "opencode_xxx"）
     func registerExternalSession(_ session: Session) {
-        // 为外部会话生成唯一 ID，避免与 Claude Code 冲突
-        let prefixedId = "\(session.source ?? "external")_\(session.sessionId)"
-        sessions[prefixedId] = session
-
-        Self.logger.debug("注册外部会话: \(prefixedId) (source: \(session.source ?? "unknown"))")
+        sessions[session.sessionId] = session
+        recomputeSortedSessions()
+        Self.logger.debug("注册外部会话: \(session.sessionId) (source: \(session.source ?? "unknown"))")
     }
 
     /// 移除外部工具的会话
     /// - Parameter sessionId: 会话 ID（可以是带前缀的 ID）
     func removeExternalSession(_ sessionId: String) {
         sessions.removeValue(forKey: sessionId)
+        recomputeSortedSessions()
+    }
+
+    /// 使排序缓存失效（sessions 字典变更时调用）
+    private func recomputeSortedSessions() {
+        sortedSessions = sessions.values.sorted { $0.lastActivity > $1.lastActivity }
     }
 
     // MARK: 查询方法
@@ -286,16 +302,23 @@ final class SessionManager: SessionAggregatable {
         sessions.values.filter { $0.source == source }
     }
 
+    /// 是否有 Claude Code 会话（source 为 nil 表示来自 CLI hook）
+    var hasClaudeCodeSessions: Bool {
+        sessions.values.contains { $0.source == nil || $0.source == "claude" }
+    }
+
     /// 移除已完成的会话
     func removeCompletedSessions() {
         sessions = sessions.filter {
             $0.value.status != .completed
         }
+        recomputeSortedSessions()
     }
 
     /// 清除所有会话
     func clearAll() {
         sessions.removeAll()
+        sortedSessions = []
         contextMonitor.clearAll()
     }
 
@@ -329,47 +352,39 @@ final class SessionManager: SessionAggregatable {
 
     // MARK: 多工具集成
 
-    /// 获取所有工具来源的汇总摘要
-    /// 用于 UI 展示多工具统一状态
+    /// 获取所有工具来源的汇总摘要（单次遍历）
     func multiToolSummary() -> String {
-        var parts: [String] = []
+        var claudeActive = 0
+        var openCodeActive = 0
+        var foundError = false
+        var foundPermission = false
 
-        // Claude Code
-        let claudeActive = sessions.values.filter {
-            ($0.source == nil || $0.source == "claude")
-                && $0.status != .completed && $0.status != .idle
-        }.count
-        if claudeActive > 0 {
-            parts.append("Claude:\(claudeActive)")
-        }
-
-        // OpenCode
-        let openCodeActive = sessions.values.filter {
-            $0.source == "opencode"
-                && $0.status != .completed && $0.status != .idle
-        }.count
-        if openCodeActive > 0 {
-            parts.append("OpenCode:\(openCodeActive)")
+        for session in sessions.values {
+            let isActive = session.status != .completed && session.status != .idle
+            if isActive {
+                switch session.source {
+                case "opencode": openCodeActive += 1
+                case "codex": break // Codex 暂不单独计数
+                default: claudeActive += 1 // nil (CLI hook) 或 "claude"
+                }
+            }
+            if session.status == .error { foundError = true }
+            if session.status == .waitingPermission { foundPermission = true }
         }
 
         let total = claudeActive + openCodeActive
+        guard total > 0 else { return "\u{2713} 无活跃会话" }
 
-        guard total > 0 else {
-            return "\u{2713} 无活跃会话"
-        }
-
-        let detail = parts.joined(separator: " | ")
+        var parts: [String] = []
+        if claudeActive > 0 { parts.append("Claude:\(claudeActive)") }
+        if openCodeActive > 0 { parts.append("OpenCode:\(openCodeActive)") }
 
         let prefix: String
-        if hasError {
-            prefix = "\u{26A0}\u{FE0F}"
-        } else if hasPendingPermission {
-            prefix = "\u{1F512}"
-        } else {
-            prefix = "\u{1F528}"
-        }
+        if foundError { prefix = "\u{26A0}\u{FE0F}" }
+        else if foundPermission { prefix = "\u{1F512}" }
+        else { prefix = "\u{1F528}" }
 
-        return "\(prefix) \(total) 活跃 (\(detail))"
+        return "\(prefix) \(total) 活跃 (\(parts.joined(separator: " | ")))"
     }
 
 // MARK: 跟踪模式切换

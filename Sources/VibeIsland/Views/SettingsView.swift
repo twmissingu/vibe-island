@@ -1,6 +1,24 @@
 import SwiftUI
 import LLMQuotaKit
 
+// MARK: - 工具来源
+
+enum ToolSource: String, CaseIterable {
+    case claudeCode = "claude"
+    case openCode = "opencode"
+    case codex = "codex"
+
+    var displayName: String {
+        switch self {
+        case .claudeCode: return "Claude Code"
+        case .openCode: return "OpenCode"
+        case .codex: return "Codex"
+        }
+    }
+
+    var sourceString: String { rawValue }
+}
+
 struct SettingsView: View {
     @Environment(StateManager.self) private var viewModel
     @Environment(\.dismiss) private var dismiss
@@ -493,11 +511,14 @@ struct SettingsView: View {
 
     private func detectRunningTools() {
         var detected: [ToolSource] = []
-        let aggregator = MultiToolAggregator.shared
+        let sm = SessionManager.shared
 
-        // 检测各工具是否有活跃会话
-        for source in ToolSource.allCases {
-            let sessions = aggregator.sessions(from: source)
+        // Claude Code 会话 source 为 nil（CLI 不设置该字段）
+        if sm.hasClaudeCodeSessions {
+            detected.append(.claudeCode)
+        }
+        for source: ToolSource in [.openCode, .codex] {
+            let sessions = sm.sessions(from: source.sourceString)
             if !sessions.isEmpty {
                 detected.append(source)
             }

@@ -312,26 +312,11 @@ struct CompactIslandView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             // 工具来源
-            Text(toolSourceName(for: session))
+            Text(session.toolDisplayName)
                 .font(.system(size: 9))
                 .foregroundStyle(.secondary)
                 .frame(width: 44, alignment: .trailing)
         }
-    }
-
-    /// 根据会话来源返回工具名称
-    private func toolSourceName(for session: Session) -> String {
-        switch session.source {
-        case "opencode": return "OpenCode"
-        default: return "Claude"
-        }
-    }
-
-    // MARK: - Context Usage Section
-
-    @ViewBuilder
-    private func contextUsageSection(_ snapshot: ContextUsageSnapshot) -> some View {
-        ContextUsageView(snapshot: snapshot)
     }
 
     private var sessionStateIcon: String {

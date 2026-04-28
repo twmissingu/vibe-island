@@ -4,61 +4,52 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Vibe Island** — a macOS menu bar app (Swift 6.0, SwiftUI + AppKit) that monitors AI coding tools (Claude Code, OpenCode, Codex CLI) and displays their status via a "Dynamic Island" style UI positioned at the Mac notch. Includes pixel pet animations, sound notifications, and API quota monitoring widgets.
+**Vibe Island** — macOS menu bar app (Swift 6.0, SwiftUI + AppKit) monitoring AI coding tools (Claude Code, OpenCode, Codex CLI) with "Dynamic Island" notch UI, pixel pet animations, sound notifications, and API quota widgets.
 
-Platform: macOS 14.0+ (Sonoma). Bundle ID prefix: `com.twmissingu`.
+Platform: macOS 14.0+ (Sonoma). Bundle ID prefix: `com.twmissingu`. App group: `group.com.twmissingu.VibeIsland`.
 
 ## Build System
 
-The project uses **XcodeGen** — `.xcodeproj` is generated, not hand-maintained (excluded via .gitignore).
+**XcodeGen** — `.xcodeproj` is generated (gitignored). **NEVER edit .xcodeproj manually.**
 
 ```bash
-# Generate Xcode project (prerequisite for all Xcode operations)
-xcodegen generate
-
-# Build & run in Xcode
-open VibeIsland.xcodeproj   # then Cmd+R
-
-# Release build (clean build + DMG)
-./scripts/build-release.sh
-
-# First-time dev setup (checks deps, generates project, type-checks CLI)
-./scripts/dev-setup.sh
+xcodegen generate                  # after ANY change to project.yml
+open VibeIsland.xcodeproj          # then Cmd+R
+./scripts/dev-setup.sh             # first-time setup (checks deps, generates project, type-checks CLI)
+./scripts/build-release.sh         # clean Release build + DMG
 ```
 
 ## Testing
 
 ```bash
-# Run all tests (hook format tests + Xcode unit tests)
-./scripts/run-tests.sh
+./scripts/run-tests.sh             # all tests (standalone scripts + Xcode unit tests)
 
-# Run only Xcode unit tests
+# Xcode unit tests
 xcodebuild test -scheme VibeIsland -destination 'platform=macOS' -only-testing:VibeIslandTests
-
-# Run a single test class
-xcodebuild test -scheme VibeIsland -destination 'platform=macOS' -only-testing:VibeIslandTests/SessionStateTests
-
-# Run a single test method
-xcodebuild test -scheme VibeIsland -destination 'platform=macOS' -only-testing:VibeIslandTests/SessionStateTests/testMethodName
+xcodebuild test -scheme VibeIsland -destination 'platform=macOS' -only-testing:VibeIslandTests/TestClass/testMethodName
 
 # CLI type-check (no Xcode needed)
-swiftc -typecheck -target arm64-apple-macosx14.0 Sources/CLI/vibe-island.swift Sources/CLI/HookHandler.swift Sources/CLI/SharedModels.swift
+cd Sources/CLI && swiftc -typecheck -target arm64-apple-macosx14.0 vibe-island.swift HookHandler.swift SharedModels.swift
 ```
 
-Tests use XCTest with `@testable import VibeIsland`. `SessionManager` provides a `makeForTesting()` factory for dependency injection.
+### Testing Quirks
+
+- `run-tests.sh` runs `hook_format_test.swift` as a **standalone Swift script** (`swift Tests/.../hook_format_test.swift`) **before** xcodebuild — NOT an XCTest
+- `hook_format_test.swift` and `dispatch_source_test.swift` are **excluded** from Xcode test target in `project.yml`
+- Tests use `@testable import VibeIsland`; create instances via `SessionManager.makeForTesting()`
+
+## Build Targets
+
+| Target | Type | Key Info |
+|--------|------|----------|
+| **VibeIsland** | macOS App | Menu bar agent (LSUIElement=true), depends on LLMQuotaKit |
+| **VibeIslandCLI** | CLI Tool | Product name `vibe-island`; invoked by Claude Code hooks via stdin JSON |
+| **LLMQuotaKit** | Framework | Local SPM package at `Packages/LLMQuotaKit/` |
+| **VibeWidget** | App Extension | **Disabled** — commented out in project.yml |
 
 ## Architecture
 
-**4 build targets** defined in [project.yml](project.yml):
-
-| Target | Type | Description |
-|--------|------|-------------|
-| **VibeIsland** | macOS App | Main menu bar app with Dynamic Island UI |
-| **VibeIslandCLI** | CLI Tool | `vibe-island` binary — hook handler invoked by Claude Code |
-| **VibeWidget** | App Extension | macOS Widget for API quota display |
-| **LLMQuotaKit** | Framework | Shared library for quota API providers |
-
-Pattern: **MVVM + @Observable**, singletons with `@MainActor`.
+Pattern: **MVVM + @Observable**, singletons with `@MainActor`. Swift 6 strict concurrency.
 
 ### Data Flow
 
@@ -70,26 +61,64 @@ SessionFileWatcher (DispatchSource) → detects file changes → SessionManager
 OpenCodeMonitor (4-level fallback: plugin hook → SSE → file monitoring → pgrep)
 CodexMonitor (process detection via pgrep)
   ↓
-MultiToolAggregator (polls every 3s, aggregates all sessions, sorts by priority)
+SessionManager (unified session store, sorts by priority)
   ↓
 DynamicIslandPanel (NSPanel at notch) → IslandView (highest-priority session)
   ↓
 SoundManager (audio cues) + PetEngine (pixel pet animations)
 ```
 
+### State Priority
+
+`Approval > Error > Compression > Coding > Thinking > Waiting > Completed > Idle`
+
+Attention-needed states (approval, compression) blink; others are constant color.
+
+### Where to Look
+
+| Task | Location | Notes |
+|------|----------|-------|
+| Add LLM quota provider | `Packages/LLMQuotaKit/Sources/LLMQuotaKit/Providers/` | Implement `QuotaProvider` protocol; add case to `ProviderType` in `Models/` |
+| Modify session tracking | `Sources/VibeIsland/Services/` | SessionManager |
+| Change Dynamic Island UI | `Sources/VibeIsland/Views/` + `Sources/VibeIsland/Window/` | IslandView + DynamicIslandPanel |
+| Add pixel pet animation | `Sources/VibeIsland/Pet/` | PetAnimations (16x16 pixel art with hex colors), PetEngine |
+| Modify CLI hook handling | `Sources/CLI/` | vibe-island.swift + HookHandler + SharedModels (shared with app) |
+| Change project structure | `project.yml` | Then `xcodegen generate` |
+
 ### Key Source Layout
 
 - **App entry**: `Sources/VibeIsland/App/VibeIslandApp.swift` — creates `DynamicIslandPanel`, calls `StateManager.startMonitoring()`
 - **CLI entry**: `Sources/CLI/vibe-island.swift` — `hook <EventType>` reads stdin JSON, delegates to `HookHandler`
-- **Services**: `Sources/VibeIsland/Services/` — monitors, watchers, managers
-- **Window**: `Sources/VibeIsland/Window/` — `DynamicIslandPanel` (NSPanel positioned at notch), `IslandState`
-- **Pet engine**: `Sources/VibeIsland/Pet/` — `PetEngine`, `PetAnimations`, `PetState`
-- **Quota providers**: `Packages/LLMQuotaKit/Sources/LLMQuotaKit/Providers/` — `QuotaProvider` protocol + implementations (MiMo, Kimi, Ark, MiniMax, Zai)
 - **Shared models (CLI ↔ App)**: `Sources/CLI/SharedModels.swift` — `Session`, `SessionEvent`, `SessionState`, file locking
 
 ### Runtime Data
 
-Session files live in `~/.vibe-island/sessions/`. The CLI and app communicate through these JSON files using `flock`-based file locking. App group: `group.com.twmissingu.VibeIsland`.
+Session files in `~/.vibe-island/sessions/`. CLI and app communicate through JSON files with `flock`-based file locking.
+
+### Pet System
+
+8 pet types (cat, dog, rabbit, fox, penguin, robot, ghost, dragon) × 5 skin tiers (Basic → Glow → Metal → Neon → King) × 8 state animations (idle, thinking, coding, waiting, celebrating, error, compacting, sleeping). 16x16 pixel art format with hex color codes.
+
+### Localization
+
+`en.lproj` + `zh-Hans.lproj` in `Sources/VibeIsland/Resources/`.
+
+## Conventions
+
+- **Project generation**: Always edit `project.yml` then `xcodegen generate`
+- **Concurrency**: All singletons `@MainActor`; Swift 6 strict concurrency
+- **DI**: dependency injection via `.environment`
+- **IPC safety**: All session file I/O must use `flock` locking
+- **Comments**: Chinese comments preferred; group code with `MARK:`
+- **Do not add unread @Observable properties** — use `@ObservationIgnored` or Swift compiler will warn
+
+## Anti-Patterns
+
+1. **NEVER edit .xcodeproj manually** — fully generated from `project.yml`
+2. **DO NOT commit .xcodeproj** — gitignored by design
+3. **NEVER crash OpenCode in hook/plugin code** — all error handling must be best-effort
+4. **DO NOT write session files without flock locking** — concurrency safety required
+5. **NEVER rely on PID alone for session tracking** — always validate process launch time
 
 ## Dependencies
 

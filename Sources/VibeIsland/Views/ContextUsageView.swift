@@ -53,7 +53,7 @@ struct ContextUsageView: View {
 
             // 剩余 token
             if let remaining = snapshot.tokensRemaining {
-                Text(formatTokens(remaining))
+                Text(formatTokenCount(remaining))
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(.tertiary)
             }
@@ -96,69 +96,13 @@ struct ContextUsageView: View {
         flashOpacity = 1.0
     }
 
-    private func formatTokens(_ count: Int) -> String {
+    private func formatTokenCount(_ count: Int) -> String {
         if count >= 1_000_000 {
-            return String(format: "%.1fm", Double(count) / 1_000_000)
+            return String(format: "%.1fM", Double(count) / 1_000_000)
         } else if count >= 1_000 {
-            return String(format: "%.0fk", Double(count) / 1_000)
+            return String(format: "%.0fK", Double(count) / 1_000)
         }
         return "\(count)"
-    }
-}
-
-// MARK: - 紧凑版上下文指示器
-
-/// 在 CompactIslandView 中使用的微型上下文指示器
-struct ContextUsageIndicator: View {
-    let usageRatio: Double
-
-    @State private var flashOpacity: Double = 1.0
-    @State private var isFlashing = false
-
-    private var isWarning: Bool {
-        usageRatio >= contextWarningThreshold
-    }
-
-    private var isCritical: Bool {
-        usageRatio >= contextCriticalThreshold
-    }
-
-    private var indicatorColor: Color {
-        if isCritical { return .red }
-        if isWarning { return .orange }
-        return .green
-    }
-
-    var body: some View {
-        Circle()
-            .fill(indicatorColor)
-            .frame(width: 6, height: 6)
-            .opacity(isWarning ? flashOpacity : 1.0)
-            .onChange(of: isWarning) { _, flashing in
-                if flashing {
-                    startFlashing()
-                } else {
-                    stopFlashing()
-                }
-            }
-            .onAppear {
-                if isWarning {
-                    startFlashing()
-                }
-            }
-    }
-
-    private func startFlashing() {
-        guard !isFlashing else { return }
-        isFlashing = true
-        withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
-            flashOpacity = 0.2
-        }
-    }
-
-    private func stopFlashing() {
-        isFlashing = false
-        flashOpacity = 1.0
     }
 }
 
@@ -173,7 +117,7 @@ struct ContextUsageCard: View {
         VStack(spacing: 8) {
             // 标题行：会话名 + 持续时间
             HStack {
-                Text(session.sessionName ?? shortenedCwd(session.cwd))
+                Text(session.sessionName ?? session.cwd.shortenedCwd())
                     .font(.system(size: 12, weight: .semibold))
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -305,18 +249,7 @@ struct ContextUsageCard: View {
         return Int(Double(tool.count) / Double(total) * 100)
     }
 
-    private func tokenCell(_ label: String, value: Int) -> some View {
-        VStack(spacing: 2) {
-            Text(label)
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(.secondary)
-            Text(formatTokenCompact(value))
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(.primary)
-        }
-    }
-
-    private func formatTokenCompact(_ count: Int) -> String {
+    private func formatTokenCount(_ count: Int) -> String {
         if count >= 1_000_000 {
             return String(format: "%.1fM", Double(count) / 1_000_000)
         } else if count >= 1_000 {
@@ -325,18 +258,85 @@ struct ContextUsageCard: View {
         return "\(count)"
     }
 
-    private func formatTokenCount(_ count: Int) -> String {
-        if count >= 1_000_000 {
-            return String(format: "%.1fM", Double(count) / 1_000_000)
-        } else if count >= 1_000 {
-            return String(format: "%.1fK", Double(count) / 1_000)
+    private func tokenCell(_ label: String, value: Int) -> some View {
+        VStack(spacing: 2) {
+            Text(label)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.secondary)
+            Text(formatTokenCount(value))
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(.primary)
         }
-        return "\(count)"
     }
 
-    private func shortenedCwd(_ cwd: String) -> String {
-        let components = cwd.split(separator: "/")
-        guard components.count > 3 else { return cwd }
-        return ".../" + components.suffix(2).joined(separator: "/")
+
+}
+
+// MARK: - 会话信息卡片（无上下文数据时展示）
+
+/// 当 trackedSession 存在但无 context_usage 数据时展示的基本会话信息
+struct SessionInfoCard: View {
+    let session: Session
+
+    var body: some View {
+        VStack(spacing: 10) {
+            // 标题行：会话名 + 状态
+            HStack {
+                Text(session.sessionName ?? session.cwd.shortenedCwd())
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Spacer()
+
+                HStack(spacing: 4) {
+                    Image(systemName: session.status.icon)
+                        .font(.system(size: 9))
+                        .foregroundStyle(session.status.color)
+                    Text(session.status.statusName)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(session.status.color)
+                }
+            }
+
+            // 来源 + 工作目录
+            HStack {
+                Label(
+                    session.toolDisplayName,
+                    systemImage: session.toolSourceIcon
+                )
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Text(session.cwd.shortenedCwd())
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+
+            Divider().opacity(0.2)
+
+            // 等待数据提示
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.trianglehead.2.clockwise")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                Text("上下文数据将在会话运行后自动更新")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(.white.opacity(0.03))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(.gray.opacity(0.15), lineWidth: 1)
+                )
+        )
     }
 }
+

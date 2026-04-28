@@ -59,10 +59,11 @@ final class ContextUsageUITests: XCTestCase {
         XCTAssertNotNil(card, "ContextUsageCard 应成功初始化")
     }
 
-    /// 测试：ContextUsageIndicator 应成功初始化
-    func testContextUsageIndicator_initializes() {
-        let indicator = ContextUsageIndicator(usageRatio: 0.5)
-        XCTAssertNotNil(indicator, "ContextUsageIndicator 应成功初始化")
+    /// 测试：ContextUsageSnapshot 低使用率不警告
+    func testContextUsageSnapshot_lowUsage_noWarning() {
+        let snapshot = makeSnapshot(usageRatio: 0.5)
+        XCTAssertFalse(snapshot.isWarning, "低使用率不应警告")
+        XCTAssertFalse(snapshot.isCritical, "低使用率不应危险")
     }
 
     // MARK: - 上下文使用率显示测试

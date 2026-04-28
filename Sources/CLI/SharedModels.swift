@@ -459,3 +459,33 @@ public struct Session: Codable, Equatable, Sendable {
         return session
     }
 }
+
+// MARK: - 共享工具扩展
+
+public extension String {
+    /// 缩短工作目录路径，保留最后两级
+    func shortenedCwd() -> String {
+        let components = split(separator: "/")
+        guard components.count > 3 else { return self }
+        return ".../" + components.suffix(2).joined(separator: "/")
+    }
+}
+
+public extension Session {
+    /// 工具来源显示名称
+    var toolDisplayName: String {
+        switch source {
+        case "opencode": return "OpenCode"
+        default: return "Claude"
+        }
+    }
+
+    /// 工具来源图标
+    var toolSourceIcon: String {
+        switch source {
+        case "opencode": return "terminal"
+        default: return "cpu"
+        }
+    }
+}
+

@@ -6,7 +6,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"ok\": true, \"message\": \"VibeIsland session started\"}'",
+            "command": "~/.vibe-island/bin/vibe-island hook SessionStart",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.vibe-island/bin/vibe-island hook UserPromptSubmit",
             "timeout": 5,
             "async": true
           }
@@ -15,22 +27,10 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"ok\": true, \"message\": \"vibe-island bash tracking\"}'",
-            "timeout": 5,
-            "async": true
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo '{\"ok\": true, \"message\": \"vibe-island file write tracking\"}'",
+            "command": "~/.vibe-island/bin/vibe-island hook PreToolUse",
             "timeout": 5,
             "async": true
           }
@@ -39,11 +39,22 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"ok\": true, \"message\": \"vibe-island bash completed\"}'",
+            "command": "~/.vibe-island/bin/vibe-island hook PostToolUse",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.vibe-island/bin/vibe-island hook PostToolUseFailure",
             "timeout": 5,
             "async": true
           }
@@ -52,11 +63,10 @@
     ],
     "PermissionRequest": [
       {
-        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"ok\": true, \"message\": \"vibe-island permission request\"}'",
+            "command": "~/.vibe-island/bin/vibe-island hook PermissionRequest",
             "timeout": 5,
             "async": true
           }
@@ -65,11 +75,10 @@
     ],
     "Stop": [
       {
-        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"ok\": true, \"message\": \"vibe-island turn completed\"}'",
+            "command": "~/.vibe-island/bin/vibe-island hook Stop",
             "timeout": 5,
             "async": true
           }
@@ -78,11 +87,10 @@
     ],
     "SessionEnd": [
       {
-        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"ok\": true, \"message\": \"vibe-island session ended\"}'",
+            "command": "~/.vibe-island/bin/vibe-island hook SessionEnd",
             "timeout": 5,
             "async": true
           }
@@ -91,11 +99,10 @@
     ],
     "SubagentStart": [
       {
-        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"ok\": true, \"message\": \"vibe-island subagent started\"}'",
+            "command": "~/.vibe-island/bin/vibe-island hook SubagentStart",
             "timeout": 5,
             "async": true
           }
@@ -104,11 +111,10 @@
     ],
     "SubagentStop": [
       {
-        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"ok\": true, \"message\": \"vibe-island subagent stopped\"}'",
+            "command": "~/.vibe-island/bin/vibe-island hook SubagentStop",
             "timeout": 5,
             "async": true
           }
@@ -117,11 +123,10 @@
     ],
     "PreCompact": [
       {
-        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"ok\": true, \"message\": \"vibe-island pre-compact\"}'",
+            "command": "~/.vibe-island/bin/vibe-island hook PreCompact",
             "timeout": 5,
             "async": true
           }
@@ -130,11 +135,22 @@
     ],
     "PostCompact": [
       {
-        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"ok\": true, \"message\": \"vibe-island post-compact\"}'",
+            "command": "~/.vibe-island/bin/vibe-island hook PostCompact",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.vibe-island/bin/vibe-island hook Notification",
             "timeout": 5,
             "async": true
           }

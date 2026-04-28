@@ -33,6 +33,28 @@ struct ContextUsageSnapshot: Equatable, Sendable {
     /// 快照时间
     let timestamp: Date
 
+    init(
+        sessionId: String,
+        usageRatio: Double,
+        tokensUsed: Int? = nil,
+        tokensTotal: Int? = nil,
+        inputTokens: Int? = nil,
+        outputTokens: Int? = nil,
+        reasoningTokens: Int? = nil,
+        toolUsage: [ToolUsage]? = nil,
+        timestamp: Date = Date()
+    ) {
+        self.sessionId = sessionId
+        self.usageRatio = usageRatio
+        self.tokensUsed = tokensUsed
+        self.tokensTotal = tokensTotal
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+        self.reasoningTokens = reasoningTokens
+        self.toolUsage = toolUsage
+        self.timestamp = timestamp
+    }
+
     /// 使用率百分比 (0 - 100)
     var usagePercent: Int {
         Int(usageRatio * 100)
@@ -197,10 +219,50 @@ final class ContextMonitor {
         updateSnapshot(sessionId: sessionId, snapshot: snapshot)
     }
     
-    /// 从会话文件直接获取 context_usage
+    /// 会话文件索引（sessionId → fileURL），批量查询时使用
+    typealias SessionFileIndex = [String: URL]
+
+    /// 构建 sessionId → fileURL 索引（读取一次目录，供多次查询复用）
+    func buildSessionFileIndex() -> SessionFileIndex {
+        let sessionsDir = SessionFileWatcher.sessionsDirectory
+        var index: SessionFileIndex = [:]
+        guard let enumerator = FileManager.default.enumerator(
+            at: sessionsDir,
+            includingPropertiesForKeys: nil
+        ) else { return index }
+        for case let fileURL as URL in enumerator {
+            guard fileURL.pathExtension == "json" else { continue }
+            guard let data = try? Data(contentsOf: fileURL),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
+            if let sid = json["session_id"] as? String {
+                index[sid] = fileURL
+            } else if let pid = json["pid"] as? Int {
+                index[String(pid)] = fileURL
+            }
+        }
+        return index
+    }
+
+    /// 使用索引查询（O(1) 查找，批量场景使用）
+    func fetchContextUsageFromFile(sessionId: String, index: SessionFileIndex) {
+        // 先尝试直接匹配
+        if let fileURL = index[sessionId] {
+            parseAndSetContext(from: fileURL, sessionId: sessionId)
+            return
+        }
+        // 回退：遍历索引做 contains 匹配
+        for (key, fileURL) in index {
+            if key.contains(sessionId) || sessionId.contains(key) {
+                parseAndSetContext(from: fileURL, sessionId: sessionId)
+                return
+            }
+        }
+    }
+
+    /// 从会话文件直接获取 context_usage（单次查询，遍历目录）
     func fetchContextUsageFromFile(sessionId: String) {
         let sessionsDir = SessionFileWatcher.sessionsDirectory
-        
+
         // 查找匹配的 session 文件（pid 或 session_id）
         guard let enumerator = FileManager.default.enumerator(
             at: sessionsDir,
@@ -272,6 +334,35 @@ final class ContextMonitor {
         }
     }
 
+    /// 从单个文件解析并设置上下文数据
+    private func parseAndSetContext(from fileURL: URL, sessionId: String) {
+        guard let data = try? Data(contentsOf: fileURL),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+        if let usage = json["context_usage"] as? Double {
+            let tokensUsed = json["context_tokens_used"] as? Int
+            let tokensTotal = json["context_tokens_total"] as? Int
+            let inputTokens = json["context_input_tokens"] as? Int
+            let outputTokens = json["context_output_tokens"] as? Int
+            let reasoningTokens = json["context_reasoning_tokens"] as? Int
+            let toolUsageRaw = json["tool_usage"] as? [[String: Any]]
+            let toolUsage = toolUsageRaw?.compactMap { dict -> ToolUsage? in
+                guard let name = dict["name"] as? String, let count = dict["count"] as? Int else { return nil }
+                return ToolUsage(name: name, count: count)
+            }
+            setContextUsage(
+                sessionId: sessionId, usage: usage,
+                tokensUsed: tokensUsed, tokensTotal: tokensTotal,
+                inputTokens: inputTokens, outputTokens: outputTokens,
+                reasoningTokens: reasoningTokens, toolUsage: toolUsage
+            )
+            return
+        }
+        if let message = json["notification_message"] as? String,
+           let snapshot = parseContextUsage(from: message, sessionId: sessionId) {
+            updateSnapshot(sessionId: sessionId, snapshot: snapshot)
+        }
+    }
+
     /// 清除指定会话的上下文快照
     func clearSnapshot(for sessionId: String) {
         snapshots.removeValue(forKey: sessionId)
@@ -320,12 +411,7 @@ final class ContextMonitor {
             sessionId: sessionId,
             usageRatio: usageRatio,
             tokensUsed: tokensUsed,
-            tokensTotal: tokensTotal,
-            inputTokens: nil,
-            outputTokens: nil,
-            reasoningTokens: nil,
-            toolUsage: nil,
-            timestamp: Date()
+            tokensTotal: tokensTotal
         )
     }
 
