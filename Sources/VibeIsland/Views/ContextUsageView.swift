@@ -186,7 +186,7 @@ struct ContextUsageCard: View {
 
                             Spacer()
 
-                            Text("\(tool.count) (\(toolPercent(tool)))%")
+                            Text("\(tool.count) (\(toolPercent(tool))%)")
                                 .font(.system(size: 10, design: .monospaced))
                                 .foregroundStyle(.secondary)
                         }
@@ -212,7 +212,7 @@ struct ContextUsageCard: View {
 
                             Spacer()
 
-                            Text("\(skill.count) (\(skillPercent(skill)))%")
+                            Text("\(skill.count) (\(skillPercent(skill))%)")
                                 .font(.system(size: 10, design: .monospaced))
                                 .foregroundStyle(.secondary)
                         }
