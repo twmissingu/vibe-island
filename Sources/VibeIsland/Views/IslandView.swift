@@ -1,5 +1,4 @@
 import SwiftUI
-import LLMQuotaKit
 
 // 全局单例存储屏幕参数
 @MainActor
@@ -77,13 +76,6 @@ struct CompactIslandView: View {
     @Environment(StateManager.self) private var viewModel
     private var sessionManager: SessionManager { .shared }
     private var contextMonitor: ContextMonitor { .shared }
-
-    private var primaryQuota: QuotaInfo? {
-        viewModel.quotas
-            .filter { $0.isHealthy }
-            .sorted { $0.usageRatio > $1.usageRatio }
-            .first
-    }
 
     private var topSession: Session? {
         sessionManager.trackedSession
@@ -262,30 +254,6 @@ struct CompactIslandView: View {
         }
     }
 
-
-    // MARK: - Quota Section
-
-    @ViewBuilder
-    private var quotaSection: some View {
-        if let quota = primaryQuota {
-            CompactProgressBar(ratio: quota.usageRatio)
-                .frame(width: 80)
-
-            Text("\(quota.provider.displayName) \(quota.remainingPercent)%")
-                .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(.primary)
-
-            Text(quota.formattedRemaining)
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(.secondary)
-        } else if viewModel.isLoading {
-            ProgressView()
-                .controlSize(.small)
-            Text("Loading…")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-        }
-    }
 
     // MARK: - Session Summary
 

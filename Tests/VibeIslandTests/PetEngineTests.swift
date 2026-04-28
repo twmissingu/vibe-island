@@ -177,7 +177,7 @@ final class PetEngineTests: XCTestCase {
     /// 测试：PetType 所有类型
     func testPetType_allCases() {
         let allCases = PetType.allCases
-        XCTAssertEqual(allCases.count, 8)
+        XCTAssertEqual(allCases.count, 9)
         XCTAssertTrue(allCases.contains(.cat))
         XCTAssertTrue(allCases.contains(.dog))
         XCTAssertTrue(allCases.contains(.rabbit))

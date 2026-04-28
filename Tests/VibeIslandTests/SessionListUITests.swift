@@ -1,7 +1,6 @@
 import XCTest
 import SwiftUI
 @testable import VibeIsland
-import LLMQuotaKit
 
 // MARK: - 会话列表 UI 测试
 

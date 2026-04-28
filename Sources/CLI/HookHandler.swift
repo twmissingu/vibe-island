@@ -65,6 +65,7 @@ enum HookHandler {
 
             // Apply the event to update session state
             session.status = event.hookEventName.toSessionState()
+            session.lastActivity = Date()
 
             // Propagate event fields to session
             session.source = resolvedSource ?? session.source

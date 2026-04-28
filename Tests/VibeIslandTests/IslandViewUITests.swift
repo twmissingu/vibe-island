@@ -1,7 +1,6 @@
 import XCTest
 import SwiftUI
 @testable import VibeIsland
-import LLMQuotaKit
 
 // MARK: - 灵动岛主界面 UI 测试
 

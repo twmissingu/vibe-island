@@ -1,21 +1,19 @@
 import SwiftUI
-import LLMQuotaKit
 
 // MARK: - 首次启动引导视图
 
 /// 新用户首次启动时的引导流程
-/// 包含：Hook 配置、平台选择、声音测试、宠物选择
+/// 包含：Hook 配置、声音测试、宠物选择
 struct OnboardingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(StateManager.self) private var stateManager
 
     @State private var currentStep = 0
-    @State private var selectedPlatforms: Set<ProviderType> = []
     @State private var hookInstalled = false
     @State private var soundTested = false
     @State private var petSelected = false
 
-    let totalSteps = 4
+    let totalSteps = 3
 
     var body: some View {
         VStack(spacing: 0) {
@@ -35,9 +33,8 @@ struct OnboardingView: View {
             Group {
                 switch currentStep {
                 case 0: WelcomeStep()
-                case 1: PlatformSelectionStep(selectedPlatforms: $selectedPlatforms)
-                case 2: HookSetupStep(installed: $hookInstalled, stateManager: stateManager)
-                case 3: CompletionStep(selectedPlatforms: selectedPlatforms, hookInstalled: hookInstalled)
+                case 1: HookSetupStep(installed: $hookInstalled, stateManager: stateManager)
+                case 2: CompletionStep(hookInstalled: hookInstalled)
                 default: EmptyView()
                 }
             }
@@ -46,7 +43,7 @@ struct OnboardingView: View {
             HStack {
                 if currentStep > 0 {
                     Button {
-                        // previous action
+                        withAnimation { currentStep -= 1 }
                     } label: {
                         Text(NSLocalizedString("onboarding.button.previous", comment: "Previous button"))
                     }
@@ -57,16 +54,16 @@ struct OnboardingView: View {
 
                 if currentStep < totalSteps - 1 {
                     Button {
-                        // next action
+                        withAnimation { currentStep += 1 }
                     } label: {
                         Text(NSLocalizedString("onboarding.button.next", comment: "Next button"))
                     }
                     .buttonStyle(.borderedProminent)
                 } else {
                     Button {
-                        // get started action
+                        dismiss()
                     } label: {
-                        Text(NSLocalizedString("onboarding.button.getStart", comment: "Get Started button"))
+                        Text(NSLocalizedString("onboarding.button.getStarted", comment: "Get Started button"))
                     }
                     .buttonStyle(.borderedProminent)
                 }
@@ -74,7 +71,7 @@ struct OnboardingView: View {
                 Button {
                     dismiss()
                 } label: {
-                    Text(currentStep == totalSteps - 1 ? NSLocalizedString("onboarding.button.skip", comment: "Skip") : NSLocalizedString("onboarding.button.skipOnboarding", comment: "Skip Onboarding"))
+                    Text(NSLocalizedString("onboarding.button.skip", comment: "Skip"))
                 }
                 .buttonStyle(.borderless)
                 .foregroundStyle(.secondary)
@@ -116,51 +113,7 @@ struct WelcomeStep: View {
     }
 }
 
-// MARK: - Step 2: 平台选择
-
-struct PlatformSelectionStep: View {
-    @Binding var selectedPlatforms: Set<ProviderType>
-
-    var body: some View {
-        VStack(spacing: 24) {
-            Text("选择要监控的平台")
-                .font(.title2)
-                .fontWeight(.bold)
-
-            Text("你可以随时在设置中修改")
-                .foregroundStyle(.secondary)
-
-            VStack(spacing: 12) {
-                ForEach(ProviderType.allCases, id: \.self) { provider in
-                    Button {
-                        if selectedPlatforms.contains(provider) {
-                            selectedPlatforms.remove(provider)
-                        } else {
-                            selectedPlatforms.insert(provider)
-                        }
-                    } label: {
-                        HStack {
-                            Image(systemName: selectedPlatforms.contains(provider) ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(selectedPlatforms.contains(provider) ? .blue : .gray)
-                            Text(provider.displayName)
-                            Spacer()
-                            Text(provider.keyDescription)
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                        }
-                        .padding()
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(8)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .padding(40)
-    }
-}
-
-// MARK: - Step 3: Hook 配置
+// MARK: - Step 2: Hook 配置
 
 struct HookSetupStep: View {
     @Binding var installed: Bool
@@ -209,10 +162,9 @@ struct HookSetupStep: View {
     }
 }
 
-// MARK: - Step 4: 完成
+// MARK: - Step 3: 完成
 
 struct CompletionStep: View {
-    let selectedPlatforms: Set<ProviderType>
     let hookInstalled: Bool
 
     var body: some View {
@@ -226,9 +178,8 @@ struct CompletionStep: View {
                 .fontWeight(.bold)
 
             VStack(alignment: .leading, spacing: 8) {
-                Label(String(format: NSLocalizedString("onboarding.completion.platforms", comment: "Selected platforms"), selectedPlatforms.count), systemImage: "checkmark")
                 Label(hookInstalled ? NSLocalizedString("onboarding.completion.hookInstalled", comment: "Hook installed") : NSLocalizedString("onboarding.completion.hookNotInstalled", comment: "Hook not installed"), systemImage: hookInstalled ? "checkmark" : "info.circle")
-                Label(NSLocalizedString("onboarding.completion.petEnabled", comment: "Pixel pet enabled"), systemImage: "checkmark")
+                Label(NSLocalizedString("onboarding.completion.petEnabled", comment: "Pixel Pet enabled"), systemImage: "checkmark")
                 Label(NSLocalizedString("onboarding.completion.soundEnabled", comment: "Sound alerts enabled"), systemImage: "checkmark")
             }
             .padding()
@@ -239,19 +190,5 @@ struct CompletionStep: View {
                 .foregroundStyle(.secondary)
         }
         .padding(40)
-    }
-}
-
-// MARK: - 辅助扩展
-
-extension ProviderType {
-    var keyDescription: String {
-        switch self {
-        case .mimo: return NSLocalizedString("provider.mimo", comment: "Xiaomi MIMO")
-        case .kimi: return NSLocalizedString("provider.kimi", comment: "Kimi")
-        case .minimax: return NSLocalizedString("provider.minimax", comment: "MiniMax")
-        case .zai: return NSLocalizedString("provider.zai", comment: "Zhipu")
-        case .ark: return NSLocalizedString("provider.ark", comment: "Volcano Ark")
-        }
     }
 }

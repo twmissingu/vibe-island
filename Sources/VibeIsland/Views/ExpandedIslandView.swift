@@ -1,5 +1,4 @@
 import SwiftUI
-import LLMQuotaKit
 
 // MARK: - 展开的灵动岛视图
 
@@ -17,13 +16,11 @@ struct ExpandedIslandView: View {
 
     /// 展开视图的标签页
     enum ExpandedTab: String, CaseIterable {
-        case quota = "额度"
         case sessions = "会话"
         case context = "上下文"
 
         var icon: String {
             switch self {
-            case .quota: return "key.fill"
             case .sessions: return "terminal"
             case .context: return "brain.fill"
             }
@@ -98,37 +95,10 @@ struct ExpandedIslandView: View {
     @ViewBuilder
     private var tabContent: some View {
         switch selectedTab {
-        case .quota:
-            quotaTab
         case .sessions:
             sessionsTab
         case .context:
             contextTab
-        }
-    }
-
-    // MARK: - 额度标签
-
-@ViewBuilder
-    private var quotaTab: some View {
-        VStack(spacing: 8) {
-            // 内容区域（可滚动，当额度多时）
-            ScrollView {
-                VStack(spacing: 8) {
-                    ForEach(viewModel.quotas) { quota in
-                        QuotaCardView(quota: quota, theme: viewModel.settings.theme)
-                    }
-
-                    if viewModel.quotas.isEmpty {
-                        emptyState
-                    }
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .frame(maxHeight: .infinity)
-
-            // 固定在底部
-            footer
         }
     }
 
@@ -212,7 +182,7 @@ struct ExpandedIslandView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
     }
-    
+
     // 批量获取所有会话的 context_usage（建索引一次，避免 O(M×N) 文件读取）
     private func fetchAllSessionContexts() {
         let sessions = Array(sessionManager.sortedSessions.prefix(8))
@@ -221,19 +191,6 @@ struct ExpandedIslandView: View {
         for session in sessions {
             contextMonitor.fetchContextUsageFromFile(sessionId: session.sessionId, index: index)
         }
-    }
-    
-    
-    private var emptyState: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "key.fill")
-                .font(.system(size: 24))
-                .foregroundStyle(.secondary)
-            Text("请在设置中添加 API Key")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
     }
 
     private var footer: some View {
@@ -247,15 +204,13 @@ struct ExpandedIslandView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            
+
             Spacer()
-            
+
             // 右下角刷新按钮
             Button {
                 Task {
                     switch selectedTab {
-                    case .quota:
-                        await viewModel.refresh()
                     case .sessions:
                         sessionManager.refresh()
                     case .context:
@@ -318,70 +273,6 @@ struct ExpandedIslandView: View {
                         lineWidth: 2.5
                     )
             }
-        }
-    }
-}
-
-// MARK: - QuotaCardView
-
-struct QuotaCardView: View {
-    let quota: QuotaInfo
-    let theme: AppTheme
-
-    var body: some View {
-        VStack(spacing: 8) {
-            header
-            CircularGaugeView(
-                remainingPercent: quota.remainingPercent,
-                theme: theme
-            )
-            .frame(width: 80, height: 80)
-            detailRows
-        }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(.white.opacity(theme == .glass ? 0.05 : 0.03))
-        )
-    }
-
-    private var header: some View {
-        HStack {
-            Text(quota.provider.displayName)
-                .font(.system(size: 13, weight: .semibold))
-            Spacer()
-            if let error = quota.error {
-                Text(error.displayMessage)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.red)
-            } else {
-                Text("✅")
-                    .font(.system(size: 11))
-            }
-        }
-    }
-
-    private var detailRows: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            detailRow("剩余", value: "\(quota.formattedRemaining) / \(quota.formattedTotal)")
-            detailRow("已用", value: "\(quota.formattedUsed) (\(quota.usedPercent)%)")
-            if let reset = quota.nextResetAt {
-                detailRow("重置", value: reset.formatted(date: .abbreviated, time: .shortened))
-            }
-            detailRow("Key", value: quota.keyIdentifier)
-        }
-    }
-
-    private func detailRow(_ label: String, value: String) -> some View {
-        HStack {
-            Text(label)
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .frame(width: 30, alignment: .leading)
-            Text(value)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(.primary)
-            Spacer()
         }
     }
 }

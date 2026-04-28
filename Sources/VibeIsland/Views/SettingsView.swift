@@ -1,31 +1,8 @@
 import SwiftUI
-import LLMQuotaKit
-
-// MARK: - 工具来源
-
-enum ToolSource: String, CaseIterable {
-    case claudeCode = "claude"
-    case openCode = "opencode"
-    case codex = "codex"
-
-    var displayName: String {
-        switch self {
-        case .claudeCode: return "Claude Code"
-        case .openCode: return "OpenCode"
-        case .codex: return "Codex"
-        }
-    }
-
-    var sourceString: String { rawValue }
-}
 
 struct SettingsView: View {
     @Environment(StateManager.self) private var viewModel
     @Environment(\.dismiss) private var dismiss
-    @State private var showAddKey = false
-    @State private var newKeyType: ProviderType = .mimo
-    @State private var newKeyValue = ""
-    @State private var keyValidation: String?
 
     // Hook 状态
     @State private var hookStatus: HookStatus = .unknown
@@ -43,7 +20,7 @@ struct SettingsView: View {
 
     // 多工具监控
     @State private var detectedTools: [ToolSource] = []
-    
+
     // 宠物设置 - 仅展示已解锁宠物
     private var unlockedPets: [PetCatalog.PetInfo] {
         let allPetIds = PetType.allCases.map { $0.rawValue }
@@ -69,7 +46,7 @@ struct SettingsView: View {
         NavigationStack {
             Form {
             Section(NSLocalizedString("settings.appearance", comment: "Appearance")) {
-                Picker(NSLocalizedString("settings.hudStyle", comment: "HUD Style"), selection: Binding(
+                Picker(NSLocalizedString("settings.hud.style", comment: "HUD Style"), selection: Binding(
                     get: { viewModel.settings.theme },
                     set: { viewModel.settings.theme = $0; saveSettings() }
                 )) {
@@ -97,7 +74,7 @@ struct SettingsView: View {
 
                 // 安装帮助提示
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("💡 \(NSLocalizedString("settings.hookInstallationGuide", comment: "Installation Guide"))：")
+                    Text("💡 \(NSLocalizedString("settings.hook.installationGuide", comment: "Installation Guide")):")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                     Text("1. \(NSLocalizedString("settings.hook.install.claude.required", comment: "Ensure Claude Code is installed"))")
@@ -149,7 +126,7 @@ struct SettingsView: View {
                     Text("💡 \(NSLocalizedString("settings.restartRequired", comment: "Restart required"))")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
-                    Text(NSLocalizedString("settings.pluginInstallationGuide", comment: "Plugin Installation Guide"))
+                    Text(NSLocalizedString("settings.plugin.installationGuide", comment: "Plugin Installation Guide"))
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
@@ -181,17 +158,17 @@ struct SettingsView: View {
                 testSoundButtons
             }
 
-    // MARK: - 宠物设置（增强版：含皮肤选择）
-    Section(NSLocalizedString("settings.section.pet", comment: "Pixel Pet")) {
-        Toggle(NSLocalizedString("settings.pet.enable", comment: "Enable Pixel Pet"), isOn: Binding(
-            get: { viewModel.settings.petEnabled },
-            set: { viewModel.settings.petEnabled = $0; saveSettings() }
-        ))
+            // MARK: - 宠物设置（增强版：含皮肤选择）
+            Section(NSLocalizedString("settings.section.pet", comment: "Pixel Pet")) {
+                Toggle(NSLocalizedString("settings.pet.enable", comment: "Enable Pixel Pet"), isOn: Binding(
+                    get: { viewModel.settings.petEnabled },
+                    set: { viewModel.settings.petEnabled = $0; saveSettings() }
+                ))
 
-        if viewModel.settings.petEnabled {
-            petSkinSelectorView
-        }
-    }
+                if viewModel.settings.petEnabled {
+                    petSkinSelectorView
+                }
+            }
 
             // MARK: - 多工具监控
             Section(NSLocalizedString("settings.section.multiTool", comment: "Multi-Tool Monitoring")) {
@@ -261,42 +238,12 @@ struct SettingsView: View {
                 }
             }
 
-            // MARK: - 刷新
-            Section(NSLocalizedString("settings.section.refresh", comment: "Refresh")) {
-                Picker(NSLocalizedString("settings.pollingInterval", comment: "Polling Interval"), selection: Binding(
-                    get: { viewModel.settings.pollingIntervalMinutes },
-                    set: { viewModel.settings.pollingIntervalMinutes = $0; saveSettings(); viewModel.startPolling() }
-                )) {
-                    Text("1 \(NSLocalizedString("settings.interval.1min", comment: "1 minute"))").tag(1)
-                    Text("3 \(NSLocalizedString("settings.interval.3min", comment: "3 minutes"))").tag(3)
-                    Text("5 \(NSLocalizedString("settings.interval.5min", comment: "5 minutes"))").tag(5)
-                    Text("10 \(NSLocalizedString("settings.interval.10min", comment: "10 minutes"))").tag(10)
-                    Text("15 \(NSLocalizedString("settings.interval.15min", comment: "15 minutes"))").tag(15)
-                    Text("30 \(NSLocalizedString("settings.interval.30min", comment: "30 minutes"))").tag(30)
-                }
-            }
-
-            // MARK: - API Keys
-            Section("API Keys") {
-                ForEach(ProviderType.allCases, id: \.self) { type in
-                    providerRow(type)
-                }
-
-                Button(NSLocalizedString("settings.addKey", comment: "Add Key")) {
-                    showAddKey = true
-                }
-            }
-
             // MARK: - 系统
             Section(NSLocalizedString("settings.section.system", comment: "System")) {
                 Toggle(NSLocalizedString("settings.launchAtLogin", comment: "Launch at Login"), isOn: Binding(
                     get: { viewModel.settings.launchAtLogin },
                     set: { viewModel.settings.launchAtLogin = $0; saveSettings() }
                 ))
-
-                Button(NSLocalizedString("settings.refreshNow", comment: "Refresh Now")) {
-                    Task { await viewModel.refresh() }
-                }
             }
         }
             .formStyle(.grouped)
@@ -309,16 +256,13 @@ struct SettingsView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showAddKey) {
-                addKeySheet
+            .task {
+                await refreshHookStatus()
+                await refreshOpenCodePluginStatus()
+                loadSoundSettings()
+                loadContextSettings()
+                detectRunningTools()
             }
-        .task {
-            await refreshHookStatus()
-            await refreshOpenCodePluginStatus()
-            loadSoundSettings()
-            loadContextSettings()
-            detectRunningTools()
-        }
         }
     }
 
@@ -532,84 +476,6 @@ struct SettingsView: View {
         contextWarningThreshold = viewModel.settings.contextWarningThreshold
     }
 
-    // MARK: - Provider Row
-
-    @ViewBuilder
-    private func providerRow(_ type: ProviderType) -> some View {
-        let enrolled = SharedDefaults.loadEnrolled()
-        let isEnrolled = enrolled.contains(type)
-
-        HStack {
-            Text(type.displayName)
-                .font(.system(size: 13, weight: .medium))
-            Spacer()
-            if isEnrolled {
-                Text(NSLocalizedString("settings.configured", comment: "Configured"))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.green)
-                Button(NSLocalizedString("settings.delete", comment: "Delete"), role: .destructive) {
-                    viewModel.keychain.delete(for: type.rawValue)
-                    var updated = enrolled
-                    updated.remove(type)
-                    SharedDefaults.saveEnrolled(updated)
-                }
-                .font(.system(size: 11))
-            } else {
-                Text(NSLocalizedString("settings.notConfigured", comment: "Not Configured"))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private var addKeySheet: some View {
-        VStack(spacing: 16) {
-            Text(NSLocalizedString("settings.addKeyTitle", comment: "Add API Key"))
-                .font(.headline)
-
-            Picker(NSLocalizedString("settings.platform", comment: "Platform"), selection: $newKeyType) {
-                ForEach(ProviderType.allCases, id: \.self) { type in
-                    Text(type.displayName).tag(type)
-                }
-            }
-
-            SecureField(NSLocalizedString("settings.pasteApiKey", comment: "Paste API Key"), text: $newKeyValue)
-                .textFieldStyle(.roundedBorder)
-
-            if let msg = keyValidation {
-                Text(msg)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.red)
-            }
-
-            HStack {
-                Button(NSLocalizedString("settings.cancel", comment: "Cancel")) { showAddKey = false }
-                Spacer()
-                Button(NSLocalizedString("settings.save", comment: "Save")) {
-                    saveNewKey()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(newKeyValue.isEmpty)
-            }
-        }
-        .padding(20)
-        .frame(width: 350)
-    }
-
-    private func saveNewKey() {
-        do {
-            try viewModel.keychain.save(key: newKeyValue, for: newKeyType.rawValue)
-            var enrolled = SharedDefaults.loadEnrolled()
-            enrolled.insert(newKeyType)
-            SharedDefaults.saveEnrolled(enrolled)
-            newKeyValue = ""
-            keyValidation = nil
-            showAddKey = false
-        } catch {
-            keyValidation = NSLocalizedString("settings.saveFailed", comment: "Save failed: %@")
-        }
-    }
-
     private func saveSettings() {
         SharedDefaults.saveSettings(viewModel.settings)
     }
@@ -709,7 +575,7 @@ struct SettingsView: View {
                 .tint(.accentColor)
 
             if let remaining = progress.minutesToNextLevel(for: selectedPet), remaining > 0 {
-                Text("还需 \(remaining) ��钟升级")
+                Text("还需 \(remaining) 分钟升级")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
             }

@@ -29,7 +29,7 @@ final class SoundManagerTests: XCTestCase {
     /// 测试：SoundType 包含所有预期类型
     func testSoundType_allCases() {
         let allCases = SoundType.allCases
-        XCTAssertEqual(allCases.count, 4)
+        XCTAssertEqual(allCases.count, 8)
         XCTAssertTrue(allCases.contains(.permissionRequest))
         XCTAssertTrue(allCases.contains(.completed))
         XCTAssertTrue(allCases.contains(.error))

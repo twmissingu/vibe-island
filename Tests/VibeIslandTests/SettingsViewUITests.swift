@@ -1,7 +1,6 @@
 import XCTest
 import SwiftUI
 @testable import VibeIsland
-import LLMQuotaKit
 
 // MARK: - 设置界面 UI 测试
 
@@ -399,38 +398,6 @@ final class SettingsViewUITests: XCTestCase {
         // 切换到 10 分钟
         settings.pollingIntervalMinutes = 10
         XCTAssertEqual(settings.pollingIntervalMinutes, 10, "轮询间隔应切换到 10 分钟")
-    }
-
-    // MARK: - API Keys 测试
-
-    /// 测试：所有平台在 API Keys 区域显示
-    func testApiKeysSection_allProvidersShown() {
-        let allProviders = ProviderType.allCases
-        XCTAssertFalse(allProviders.isEmpty, "应显示所有平台")
-
-        for provider in allProviders {
-            XCTAssertFalse(provider.displayName.isEmpty, "\(provider) 应有显示名称")
-        }
-    }
-
-    /// 测试：已配置平台显示"已配置"
-    func testApiKeys_enrolled_showsConfigured() {
-        let isEnrolled = true
-        let statusText = isEnrolled ? "已配置 ✅" : "未配置"
-        XCTAssertEqual(statusText, "已配置 ✅", "已配置平台应显示'已配置 ✅'")
-    }
-
-    /// 测试：未配置平台显示"未配置"
-    func testApiKeys_notEnrolled_showsNotConfigured() {
-        let isEnrolled = false
-        let statusText = isEnrolled ? "已配置 ✅" : "未配置"
-        XCTAssertEqual(statusText, "未配置", "未配置平台应显示'未配置'")
-    }
-
-    /// 测试：添加 Key 按钮存在
-    func testApiKeys_addKeyButton_exists() {
-        let buttonText = "添加 Key"
-        XCTAssertFalse(buttonText.isEmpty, "应存在'添加 Key'按钮")
     }
 
     // MARK: - 系统设置测试

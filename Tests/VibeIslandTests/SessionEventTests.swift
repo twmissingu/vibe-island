@@ -226,7 +226,7 @@ final class SessionEventTests: XCTestCase {
 
     func testSessionEventNameAllCases() {
         let allCases = SessionEventName.allCases
-        XCTAssertEqual(allCases.count, 14)
+        XCTAssertEqual(allCases.count, 15)
 
         let expectedCases: [SessionEventName] = [
             .sessionStart, .sessionEnd, .stop, .sessionError,

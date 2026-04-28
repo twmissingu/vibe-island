@@ -76,8 +76,19 @@ public enum SessionState: String, Codable, Equatable, Sendable, CaseIterable {
         }
     }
 
-    /// 默认优先级（用于排序，不影响显示）
-    public var priority: Int { 0 }
+    /// 状态优先级（数值越小越高）
+    public var priority: Int {
+        switch self {
+        case .waitingPermission: return 0
+        case .error: return 1
+        case .compacting: return 2
+        case .coding: return 3
+        case .thinking: return 4
+        case .waiting: return 5
+        case .completed: return 6
+        case .idle: return 7
+        }
+    }
     
     // MARK: 渐变色
 

@@ -1,7 +1,6 @@
 import XCTest
 import SwiftUI
 @testable import VibeIsland
-import LLMQuotaKit
 
 // MARK: - 上下文使用率 UI 测试
 

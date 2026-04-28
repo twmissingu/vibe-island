@@ -1,5 +1,4 @@
 import Foundation
-import LLMQuotaKit
 
 // MARK: - Hook 事件名称
 
@@ -57,7 +56,6 @@ public enum SessionEventName: String, Codable, Sendable, CaseIterable {
         }
     }
 
-    /// 事件类型分组
     public var category: String {
         switch self {
         case .sessionStart, .sessionEnd, .stop, .sessionError:
@@ -117,6 +115,64 @@ public struct SessionEvent: Codable, Sendable {
     public let contextReasoningTokens: Int?
     public let toolUsage: [ToolUsage]?
     public let receivedAt: Date
+
+    public init(
+        sessionId: String,
+        cwd: String,
+        hookEventName: SessionEventName,
+        source: String? = nil,
+        sessionName: String? = nil,
+        prompt: String? = nil,
+        toolName: String? = nil,
+        toolInput: [String: String]? = nil,
+        title: String? = nil,
+        error: String? = nil,
+        message: String? = nil,
+        notificationType: NotificationType? = nil,
+        agentId: String? = nil,
+        agentType: String? = nil,
+        transcriptPath: String? = nil,
+        permissionMode: String? = nil,
+        isInterrupt: Bool? = nil,
+        pid: UInt32? = nil,
+        pidStartTime: TimeInterval? = nil,
+        contextUsage: Double? = nil,
+        contextTokensUsed: Int? = nil,
+        contextTokensTotal: Int? = nil,
+        contextInputTokens: Int? = nil,
+        contextOutputTokens: Int? = nil,
+        contextReasoningTokens: Int? = nil,
+        toolUsage: [ToolUsage]? = nil,
+        receivedAt: Date = Date()
+    ) {
+        self.sessionId = sessionId
+        self.cwd = cwd
+        self.hookEventName = hookEventName
+        self.source = source
+        self.sessionName = sessionName
+        self.prompt = prompt
+        self.toolName = toolName
+        self.toolInput = toolInput
+        self.title = title
+        self.error = error
+        self.message = message
+        self.notificationType = notificationType
+        self.agentId = agentId
+        self.agentType = agentType
+        self.transcriptPath = transcriptPath
+        self.permissionMode = permissionMode
+        self.isInterrupt = isInterrupt
+        self.pid = pid
+        self.pidStartTime = pidStartTime
+        self.contextUsage = contextUsage
+        self.contextTokensUsed = contextTokensUsed
+        self.contextTokensTotal = contextTokensTotal
+        self.contextInputTokens = contextInputTokens
+        self.contextOutputTokens = contextOutputTokens
+        self.contextReasoningTokens = contextReasoningTokens
+        self.toolUsage = toolUsage
+        self.receivedAt = receivedAt
+    }
 
     enum CodingKeys: String, CodingKey {
         case sessionId = "session_id"
@@ -208,63 +264,5 @@ public struct SessionEvent: Codable, Sendable {
         try container.encodeIfPresent(contextReasoningTokens, forKey: .contextReasoningTokens)
         try container.encodeIfPresent(toolUsage, forKey: .toolUsage)
         try container.encode(receivedAt, forKey: .receivedAt)
-    }
-
-    public init(
-        sessionId: String,
-        cwd: String,
-        hookEventName: SessionEventName,
-        source: String? = nil,
-        sessionName: String? = nil,
-        prompt: String? = nil,
-        toolName: String? = nil,
-        toolInput: [String: String]? = nil,
-        title: String? = nil,
-        error: String? = nil,
-        message: String? = nil,
-        notificationType: NotificationType? = nil,
-        agentId: String? = nil,
-        agentType: String? = nil,
-        transcriptPath: String? = nil,
-        permissionMode: String? = nil,
-        isInterrupt: Bool? = nil,
-        pid: UInt32? = nil,
-        pidStartTime: TimeInterval? = nil,
-        contextUsage: Double? = nil,
-        contextTokensUsed: Int? = nil,
-        contextTokensTotal: Int? = nil,
-        contextInputTokens: Int? = nil,
-        contextOutputTokens: Int? = nil,
-        contextReasoningTokens: Int? = nil,
-        toolUsage: [ToolUsage]? = nil,
-        receivedAt: Date = Date()
-    ) {
-        self.sessionId = sessionId
-        self.cwd = cwd
-        self.hookEventName = hookEventName
-        self.source = source
-        self.sessionName = sessionName
-        self.prompt = prompt
-        self.toolName = toolName
-        self.toolInput = toolInput
-        self.title = title
-        self.error = error
-        self.message = message
-        self.notificationType = notificationType
-        self.agentId = agentId
-        self.agentType = agentType
-        self.transcriptPath = transcriptPath
-        self.permissionMode = permissionMode
-        self.isInterrupt = isInterrupt
-        self.pid = pid
-        self.pidStartTime = pidStartTime
-        self.contextUsage = contextUsage
-        self.contextTokensUsed = contextTokensUsed
-        self.contextTokensTotal = contextTokensTotal
-        self.contextInputTokens = contextInputTokens
-        self.contextOutputTokens = contextOutputTokens
-        self.contextReasoningTokens = contextReasoningTokens
-        self.toolUsage = toolUsage
-        self.receivedAt = receivedAt
     }
 }

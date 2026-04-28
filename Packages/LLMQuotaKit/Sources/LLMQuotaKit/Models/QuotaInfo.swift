@@ -1,17 +1,5 @@
 import Foundation
 
-// MARK: - ToolUsage
-
-public struct ToolUsage: Codable, Equatable, Sendable {
-    public let name: String
-    public let count: Int
-
-    public init(name: String, count: Int) {
-        self.name = name
-        self.count = count
-    }
-}
-
 // MARK: - ProviderType
 
 public enum ProviderType: String, Codable, CaseIterable, Sendable {

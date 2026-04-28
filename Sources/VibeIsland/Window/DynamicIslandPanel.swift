@@ -1,6 +1,5 @@
 import AppKit
 import SwiftUI
-import LLMQuotaKit
 import CoreGraphics
 
 final class DynamicIslandPanel: NSPanel {

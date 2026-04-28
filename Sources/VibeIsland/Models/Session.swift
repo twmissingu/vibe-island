@@ -1,5 +1,39 @@
 import Foundation
-import LLMQuotaKit
+
+// MARK: - 工具来源
+
+/// 支持的 LLM 编码工具
+public enum ToolSource: String, Codable, Equatable, CaseIterable, Sendable {
+    case claudeCode = "claude_code"
+    case openCode = "opencode"
+    case codex = "codex"
+
+    /// 显示名称
+    public var displayName: String {
+        switch self {
+        case .claudeCode: return "Claude Code"
+        case .openCode: return "OpenCode"
+        case .codex: return "Codex"
+        }
+    }
+
+    /// 用于查询会话的字符串
+    public var sourceString: String {
+        rawValue
+    }
+}
+
+// MARK: - ToolUsage
+
+public struct ToolUsage: Codable, Equatable, Sendable {
+    public let name: String
+    public let count: Int
+
+    public init(name: String, count: Int) {
+        self.name = name
+        self.count = count
+    }
+}
 
 // MARK: - 会话错误
 

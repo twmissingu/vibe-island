@@ -1,6 +1,5 @@
 import Foundation
 import OSLog
-import LLMQuotaKit
 
 // MARK: - 跟踪模式
 
@@ -221,13 +220,15 @@ final class SessionManager: SessionAggregatable {
     /// 更新单个会话状态（文件回调入口）
     private func updateSession(_ sessionId: String, _ session: Session) {
         let oldState = aggregateState
+
         sessions[sessionId] = session
         recomputeSortedSessions()
 
-        // 同步到上下文监控
-        contextMonitor.handleSessionUpdate(session)
-
-        // 同步到编码时长追踪器
+        if session.status == .completed {
+            contextMonitor.clearSnapshot(for: sessionId)
+        } else {
+            contextMonitor.handleSessionUpdate(session)
+        }
         CodingTimeTracker.shared.handleSessionStateChange(sessionId: sessionId, state: session.status)
 
         // 同步到宠物进度管理器
