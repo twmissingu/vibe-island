@@ -9,9 +9,11 @@
 //   rm ~/.config/opencode/plugins/vibe-island.js
 
 import { execFileSync } from "child_process";
-import { existsSync } from "fs";
+import { existsSync, unlinkSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
+
+const sessionsDir = join(homedir(), ".vibe-island", "sessions");
 
 // ---------------------------------------------------------------------------
 // Tool name normalization: opencode lowercase → Claude Code PascalCase
@@ -96,6 +98,7 @@ export const vibeIsland = async ({ directory }) => {
   const sessionId = `opencode-${process.pid}`;
   let sessionName = null;
   let modelContextLimit = 200000; // default to 200K
+  let toolCounts = {}; // Track tool usage counts for this session
   
   function basePayload() {
     return {
@@ -123,8 +126,9 @@ export const vibeIsland = async ({ directory }) => {
 
       switch (event.type) {
         case "session.created":
-          // Reset model context limit for new session
+          // Reset model context limit and tool counts for new session
           modelContextLimit = 200000;
+          toolCounts = {};
           callHook(hookBin, "SessionStart", basePayload());
           break;
 
@@ -172,19 +176,20 @@ export const vibeIsland = async ({ directory }) => {
         case "permission.replied":
           // skip — liveness handles deletion, PreToolUse follows permission
           break;
+
+        // 检查刷新标记文件，触发上下文刷新
+        const refreshFile = join(sessionsDir, `${sessionId}.refresh`);
+        if (existsSync(refreshFile)) {
+          try { unlinkSync(refreshFile); } catch {}
+          // 请求 VibeIsland 刷新会话上下文
+          callHook(hookBin, "RefreshContext", basePayload());
+        }
       }
     },
 
     // ---- Message events: track token usage ----
-    "chat.message": async (_input, output) => {
-      const prompt =
-        output?.message?.content ||
-        output?.content ||
-        (typeof output?.text === "string" ? output.text : null);
-      callHook(hookBin, "UserPromptSubmit", {
-        ...basePayload(),
-        ...(prompt && { prompt }),
-      });
+    "chat.message": async (_input, _output) => {
+      // Token tracking now in chat.complete only
     },
 
     "chat.complete": async (_input, output) => {
@@ -207,6 +212,11 @@ export const vibeIsland = async ({ directory }) => {
         ? Math.round((totalTokens / modelContextLimit) * 100)
         : 0;
       
+      // Sort tool usage by count descending
+      const sortedToolUsage = Object.entries(toolCounts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, count]) => ({ name, count }));
+      
       // Send context usage info with the message
       const contextMsg = `Context usage: ${usagePercent}% (${totalTokens}/${modelContextLimit} tokens)`;
       callHook(hookBin, "UserPromptSubmit", {
@@ -215,6 +225,10 @@ export const vibeIsland = async ({ directory }) => {
         context_usage: usagePercent / 100,
         context_tokens_used: totalTokens,
         context_tokens_total: modelContextLimit,
+        context_input_tokens: inputTokens,
+        context_output_tokens: outputTokens,
+        context_reasoning_tokens: reasoningTokens,
+        tool_usage: sortedToolUsage,
       });
     },
 
@@ -227,6 +241,10 @@ export const vibeIsland = async ({ directory }) => {
         ...(tool && { tool_name: tool }),
         ...(args && { tool_input: normalizeToolInput(args) }),
       });
+      // Track tool usage
+      if (tool) {
+        toolCounts[tool] = (toolCounts[tool] || 0) + 1;
+      }
     },
 
     "tool.execute.after": async () => {

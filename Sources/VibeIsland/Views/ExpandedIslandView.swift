@@ -6,7 +6,6 @@ struct ExpandedIslandView: View {
     @Environment(StateManager.self) private var viewModel
     @State private var selectedTab: ExpandedTab = .sessions
     @State private var showSettings = false
-    private var contextMonitor: ContextMonitor { .shared }
     private var sessionManager: SessionManager { .shared }
 
     /// 聚合状态用于渐变边框
@@ -127,14 +126,8 @@ struct ExpandedIslandView: View {
             ScrollView {
                 VStack(spacing: 8) {
                     if let session = sessionManager.trackedSession {
-                        // 优先从 snapshot 获取
-                        if let snapshot = contextMonitor.snapshot(for: session.sessionId),
-                           snapshot.usageRatio > 0 {
-                            ContextUsageCard(session: session, snapshot: snapshot)
-                        }
-                        // 回退：用 Session 模型的 contextUsage
-                        else if let usage = session.contextUsage, usage > 0 {
-                            let fallbackSnapshot = ContextUsageSnapshot(
+                        if let usage = session.contextUsage, usage > 0 {
+                            let snapshot = ContextUsageSnapshot(
                                 sessionId: session.sessionId,
                                 usageRatio: usage,
                                 tokensUsed: session.contextTokensUsed,
@@ -145,9 +138,8 @@ struct ExpandedIslandView: View {
                                 toolUsage: session.toolUsage,
                                 timestamp: Date()
                             )
-                            ContextUsageCard(session: session, snapshot: fallbackSnapshot)
+                            ContextUsageCard(session: session, snapshot: snapshot)
                         } else {
-                            // 有会话但无上下文数据 → 展示会话基本信息
                             SessionInfoCard(session: session)
                         }
                     } else {
@@ -158,15 +150,7 @@ struct ExpandedIslandView: View {
             }
             .frame(maxHeight: .infinity)
 
-            footer
-        }
-        .task {
-            fetchAllSessionContexts()
-        }
-        .onChange(of: sessionManager.trackedSession?.sessionId) { _, newId in
-            if let id = newId {
-                contextMonitor.fetchContextUsageFromFile(sessionId: id)
-            }
+footer
         }
     }
 
@@ -181,16 +165,6 @@ struct ExpandedIslandView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
-    }
-
-    // 批量获取所有会话的 context_usage（建索引一次，避免 O(M×N) 文件读取）
-    private func fetchAllSessionContexts() {
-        let sessions = Array(sessionManager.sortedSessions.prefix(8))
-        guard !sessions.isEmpty else { return }
-        let index = contextMonitor.buildSessionFileIndex()
-        for session in sessions {
-            contextMonitor.fetchContextUsageFromFile(sessionId: session.sessionId, index: index)
-        }
     }
 
     private var footer: some View {

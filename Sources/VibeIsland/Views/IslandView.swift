@@ -75,7 +75,6 @@ struct IslandView: View {
 struct CompactIslandView: View {
     @Environment(StateManager.self) private var viewModel
     private var sessionManager: SessionManager { .shared }
-    private var contextMonitor: ContextMonitor { .shared }
 
     private var topSession: Session? {
         sessionManager.trackedSession
@@ -83,10 +82,6 @@ struct CompactIslandView: View {
 
     private var aggregateState: SessionState {
         sessionManager.trackedSessionState
-    }
-
-    private var contextSnapshot: ContextUsageSnapshot? {
-        contextMonitor.topSnapshot
     }
 
     /// 当前会话的上下文使用百分比
@@ -97,19 +92,9 @@ struct CompactIslandView: View {
     
     /// 当前会话的上下文使用率（0-100 整数）
     private var contextPercentInt: Int? {
-        guard let session = topSession else { return nil }
-        
-        // 优先从快照获取
-        if let snapshot = contextMonitor.snapshot(for: session.sessionId), snapshot.usageRatio > 0 {
-            return snapshot.usagePercent
-        }
-        
-        // 回退到 Session 模型的 contextUsage 字段
-        if let usage = session.contextUsage, usage > 0 {
-            return Int(usage * 100)
-        }
-        
-        return nil
+        guard let session = topSession,
+              let usage = session.contextUsage, usage > 0 else { return nil }
+        return Int(usage * 100)
     }
     
     /// 上下文百分比的颜色（<40% 绿色，40%-70% 橙色，>70% 红色）

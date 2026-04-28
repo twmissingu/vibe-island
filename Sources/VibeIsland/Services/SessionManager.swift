@@ -433,8 +433,26 @@ final class SessionManager: SessionAggregatable {
         let refreshFile = sessionsDir.appendingPathComponent("\(sessionId).refresh")
         try? "".write(to: refreshFile, atomically: true, encoding: .utf8)
         
-        // 立即获取新会话的 context_usage
-        contextMonitor.fetchContextUsageFromFile(sessionId: sessionId)
+        // 延迟获取新会话的 context_usage（带重试机制）
+        let monitor = contextMonitor
+        
+        // 首次尝试
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self else { return }
+            if let session = self.sessions[sessionId], let usage = session.contextUsage, usage > 0 {
+                monitor.setContextUsage(sessionId: sessionId, usage: usage, tokensUsed: session.contextTokensUsed, tokensTotal: session.contextTokensTotal, inputTokens: session.contextInputTokens, outputTokens: session.contextOutputTokens, reasoningTokens: session.contextReasoningTokens, toolUsage: session.toolUsage)
+            }
+            monitor.fetchContextUsageFromFile(sessionId: sessionId)
+        }
+        
+        // 重试一次（等待文件写入）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            guard let self = self else { return }
+            if let session = self.sessions[sessionId], let usage = session.contextUsage, usage > 0 {
+                monitor.setContextUsage(sessionId: sessionId, usage: usage, tokensUsed: session.contextTokensUsed, tokensTotal: session.contextTokensTotal, inputTokens: session.contextInputTokens, outputTokens: session.contextOutputTokens, reasoningTokens: session.contextReasoningTokens, toolUsage: session.toolUsage)
+            }
+            monitor.fetchContextUsageFromFile(sessionId: sessionId)
+        }
         // 持久化到设置
         viewModel?.settings.sessionTrackingMode = "manual"
         viewModel?.settings.pinnedSessionId = sessionId
