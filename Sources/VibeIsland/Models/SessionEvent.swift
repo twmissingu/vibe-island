@@ -114,6 +114,7 @@ public struct SessionEvent: Codable, Sendable {
     public let contextOutputTokens: Int?
     public let contextReasoningTokens: Int?
     public let toolUsage: [ToolUsage]?
+    public let skillUsage: [ToolUsage]?
     public let receivedAt: Date
 
     public init(
@@ -143,6 +144,7 @@ public struct SessionEvent: Codable, Sendable {
         contextOutputTokens: Int? = nil,
         contextReasoningTokens: Int? = nil,
         toolUsage: [ToolUsage]? = nil,
+        skillUsage: [ToolUsage]? = nil,
         receivedAt: Date = Date()
     ) {
         self.sessionId = sessionId
@@ -171,6 +173,7 @@ public struct SessionEvent: Codable, Sendable {
         self.contextOutputTokens = contextOutputTokens
         self.contextReasoningTokens = contextReasoningTokens
         self.toolUsage = toolUsage
+        self.skillUsage = skillUsage
         self.receivedAt = receivedAt
     }
 
@@ -201,6 +204,7 @@ public struct SessionEvent: Codable, Sendable {
         case contextOutputTokens = "context_output_tokens"
         case contextReasoningTokens = "context_reasoning_tokens"
         case toolUsage = "tool_usage"
+        case skillUsage = "skill_usage"
         case receivedAt = "received_at"
     }
 
@@ -232,6 +236,7 @@ public struct SessionEvent: Codable, Sendable {
         contextOutputTokens = try container.decodeIfPresent(Int.self, forKey: .contextOutputTokens)
         contextReasoningTokens = try container.decodeIfPresent(Int.self, forKey: .contextReasoningTokens)
         toolUsage = try container.decodeIfPresent([ToolUsage].self, forKey: .toolUsage)
+        skillUsage = try container.decodeIfPresent([ToolUsage].self, forKey: .skillUsage)
         receivedAt = Date()
     }
 
@@ -263,6 +268,7 @@ public struct SessionEvent: Codable, Sendable {
         try container.encodeIfPresent(contextOutputTokens, forKey: .contextOutputTokens)
         try container.encodeIfPresent(contextReasoningTokens, forKey: .contextReasoningTokens)
         try container.encodeIfPresent(toolUsage, forKey: .toolUsage)
+        try container.encodeIfPresent(skillUsage, forKey: .skillUsage)
         try container.encode(receivedAt, forKey: .receivedAt)
     }
 }

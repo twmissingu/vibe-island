@@ -122,6 +122,7 @@ public struct Session: Codable, Equatable, Sendable {
     public var contextOutputTokens: Int?
     public var contextReasoningTokens: Int?
     public var toolUsage: [ToolUsage]?
+    public var skillUsage: [ToolUsage]?
     public var fileURL: URL?
 
     enum CodingKeys: String, CodingKey {
@@ -146,6 +147,7 @@ public struct Session: Codable, Equatable, Sendable {
         case contextOutputTokens, context_output_tokens
         case contextReasoningTokens, context_reasoning_tokens
         case toolUsage, tool_usage
+        case skillUsage, skill_usage
     }
 
     public init(
@@ -170,6 +172,7 @@ public struct Session: Codable, Equatable, Sendable {
         contextOutputTokens: Int? = nil,
         contextReasoningTokens: Int? = nil,
         toolUsage: [ToolUsage]? = nil,
+        skillUsage: [ToolUsage]? = nil,
         fileURL: URL? = nil
     ) {
         self.sessionId = sessionId
@@ -193,6 +196,7 @@ public struct Session: Codable, Equatable, Sendable {
         self.contextOutputTokens = contextOutputTokens
         self.contextReasoningTokens = contextReasoningTokens
         self.toolUsage = toolUsage
+        self.skillUsage = skillUsage
         self.fileURL = fileURL
     }
 
@@ -219,6 +223,7 @@ public struct Session: Codable, Equatable, Sendable {
         contextOutputTokens = try Self.decodeFirstOptional(container, key1: .contextOutputTokens, key2: .context_output_tokens) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
         contextReasoningTokens = try Self.decodeFirstOptional(container, key1: .contextReasoningTokens, key2: .context_reasoning_tokens) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
         toolUsage = try Self.decodeFirstOptional(container, key1: .toolUsage, key2: .tool_usage) { c, k in try c.decodeIfPresent([ToolUsage].self, forKey: k) }
+        skillUsage = try Self.decodeFirstOptional(container, key1: .skillUsage, key2: .skill_usage) { c, k in try c.decodeIfPresent([ToolUsage].self, forKey: k) }
         fileURL = nil
     }
 
@@ -255,6 +260,7 @@ public struct Session: Codable, Equatable, Sendable {
         try container.encodeIfPresent(contextOutputTokens, forKey: .context_output_tokens)
         try container.encodeIfPresent(contextReasoningTokens, forKey: .context_reasoning_tokens)
         try container.encodeIfPresent(toolUsage, forKey: .tool_usage)
+        try container.encodeIfPresent(skillUsage, forKey: .skill_usage)
     }
 
     public func writeToFile() throws {
@@ -286,6 +292,32 @@ extension Session {
         source = event.source ?? source
         sessionName = event.sessionName ?? sessionName
         notificationMessage = nil
+        
+        // 更新上下文数据（如果事件中包含）
+        if let contextUsage = event.contextUsage {
+            self.contextUsage = contextUsage
+        }
+        if let contextTokensUsed = event.contextTokensUsed {
+            self.contextTokensUsed = contextTokensUsed
+        }
+        if let contextTokensTotal = event.contextTokensTotal {
+            self.contextTokensTotal = contextTokensTotal
+        }
+        if let contextInputTokens = event.contextInputTokens {
+            self.contextInputTokens = contextInputTokens
+        }
+        if let contextOutputTokens = event.contextOutputTokens {
+            self.contextOutputTokens = contextOutputTokens
+        }
+        if let contextReasoningTokens = event.contextReasoningTokens {
+            self.contextReasoningTokens = contextReasoningTokens
+        }
+        if let toolUsage = event.toolUsage {
+            self.toolUsage = toolUsage
+        }
+        if let skillUsage = event.skillUsage {
+            self.skillUsage = skillUsage
+        }
 
         switch event.hookEventName {
         case .userPromptSubmit:

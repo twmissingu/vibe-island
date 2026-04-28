@@ -99,6 +99,7 @@ export const vibeIsland = async ({ directory }) => {
   let sessionName = null;
   let modelContextLimit = 200000; // default to 200K
   let toolCounts = {}; // Track tool usage counts for this session
+  let skillCounts = {}; // Track skill usage counts for this session
   
   function basePayload() {
     return {
@@ -129,6 +130,7 @@ export const vibeIsland = async ({ directory }) => {
           // Reset model context limit and tool counts for new session
           modelContextLimit = 200000;
           toolCounts = {};
+          skillCounts = {};
           callHook(hookBin, "SessionStart", basePayload());
           break;
 
@@ -217,6 +219,11 @@ export const vibeIsland = async ({ directory }) => {
         .sort((a, b) => b[1] - a[1])
         .map(([name, count]) => ({ name, count }));
       
+      // Sort skill usage by count descending
+      const sortedSkillUsage = Object.entries(skillCounts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, count]) => ({ name, count }));
+      
       // Send context usage info with the message
       const contextMsg = `Context usage: ${usagePercent}% (${totalTokens}/${modelContextLimit} tokens)`;
       callHook(hookBin, "UserPromptSubmit", {
@@ -229,6 +236,7 @@ export const vibeIsland = async ({ directory }) => {
         context_output_tokens: outputTokens,
         context_reasoning_tokens: reasoningTokens,
         tool_usage: sortedToolUsage,
+        skill_usage: sortedSkillUsage,
       });
     },
 
@@ -249,6 +257,15 @@ export const vibeIsland = async ({ directory }) => {
 
     "tool.execute.after": async () => {
       callHook(hookBin, "PostToolUse", basePayload());
+    },
+
+    // ---- Skill execution events ----
+    "skill.execute.before": async (_input, output) => {
+      const skill = output?.skill || _input?.skill;
+      // Track skill usage
+      if (skill) {
+        skillCounts[skill] = (skillCounts[skill] || 0) + 1;
+      }
     },
 
     // ---- Permission events ----

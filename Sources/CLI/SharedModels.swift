@@ -188,6 +188,7 @@ public struct SessionEvent: Codable, Sendable {
     public let contextOutputTokens: Int?
     public let contextReasoningTokens: Int?
     public let toolUsage: [ToolUsage]?
+    public let skillUsage: [ToolUsage]?
     public let receivedAt: Date
 
     public init(
@@ -215,6 +216,7 @@ public struct SessionEvent: Codable, Sendable {
         contextOutputTokens: Int? = nil,
         contextReasoningTokens: Int? = nil,
         toolUsage: [ToolUsage]? = nil,
+        skillUsage: [ToolUsage]? = nil,
         receivedAt: Date = Date()
     ) {
         self.sessionId = sessionId
@@ -241,6 +243,7 @@ public struct SessionEvent: Codable, Sendable {
         self.contextOutputTokens = contextOutputTokens
         self.contextReasoningTokens = contextReasoningTokens
         self.toolUsage = toolUsage
+        self.skillUsage = skillUsage
         self.receivedAt = receivedAt
     }
 
@@ -269,6 +272,7 @@ public struct SessionEvent: Codable, Sendable {
         case contextOutputTokens = "context_output_tokens"
         case contextReasoningTokens = "context_reasoning_tokens"
         case toolUsage = "tool_usage"
+        case skillUsage = "skill_usage"
     }
 
     public init(from decoder: Decoder) throws {
@@ -297,6 +301,7 @@ public struct SessionEvent: Codable, Sendable {
         contextOutputTokens = try container.decodeIfPresent(Int.self, forKey: .contextOutputTokens)
         contextReasoningTokens = try container.decodeIfPresent(Int.self, forKey: .contextReasoningTokens)
         toolUsage = try container.decodeIfPresent([ToolUsage].self, forKey: .toolUsage)
+        skillUsage = try container.decodeIfPresent([ToolUsage].self, forKey: .skillUsage)
         receivedAt = Date()
     }
 }
@@ -370,6 +375,7 @@ public struct Session: Codable, Equatable, Sendable {
     public var contextOutputTokens: Int?
     public var contextReasoningTokens: Int?
     public var toolUsage: [ToolUsage]?
+    public var skillUsage: [ToolUsage]?
     public var fileURL: URL?
 
     enum CodingKeys: String, CodingKey {
@@ -394,6 +400,7 @@ public struct Session: Codable, Equatable, Sendable {
         case contextOutputTokens, context_output_tokens
         case contextReasoningTokens, context_reasoning_tokens
         case toolUsage, tool_usage
+        case skillUsage, skill_usage
     }
 
     public init(
@@ -418,6 +425,7 @@ public struct Session: Codable, Equatable, Sendable {
         contextOutputTokens: Int? = nil,
         contextReasoningTokens: Int? = nil,
         toolUsage: [ToolUsage]? = nil,
+        skillUsage: [ToolUsage]? = nil,
         fileURL: URL? = nil
     ) {
         self.sessionId = sessionId
@@ -441,6 +449,7 @@ public struct Session: Codable, Equatable, Sendable {
         self.contextOutputTokens = contextOutputTokens
         self.contextReasoningTokens = contextReasoningTokens
         self.toolUsage = toolUsage
+        self.skillUsage = skillUsage
         self.fileURL = fileURL
     }
 
@@ -468,6 +477,7 @@ public struct Session: Codable, Equatable, Sendable {
         contextOutputTokens = try Self.decodeFirstOptional(container, key1: .contextOutputTokens, key2: .context_output_tokens) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
         contextReasoningTokens = try Self.decodeFirstOptional(container, key1: .contextReasoningTokens, key2: .context_reasoning_tokens) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
         toolUsage = try Self.decodeFirstOptional(container, key1: .toolUsage, key2: .tool_usage) { c, k in try c.decodeIfPresent([ToolUsage].self, forKey: k) }
+        skillUsage = try Self.decodeFirstOptional(container, key1: .skillUsage, key2: .skill_usage) { c, k in try c.decodeIfPresent([ToolUsage].self, forKey: k) }
         fileURL = nil
     }
 
@@ -504,6 +514,7 @@ public struct Session: Codable, Equatable, Sendable {
         try container.encodeIfPresent(contextOutputTokens, forKey: .context_output_tokens) // 输出蛇形键名保持兼容
         try container.encodeIfPresent(contextReasoningTokens, forKey: .context_reasoning_tokens) // 输出蛇形键名保持兼容
         try container.encodeIfPresent(toolUsage, forKey: .tool_usage) // 输出蛇形键名保持兼容
+        try container.encodeIfPresent(skillUsage, forKey: .skill_usage) // 输出蛇形键名保持兼容
     }
 
     public func writeToFile() throws {

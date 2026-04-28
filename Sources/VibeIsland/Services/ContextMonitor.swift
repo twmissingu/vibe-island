@@ -29,6 +29,8 @@ struct ContextUsageSnapshot: Equatable, Sendable {
     let reasoningTokens: Int?
     /// 工具使用列表
     let toolUsage: [ToolUsage]?
+    /// 技能使用列表
+    let skillUsage: [ToolUsage]?
     /// 快照时间
     let timestamp: Date
 
@@ -41,6 +43,7 @@ struct ContextUsageSnapshot: Equatable, Sendable {
         outputTokens: Int? = nil,
         reasoningTokens: Int? = nil,
         toolUsage: [ToolUsage]? = nil,
+        skillUsage: [ToolUsage]? = nil,
         timestamp: Date = Date()
     ) {
         self.sessionId = sessionId
@@ -51,6 +54,7 @@ struct ContextUsageSnapshot: Equatable, Sendable {
         self.outputTokens = outputTokens
         self.reasoningTokens = reasoningTokens
         self.toolUsage = toolUsage
+        self.skillUsage = skillUsage
         self.timestamp = timestamp
     }
 
@@ -167,11 +171,24 @@ final class ContextMonitor {
         // 尝试从 session 的 notificationMessage 中解析上下文使用率
         // 这通常在 PreCompact 事件时被设置
         if let message = session.notificationMessage {
-            if let snapshot = parseContextUsage(from: message, sessionId: session.sessionId) {
-                updateSnapshot(sessionId: session.sessionId, snapshot: snapshot)
+            if var snapshot = parseContextUsage(from: message, sessionId: session.sessionId) {
+                // 如果原始快照缺少 skillUsage 但会话有数据，补充进去
+                let updatedSnapshot = ContextUsageSnapshot(
+                    sessionId: snapshot.sessionId,
+                    usageRatio: snapshot.usageRatio,
+                    tokensUsed: snapshot.tokensUsed,
+                    tokensTotal: snapshot.tokensTotal,
+                    inputTokens: snapshot.inputTokens,
+                    outputTokens: snapshot.outputTokens,
+                    reasoningTokens: snapshot.reasoningTokens,
+                    toolUsage: session.toolUsage,
+                    skillUsage: session.skillUsage,
+                    timestamp: session.lastActivity
+                )
+                updateSnapshot(sessionId: session.sessionId, snapshot: updatedSnapshot)
 
                 // 同步更新 Session 模型的上下文属性
-                updateSessionContext(session, snapshot: snapshot)
+                updateSessionContext(session, snapshot: updatedSnapshot)
                 return
             }
         }
@@ -187,6 +204,7 @@ final class ContextMonitor {
                 outputTokens: session.contextOutputTokens,
                 reasoningTokens: session.contextReasoningTokens,
                 toolUsage: session.toolUsage,
+                skillUsage: session.skillUsage,
                 timestamp: session.lastActivity
             )
             updateSnapshot(sessionId: session.sessionId, snapshot: snapshot)
@@ -202,7 +220,8 @@ final class ContextMonitor {
         inputTokens: Int? = nil,
         outputTokens: Int? = nil,
         reasoningTokens: Int? = nil,
-        toolUsage: [ToolUsage]? = nil
+        toolUsage: [ToolUsage]? = nil,
+        skillUsage: [ToolUsage]? = nil
     ) {
         let snapshot = ContextUsageSnapshot(
             sessionId: sessionId,
@@ -213,6 +232,7 @@ final class ContextMonitor {
             outputTokens: outputTokens,
             reasoningTokens: reasoningTokens,
             toolUsage: toolUsage,
+            skillUsage: skillUsage,
             timestamp: Date()
         )
         updateSnapshot(sessionId: sessionId, snapshot: snapshot)
@@ -303,6 +323,11 @@ final class ContextMonitor {
                         guard let name = dict["name"] as? String, let count = dict["count"] as? Int else { return nil }
                         return ToolUsage(name: name, count: count)
                     }
+                    let skillUsageRaw = json["skill_usage"] as? [[String: Any]]
+                    let skillUsage = skillUsageRaw?.compactMap { dict -> ToolUsage? in
+                        guard let name = dict["name"] as? String, let count = dict["count"] as? Int else { return nil }
+                        return ToolUsage(name: name, count: count)
+                    }
                     
                     setContextUsage(
                         sessionId: sessionId,
@@ -312,7 +337,8 @@ final class ContextMonitor {
                         inputTokens: inputTokens,
                         outputTokens: outputTokens,
                         reasoningTokens: reasoningTokens,
-                        toolUsage: toolUsage
+                        toolUsage: toolUsage,
+                        skillUsage: skillUsage
                     )
                     Self.logger.debug("从文件获取上下文 usage: \(sessionId) = \(usage)")
                     return
@@ -348,11 +374,17 @@ final class ContextMonitor {
                 guard let name = dict["name"] as? String, let count = dict["count"] as? Int else { return nil }
                 return ToolUsage(name: name, count: count)
             }
+            let skillUsageRaw = json["skill_usage"] as? [[String: Any]]
+            let skillUsage = skillUsageRaw?.compactMap { dict -> ToolUsage? in
+                guard let name = dict["name"] as? String, let count = dict["count"] as? Int else { return nil }
+                return ToolUsage(name: name, count: count)
+            }
             setContextUsage(
                 sessionId: sessionId, usage: usage,
                 tokensUsed: tokensUsed, tokensTotal: tokensTotal,
                 inputTokens: inputTokens, outputTokens: outputTokens,
-                reasoningTokens: reasoningTokens, toolUsage: toolUsage
+                reasoningTokens: reasoningTokens, toolUsage: toolUsage,
+                skillUsage: skillUsage
             )
             return
         }

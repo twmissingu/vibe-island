@@ -146,32 +146,27 @@ struct ContextUsageCard: View {
             }
             .frame(height: 8)
 
-            // Token 概览行
-            if let used = snapshot.tokensUsed, let total = snapshot.tokensTotal {
-                HStack {
-                    tokenCell("USED", value: used)
-                    Spacer()
-                    tokenCell("TOTAL", value: total)
-                    Spacer()
-                    if let remaining = snapshot.tokensRemaining {
-                        tokenCell("REMAIN", value: remaining)
+            // Token 统计表格（两行三列对齐）
+            Grid(alignment: .center, horizontalSpacing: 8, verticalSpacing: 8) {
+                // 第一行：USED / TOTAL / REMAIN
+                if let used = snapshot.tokensUsed, let total = snapshot.tokensTotal {
+                    GridRow {
+                        tokenCell("USED", value: used)
+                        tokenCell("TOTAL", value: total)
+                        if let remaining = snapshot.tokensRemaining {
+                            tokenCell("REMAIN", value: remaining)
+                        } else {
+                            tokenCell("REMAIN", value: nil)
+                        }
                     }
                 }
-            }
-
-            // Token 分类行
-            if hasCategoryTokens {
-                HStack {
-                    if let input = snapshot.inputTokens, input > 0 {
-                        tokenCell("INPUT", value: input)
-                        Spacer()
-                    }
-                    if let output = snapshot.outputTokens, output > 0 {
-                        tokenCell("OUTPUT", value: output)
-                        Spacer()
-                    }
-                    if let reasoning = snapshot.reasoningTokens, reasoning > 0 {
-                        tokenCell("REASONING", value: reasoning)
+                
+                // 第二行：INPUT / OUTPUT / REASONING
+                if hasCategoryTokens || snapshot.inputTokens != nil || snapshot.outputTokens != nil || snapshot.reasoningTokens != nil {
+                    GridRow {
+                        tokenCell("INPUT", value: snapshot.inputTokens ?? 0, showIfZero: false)
+                        tokenCell("OUTPUT", value: snapshot.outputTokens ?? 0, showIfZero: false)
+                        tokenCell("REASONING", value: snapshot.reasoningTokens ?? 0, showIfZero: false)
                     }
                 }
             }
@@ -191,7 +186,33 @@ struct ContextUsageCard: View {
 
                             Spacer()
 
-                            Text("\(tool.count) (\(toolPercent(tool)))")
+                            Text("\(tool.count) (\(toolPercent(tool)))%")
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+
+            // 技能使用行
+            if let skills = snapshot.skillUsage, !skills.isEmpty {
+                Divider()
+                    .opacity(0.2)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("SKILL USAGE")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.secondary)
+
+                    ForEach(skills, id: \.name) { skill in
+                        HStack {
+                            Text(skill.name.uppercased())
+                                .font(.system(size: 10))
+                                .foregroundStyle(.primary)
+
+                            Spacer()
+
+                            Text("\(skill.count) (\(skillPercent(skill)))%")
                                 .font(.system(size: 10, design: .monospaced))
                                 .foregroundStyle(.secondary)
                         }
@@ -248,6 +269,16 @@ struct ContextUsageCard: View {
         return Int(Double(tool.count) / Double(total) * 100)
     }
 
+    private var totalSkillCount: Int {
+        snapshot.skillUsage?.reduce(0) { $0 + $1.count } ?? 0
+    }
+
+    private func skillPercent(_ skill: ToolUsage) -> Int {
+        let total = totalSkillCount
+        guard total > 0 else { return 0 }
+        return Int(Double(skill.count) / Double(total) * 100)
+    }
+
     private func formatTokenCount(_ count: Int) -> String {
         if count >= 1_000_000 {
             return String(format: "%.1fM", Double(count) / 1_000_000)
@@ -257,15 +288,22 @@ struct ContextUsageCard: View {
         return "\(count)"
     }
 
-    private func tokenCell(_ label: String, value: Int) -> some View {
+    private func tokenCell(_ label: String, value: Int?, showIfZero: Bool = true) -> some View {
         VStack(spacing: 2) {
             Text(label)
                 .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(.secondary)
-            Text(formatTokenCount(value))
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(.primary)
+                .foregroundStyle((value == nil || (value! == 0 && !showIfZero)) ? .tertiary : .secondary)
+            if let val = value, (val > 0 || showIfZero) {
+                Text(formatTokenCount(val))
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.primary)
+            } else {
+                Text("--")
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+            }
         }
+        .frame(maxWidth: .infinity)
     }
 
 
