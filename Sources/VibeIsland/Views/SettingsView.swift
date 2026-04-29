@@ -124,26 +124,6 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-
-                if !detectedTools.isEmpty {
-                    HStack {
-                        Text(NSLocalizedString("settings.detectedTools", comment: "Detected"))
-                        Spacer()
-                        ForEach(detectedTools, id: \.self) { tool in
-                            Label(tool.displayName, systemImage: "checkmark.circle.fill")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.green)
-                        }
-                    }
-                } else {
-                    HStack {
-                        Text(NSLocalizedString("settings.detectedTools", comment: "Detected"))
-                        Spacer()
-                        Text(NSLocalizedString("settings.none", comment: "None"))
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    }
-                }
             }
 
             // MARK: - 插件
@@ -155,12 +135,28 @@ struct SettingsView: View {
                         Task { await performHookAction() }
                     })
                 }
+                if let msg = hookMessage {
+                    HStack {
+                        Text(msg)
+                            .font(.system(size: 10))
+                            .foregroundStyle(msg.hasPrefix("失败") || msg.hasPrefix("错误") ? .red : .green)
+                        Spacer()
+                    }
+                }
                 HStack {
                     Text("OpenCode")
                     Spacer()
                     pluginButton(isInstalled: openCodePluginStatus == .installed, action: {
                         Task { await performOpenCodePluginAction() }
                     })
+                }
+                if let msg = openCodePluginMessage {
+                    HStack {
+                        Text(msg)
+                            .font(.system(size: 10))
+                            .foregroundStyle(openCodePluginMessageIsError ? .red : .green)
+                        Spacer()
+                    }
                 }
             } header: {
                 HStack {
@@ -183,7 +179,7 @@ struct SettingsView: View {
             .background(Color(white: 0.08))
             .scrollContentBackground(.hidden)
             .preferredColorScheme(.dark)
-.tint(.blue)
+            .tint(.blue)
             .onAppear {
                 // Force state refresh on appear
                 loadSoundSettings()
@@ -259,7 +255,7 @@ struct SettingsView: View {
             hookMessage = msg
             await refreshHookStatus()
         case .failure(let error):
-            hookMessage = NSLocalizedString("settings.saveFailed", comment: "Save failed: %@")
+            hookMessage = "保存失败: \(error.localizedDescription)"
             await refreshHookStatus()
         }
     }
@@ -331,7 +327,7 @@ struct SettingsView: View {
             openCodePluginMessage = msg
             await refreshOpenCodePluginStatus()
         case .failure(let error):
-            openCodePluginMessage = NSLocalizedString("settings.saveFailed", comment: "Save failed: %@")
+            openCodePluginMessage = "失败: \(error.localizedDescription)"
             await refreshOpenCodePluginStatus()
         }
     }

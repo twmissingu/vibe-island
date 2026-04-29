@@ -116,19 +116,23 @@ final class StateManager {
         let result = await hookInstaller.install()
         switch result {
         case .success(let backupPath):
-            let msg = String(format: NSLocalizedString("hook.install.success.message", value: "Hooks 安装成功，备份: %@", comment: ""), backupPath)
+            let msg = backupPath != nil 
+                ? String(format: NSLocalizedString("hook.install.success.detail", value: "Hooks 安装成功，备份位置: %@", comment: ""), backupPath!)
+                : NSLocalizedString("hook.install.success.title", value: "Hooks 安装成功", comment: "")
             return .success(msg)
         case .failure(let error):
             return .failure(error)
         }
     }
-
+    
     /// 卸载 hooks（返回 Result，调用方自行处理 UI 反馈）
     func uninstallHooks() async -> Result<String, Error> {
         let result = await hookInstaller.uninstall()
         switch result {
         case .success(let backupPath):
-            let msg = String(format: NSLocalizedString("hook.uninstall.success.message", value: "Hooks 卸载成功，备份: %@", comment: ""), backupPath)
+            let msg = backupPath != nil
+                ? String(format: NSLocalizedString("hook.uninstall.success.detail", value: "Hooks 卸载成功，备份位置: %@", comment: ""), backupPath!)
+                : NSLocalizedString("hook.uninstall.success.title", value: "Hooks 卸载成功", comment: "")
             return .success(msg)
         case .failure(let error):
             return .failure(error)

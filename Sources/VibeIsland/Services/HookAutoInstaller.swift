@@ -21,13 +21,171 @@ final class HookAutoInstaller {
     // MARK: - 常量
     
     /// Claude Code 全局配置路径
-    static let claudeSettingsPath = NSString("~/").expandingTildeInPath + ".claude/settings.json"
+    static let claudeSettingsPath = NSString("~/.claude/settings.json").expandingTildeInPath
     
     /// 配置备份目录
-    static let backupDirectory = NSString("~/").expandingTildeInPath + ".claude/vibe-island-backups"
+    static let backupDirectory = NSString("~/.claude/vibe-island-backups").expandingTildeInPath
     
     /// 内置 hooks 配置资源名
     static let hooksConfigResourceName = "hooks-config"
+    
+    // MARK: - 安全书签相关常量
+    
+    /// 用户默认设置中存储安全书签的 key
+    private static let claudeDirBookmarkKey = "claude-dir-bookmark"
+    
+    /// Claude 目录路径
+    static let claudeDirPath = NSString("~/.claude").expandingTildeInPath
+    
+    // MARK: - 安全书签管理
+    
+    /// 缓存的目录访问权限
+    private var claudeDirAccessGranted = false
+    
+    /// 当前正在访问的安全范围 URL（用于平衡 stopAccessingSecurityScopedResource）
+    private var currentSecurityScopedURL: URL?
+    
+    /// 请求目录授权（弹出 NSOpenPanel）
+    func requestDirectoryAuthorization() async -> Bool {
+        NSLog("[HookAutoInstaller] requestDirectoryAuthorization 开始")
+        
+        // 如果已经授权，直接返回
+        if claudeDirAccessGranted {
+            NSLog("[HookAutoInstaller] 已有目录授权，跳过")
+            return true
+        }
+        
+        // 尝试从书签恢复权限
+        NSLog("[HookAutoInstaller] 尝试从书签恢复权限")
+        if await restoreBookmarkAccess() {
+            claudeDirAccessGranted = true
+            NSLog("[HookAutoInstaller] 从书签恢复权限成功")
+            return true
+        }
+        
+        // 弹出 NSOpenPanel 让用户选择目录
+        NSLog("[HookAutoInstaller] 弹出目录选择面板")
+        return await showDirectorySelectionPanel()
+    }
+    
+    /// 显示目录选择面板
+    private func showDirectorySelectionPanel() async -> Bool {
+        NSLog("[HookAutoInstaller] showDirectorySelectionPanel 开始")
+        
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.main.async { [weak self] in
+                NSLog("[HookAutoInstaller] 在主线程创建 NSOpenPanel")
+                
+                let panel = NSOpenPanel()
+                panel.title = NSLocalizedString("hook.auth.title", value: "授权访问 Claude 配置目录", comment: "")
+                panel.message = NSLocalizedString("hook.auth.message", value: "请选择 ~/.claude 目录以授权 Vibe Island 访问 Claude Code 配置文件", comment: "")
+                panel.canChooseFiles = false
+                panel.canChooseDirectories = true
+                panel.canCreateDirectories = false
+                panel.allowsMultipleSelection = false
+                panel.showsHiddenFiles = true
+                
+                // 设置默认目录为 ~/.claude
+                let claudeDir = URL(fileURLWithPath: Self.claudeDirPath)
+                if FileManager.default.fileExists(atPath: Self.claudeDirPath) {
+                    panel.directoryURL = claudeDir
+                }
+                
+                NSLog("[HookAutoInstaller] 准备显示面板")
+                
+                // 使用 runModal 同步显示面板
+                let response = panel.runModal()
+                NSLog("[HookAutoInstaller] 面板响应: \(response.rawValue)")
+                
+                guard response == .OK, let url = panel.url else {
+                    NSLog("[HookAutoInstaller] 用户取消了目录授权")
+                    continuation.resume(returning: false)
+                    return
+                }
+                
+                NSLog("[HookAutoInstaller] 用户选择的目录: \(url.path)")
+                
+                // 验证选择的目录是否为 ~/.claude
+                let selectedPath = url.path
+                if selectedPath != Self.claudeDirPath {
+                    NSLog("[HookAutoInstaller] 用户选择了错误的目录: \(selectedPath)")
+                    continuation.resume(returning: false)
+                    return
+                }
+                
+                // 保存安全书签
+                if self?.saveBookmark(for: url) == true {
+                    self?.claudeDirAccessGranted = true
+                    NSLog("[HookAutoInstaller] 目录授权成功")
+                    continuation.resume(returning: true)
+                } else {
+                    NSLog("[HookAutoInstaller] 保存安全书签失败")
+                    continuation.resume(returning: false)
+                }
+            }
+        }
+    }
+    
+    /// 保存安全书签
+    private func saveBookmark(for url: URL) -> Bool {
+        do {
+            let bookmarkData = try url.bookmarkData(
+                options: [.withSecurityScope],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+            UserDefaults.standard.set(bookmarkData, forKey: Self.claudeDirBookmarkKey)
+            Self.logger.info("安全书签保存成功")
+            return true
+        } catch {
+            Self.logger.error("保存安全书签失败: \(error.localizedDescription)")
+            return false
+        }
+    }
+    
+    /// 从书签恢复访问权限
+    private func restoreBookmarkAccess() async -> Bool {
+        guard let bookmarkData = UserDefaults.standard.data(forKey: Self.claudeDirBookmarkKey) else {
+            return false
+        }
+        
+        do {
+            var isStale = false
+            let url = try URL(
+                resolvingBookmarkData: bookmarkData,
+                options: [.withSecurityScope],
+                relativeTo: nil,
+                bookmarkDataIsStale: &isStale
+            )
+            
+            if isStale {
+                Self.logger.warning("安全书签已过期，需要重新授权")
+                return false
+            }
+            
+            // 开始访问目录
+            if url.startAccessingSecurityScopedResource() {
+                currentSecurityScopedURL = url
+                Self.logger.info("从书签恢复目录访问成功")
+                return true
+            } else {
+                Self.logger.error("无法访问安全范围资源")
+                return false
+            }
+        } catch {
+            Self.logger.error("解析安全书签失败: \(error.localizedDescription)")
+            return false
+        }
+    }
+    
+    /// 停止访问安全范围资源
+    private func stopAccessingSecurityScopedResource() {
+        if let url = currentSecurityScopedURL {
+            url.stopAccessingSecurityScopedResource()
+            currentSecurityScopedURL = nil
+            Self.logger.info("已停止访问安全范围资源")
+        }
+    }
     
     // MARK: - 日志
     
@@ -54,51 +212,69 @@ final class HookAutoInstaller {
     /// 安装 hooks 到 Claude Code 配置
     /// - Returns: 安装结果
     func install() async -> InstallResult {
+        NSLog("[HookAutoInstaller] install() 开始")
+        
         // 0. 检查并修复权限
         let permissionResult = await checkAndFixPermissions()
         if case .failure(let error) = permissionResult {
+            NSLog("[HookAutoInstaller] 权限检查失败: %@", error.localizedDescription)
             return .failure(error)
         }
         
         // 1. 检测 Claude Code
         guard isClaudeCodeInstalled else {
+            NSLog("[HookAutoInstaller] Claude Code 未安装")
             return .failure(.claudeCodeNotFound)
         }
+        
+        NSLog("[HookAutoInstaller] Claude Code 已安装")
         
         // 2. 读取现有配置
         let existingSettings: ClaudeSettings
         if let settings = readClaudeSettings() {
             existingSettings = settings
+            NSLog("[HookAutoInstaller] 读取现有配置成功")
         } else {
             // 配置文件不存在，创建新文件
             existingSettings = ClaudeSettings(hooks: [:])
+            NSLog("[HookAutoInstaller] 配置文件不存在，创建新配置")
         }
         
-        // 3. 备份原有配置
-        let backupPath: String
+        // 3. 备份原有配置（可选，失败不阻断安装）
+        var backupPath: String? = nil
         do {
             backupPath = try backupCurrentSettings(existingSettings)
+            NSLog("[HookAutoInstaller] 配置备份成功: %@", backupPath ?? "nil")
         } catch {
-            return .failure(.backupFailed(error))
+            NSLog("[HookAutoInstaller] 配置备份失败（沙盒限制），继续安装: %@", error.localizedDescription)
+            backupPath = nil
         }
         
         // 4. 加载内置 hooks 配置
         guard let newHooks = loadBuiltInHooksConfig() else {
+            NSLog("[HookAutoInstaller] 加载内置配置失败")
             return .failure(.configNotFound)
         }
         
+        NSLog("[HookAutoInstaller] 加载内置配置成功")
+        
         // 5. 合并配置（非破坏性更新）
         let mergedSettings = mergeHooks(existing: existingSettings, newHooks: newHooks)
+        NSLog("[HookAutoInstaller] 配置合并完成")
         
         // 6. 写入配置
         do {
             try writeClaudeSettings(mergedSettings)
+            NSLog("[HookAutoInstaller] 配置写入成功")
         } catch {
+            NSLog("[HookAutoInstaller] 配置写入失败: %@", error.localizedDescription)
             // 写入失败，尝试回滚
-            do {
-                try restoreFromBackup(backupPath)
-            } catch {
-                Self.logger.error("回滚也失败了: \(error.localizedDescription)")
+            if let bp = backupPath {
+                do {
+                    try restoreFromBackup(bp)
+                } catch {
+                    Self.logger.error("回滚也失败了: \(error.localizedDescription)")
+                }
             }
             return .failure(.writeFailed(error))
         }
@@ -106,7 +282,10 @@ final class HookAutoInstaller {
         // 7. 清理备份（成功时保留备份 7 天）
         scheduleBackupCleanup()
         
-        Self.logger.info("Hooks 安装成功，备份位置: \(backupPath)")
+        // 8. 停止访问安全范围资源
+        stopAccessingSecurityScopedResource()
+        
+        Self.logger.info("Hooks 安装成功，备份位置: \(backupPath ?? "无")")
         return .success(backupPath: backupPath)
     }
     
@@ -136,12 +315,13 @@ final class HookAutoInstaller {
             return .failure(.notInstalled)
         }
         
-        // 4. 备份
-        let backupPath: String
+        // 4. 备份（可选，失败不阻断卸载）
+        var backupPath: String? = nil
         do {
             backupPath = try backupCurrentSettings(settings)
+            Self.logger.info("配置备份成功: \(backupPath ?? "nil")")
         } catch {
-            return .failure(.backupFailed(error))
+            Self.logger.warning("配置备份失败，继续卸载: \(error.localizedDescription)")
         }
         
         // 5. 移除 VibeIsland hooks
@@ -152,15 +332,20 @@ final class HookAutoInstaller {
             try writeClaudeSettings(cleanedSettings)
         } catch {
             // 写入失败，尝试回滚
-            do {
-                try restoreFromBackup(backupPath)
-            } catch {
-                Self.logger.error("回滚也失败了: \(error.localizedDescription)")
+            if let bp = backupPath {
+                do {
+                    try restoreFromBackup(bp)
+                } catch {
+                    Self.logger.error("回滚也失败了: \(error.localizedDescription)")
+                }
             }
             return .failure(.writeFailed(error))
         }
         
-        Self.logger.info("Hooks 卸载成功，备份位置: \(backupPath)")
+        // 7. 停止访问安全范围资源
+        stopAccessingSecurityScopedResource()
+        
+        Self.logger.info("Hooks 卸载成功，备份位置: \(backupPath ?? "无")")
         return .success(backupPath: backupPath)
     }
     
@@ -294,16 +479,22 @@ final class HookAutoInstaller {
         let path = Self.claudeSettingsPath
         let dirPath = (path as NSString).deletingLastPathComponent
         
+        NSLog("[HookAutoInstaller] writeClaudeSettings 开始, path=%@", path)
+        
         // 确保目录存在
         let fm = FileManager.default
         if !fm.fileExists(atPath: dirPath) {
+            NSLog("[HookAutoInstaller] 创建目录: %@", dirPath)
             try fm.createDirectory(atPath: dirPath, withIntermediateDirectories: true)
         }
         
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(settings)
+        
+        NSLog("[HookAutoInstaller] 写入配置文件, 大小=%lu bytes", data.count)
         try data.write(to: URL(fileURLWithPath: path), options: .atomic)
+        NSLog("[HookAutoInstaller] writeClaudeSettings 完成")
     }
     
     /// 备份当前配置
@@ -443,72 +634,40 @@ final class HookAutoInstaller {
     /// 检查并自动修复 ~/.claude 目录权限
     private func checkAndFixPermissions() async -> Result<Void, HookError> {
         let fm = FileManager.default
-        let claudeDir = NSString("~/.claude").expandingTildeInPath
-        let settingsPath = claudeDir + "/settings.json"
         
-        // 先执行权限修复，确保目录存在且可访问
-        let fixSuccess = await runPermissionFixCommand()
-        if !fixSuccess {
-            return .failure(.permissionDenied("""
-            权限不足，无法访问~/.claude目录。
-            请在「系统设置→隐私与安全性→完全磁盘访问」中给Vibe Island开启权限，重启App后重试。
-            """))
+        NSLog("[HookAutoInstaller] checkAndFixPermissions 开始, claudeDirPath=%@", Self.claudeDirPath)
+        
+        // 1. 检查 ~/.claude 目录是否存在
+        guard fm.fileExists(atPath: Self.claudeDirPath) else {
+            NSLog("[HookAutoInstaller] ~/.claude 目录不存在, 路径=%@", Self.claudeDirPath)
+            return .failure(.permissionDenied("未找到 Claude Code 配置目录 (~/.claude)。请先安装并运行 Claude Code。"))
         }
         
-        // 修复后验证访问
-        do {
-            // 尝试写入测试文件验证权限
-            let testFile = claudeDir + "/.vibetest"
-            try "test".write(toFile: testFile, atomically: true, encoding: .utf8)
-            try fm.removeItem(atPath: testFile)
-            Self.logger.info("目录权限验证通过")
-        } catch {
-            Self.logger.error("权限验证失败: \(error.localizedDescription)")
-            return .failure(.permissionDenied("""
-            权限不足，无法写入~/.claude目录。
-            请在「系统设置→隐私与安全性→完全磁盘访问」中给Vibe Island开启权限，重启App后重试。
-            """))
+        NSLog("[HookAutoInstaller] ~/.claude 目录存在，请求授权")
+        
+        // 2. 请求目录授权（弹出 NSOpenPanel 或从书签恢复）
+        let authorized = await requestDirectoryAuthorization()
+        NSLog("[HookAutoInstaller] 授权结果: \(authorized)")
+        
+        if !authorized {
+            return .failure(.permissionDenied("需要授权访问 ~/.claude 目录才能安装 Hook。"))
         }
         
-        // 2. 检查目录权限
-        do {
-            let dirAttrs = try fm.attributesOfItem(atPath: claudeDir)
-            let dirPerm = dirAttrs[.posixPermissions] as? Int ?? 0
-            let dirOwner = dirAttrs[.ownerAccountID] as? uid_t ?? 0
-            
-            // 如果目录没有读写权限或者所有者不是当前用户，尝试修复
-            if (dirPerm & 0o700) != 0o700 || dirOwner != getuid() {
-                Self.logger.warning("~/.claude 目录权限异常，权限: \(String(dirPerm, radix: 8)), 所有者: \(dirOwner), 当前用户: \(getuid())")
-                let fixSuccess = await runPermissionFixCommand()
-                if !fixSuccess {
-                    return .failure(.permissionDenied("~/.claude 目录权限不足"))
-                }
-            }
-        } catch {
-            Self.logger.error("读取目录权限失败: \(error.localizedDescription)")
-            return .failure(.permissionDenied("无法读取 ~/.claude 目录权限"))
-        }
-        
-        // 3. 如果配置文件存在，检查文件权限
+        // 3. 验证写入权限
+        let settingsPath = Self.claudeDirPath + "/settings.json"
         if fm.fileExists(atPath: settingsPath) {
             do {
-                let fileAttrs = try fm.attributesOfItem(atPath: settingsPath)
-                let filePerm = fileAttrs[.posixPermissions] as? Int ?? 0
-                let fileOwner = fileAttrs[.ownerAccountID] as? uid_t ?? 0
-                
-                if (filePerm & 0o600) != 0o600 || fileOwner != getuid() {
-                    Self.logger.warning("settings.json 权限异常，权限: \(String(filePerm, radix: 8)), 所有者: \(fileOwner)")
-                    let fixSuccess = await runPermissionFixCommand()
-                    if !fixSuccess {
-                        return .failure(.permissionDenied("settings.json 文件权限不足"))
-                    }
-                }
+                let testWrite = settingsPath + ".test"
+                try "test".write(toFile: testWrite, atomically: true, encoding: .utf8)
+                try fm.removeItem(atPath: testWrite)
+                NSLog("[HookAutoInstaller] 目录写入权限验证通过")
             } catch {
-                Self.logger.error("读取文件权限失败: \(error.localizedDescription)")
-                return .failure(.permissionDenied("无法读取 settings.json 权限"))
+                NSLog("[HookAutoInstaller] 写入测试失败: \(error.localizedDescription)")
+                return .failure(.permissionDenied("无法写入 ~/.claude 目录。请确保已获得访问权限。"))
             }
         }
         
+        NSLog("[HookAutoInstaller] checkAndFixPermissions 完成")
         return .success(())
     }
     
@@ -722,7 +881,7 @@ extension HookAutoInstaller {
         return false
     }
 
-    /// 备份 OpenCode 插件
+    /// 备份 OpenCode 插件（可选，失败返回 nil）
     private func backupOpenCodePlugin() -> String? {
         let fm = FileManager.default
         let backupDir = Self.backupDirectory + "/opencode-plugins"
@@ -738,7 +897,7 @@ extension HookAutoInstaller {
             try fm.copyItem(atPath: Self.opencodePluginPath, toPath: backupPath)
             return backupPath
         } catch {
-            Self.logger.error("备份 OpenCode 插件失败: \(error.localizedDescription)")
+            Self.logger.warning("OpenCode 插件备份跳过（沙盒限制）: \(error.localizedDescription)")
             return nil
         }
     }
@@ -959,13 +1118,13 @@ struct HooksConfig: Codable {
 
 /// 安装结果
 enum InstallResult {
-    case success(backupPath: String)
+    case success(backupPath: String?)
     case failure(HookError)
 }
 
 /// 卸载结果
 enum UninstallResult {
-    case success(backupPath: String)
+    case success(backupPath: String?)
     case failure(HookError)
 }
 

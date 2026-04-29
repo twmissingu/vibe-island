@@ -175,23 +175,48 @@ struct ContextUsageCard: View {
 
             // 工具使用行
             if let tools = snapshot.toolUsage, !tools.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text("TOOL USAGE")
                         .font(.system(size: 9, weight: .medium))
                         .foregroundStyle(sectionLabelColor)
 
                     ForEach(tools, id: \.name) { tool in
-                        HStack {
-                            Text(tool.name.uppercased())
+                        HStack(spacing: 6) {
+                            Image(systemName: toolIcon(for: tool.name))
                                 .font(.system(size: 10))
+                                .foregroundStyle(itemNameColor)
+                                .frame(width: 14)
+
+                            Text(tool.name.uppercased())
+                                .font(.system(size: 10, weight: .medium))
                                 .foregroundStyle(itemNameColor)
 
                             Spacer()
 
-                            Text("\(tool.count) (\(toolPercent(tool))%)")
+                            Text("\(tool.count)")
                                 .font(.system(size: 10, design: .monospaced))
                                 .foregroundStyle(itemValueColor)
+
+                            Text("(\(toolPercent(tool))%)")
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundStyle(.gray.opacity(0.6))
                         }
+                    }
+
+                    // 工具使用进度条
+                    if let maxCount = tools.map({ $0.count }).max(), maxCount > 0 {
+                        let sortedTools = tools.sorted { $0.count > $1.count }
+                        GeometryReader { geo in
+                            ForEach(Array(sortedTools.enumerated()), id: \.element.name) { index, tool in
+                                let width = geo.size.width * CGFloat(tool.count) / CGFloat(maxCount)
+                                Rectangle()
+                                    .fill(toolColor(for: tool.name).opacity(0.6))
+                                    .frame(width: max(2, width), height: 4)
+                                    .cornerRadius(2)
+                                    .offset(y: CGFloat(index) * 6)
+                            }
+                        }
+                        .frame(height: CGFloat(min(tools.count, 5)) * 6)
                     }
                 }
             }
@@ -307,6 +332,31 @@ struct ContextUsageCard: View {
         let total = totalToolCount
         guard total > 0 else { return 0 }
         return Int(Double(tool.count) / Double(total) * 100)
+    }
+
+    private func toolIcon(for name: String) -> String {
+        switch name.lowercased() {
+        case "read", "glob", "grep": return "doc.text"
+        case "edit", "write": return "pencil"
+        case "bash", "shell", "cmd": return "terminal"
+        case "webfetch", "fetch": return "globe"
+        case "task": return "sparkles"
+        case "tool": return "wrench.and.screwdriver"
+        case "mcp": return "puzzlepiece.extension"
+        default: return "questionmark.circle"
+        }
+    }
+
+    private func toolColor(for name: String) -> Color {
+        switch name.lowercased() {
+        case "read", "glob", "grep": return .blue
+        case "edit", "write": return .orange
+        case "bash", "shell", "cmd": return .green
+        case "webfetch", "fetch": return .purple
+        case "task": return .yellow
+        case "tool": return .cyan
+        default: return .gray
+        }
     }
 
     private var totalSkillCount: Int {
