@@ -16,7 +16,7 @@ struct SettingsView: View {
 
     // 声音设置
     @State private var soundEnabled = true
-    @State private var soundVolume: Float = 0.7
+    @State private var soundVolume: Float = 1.0
 
     // 多工具监控
     @State private var detectedTools: [ToolSource] = []
@@ -39,8 +39,7 @@ struct SettingsView: View {
         return PetLevel.allCases.filter { level in level <= currentLevel }
     }
 
-    // 上下文感知
-    @State private var contextWarningThreshold: Double = 80.0
+    
 
     var body: some View {
         NavigationStack {
@@ -216,29 +215,6 @@ struct SettingsView: View {
                 }
             }
 
-            // MARK: - 上下文感知
-            Section(NSLocalizedString("settings.section.context", comment: "Context Awareness")) {
-                Toggle(NSLocalizedString("settings.context.enable", comment: "Enable Context Monitoring"), isOn: Binding(
-                    get: { viewModel.settings.contextMonitorEnabled },
-                    set: { viewModel.settings.contextMonitorEnabled = $0; saveSettings() }
-                ))
-
-                if viewModel.settings.contextMonitorEnabled {
-                    HStack {
-                        Text(NSLocalizedString("settings.context.warningThreshold", comment: "Warning Threshold"))
-                        Slider(value: $contextWarningThreshold, in: 50...95, step: 5) { editing in
-                            if !editing {
-                                viewModel.settings.contextWarningThreshold = contextWarningThreshold
-                                saveSettings()
-                            }
-                        }
-                        Text("\(Int(contextWarningThreshold))%")
-                            .font(.system(size: 12))
-                            .frame(width: 50)
-                    }
-                }
-            }
-
             // MARK: - 系统
             Section(NSLocalizedString("settings.section.system", comment: "System")) {
                 Toggle(NSLocalizedString("settings.launchAtLogin", comment: "Launch at Login"), isOn: Binding(
@@ -264,7 +240,6 @@ struct SettingsView: View {
                 await refreshHookStatus()
                 await refreshOpenCodePluginStatus()
                 loadSoundSettings()
-                loadContextSettings()
                 detectRunningTools()
             }
         }
@@ -474,12 +449,6 @@ struct SettingsView: View {
         detectedTools = detected
     }
 
-    // MARK: - 上下文感知
-
-    private func loadContextSettings() {
-        contextWarningThreshold = viewModel.settings.contextWarningThreshold
-    }
-
     private func saveSettings() {
         SharedDefaults.saveSettings(viewModel.settings)
     }
@@ -498,10 +467,7 @@ struct SettingsView: View {
                 }
             )) {
                 ForEach(unlockedPets, id: \.id) { pet in
-                    HStack {
-                        Image(systemName: pet.systemImage)
-                        Text(pet.name)
-                    }.tag(pet.id)
+                    Text(pet.name).tag(pet.id)
                 }
             }
 

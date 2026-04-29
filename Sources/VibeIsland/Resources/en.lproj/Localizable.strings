@@ -25,7 +25,8 @@
 
 "settings.title" = "Settings";
 "settings.section.appearance" = "Appearance";
-"settings.hudStyle" = "HUD Style";
+"settings.hudStyle" = "Style";
+"settings.hud.style" = "Style";
 "settings.section.claudeHook" = "Claude Code Hook";
 "settings.hookStatus" = "Hook Status";
 "settings.hook.installed" = "Installed";
@@ -43,8 +44,8 @@
 "settings.sound.completed" = "Completed";
 "settings.sound.error" = "Error";
 "settings.sound.compacting" = "Compacting";
-"settings.section.pet" = "Pixel Pet";
-"settings.pet.enable" = "Enable Pixel Pet";
+"settings.section.pet" = "Pet";
+"settings.pet.enable" = "Enable Pet";
 "settings.pet.type" = "Pet Type";
 "settings.pet.size" = "Pet Size";
 "settings.section.multiTool" = "Multi-Tool Monitoring";
@@ -131,7 +132,7 @@
 "onboarding.welcome.subtitle" = "Your AI Coding Assistant Status Monitor\nReal-time monitoring of Claude Code, OpenCode";
 "onboarding.feature.realTime" = "Real-time Status Awareness";
 "onboarding.feature.sound" = "Sound Alerts";
-"onboarding.feature.pet" = "Pixel Pet";
+"onboarding.feature.pet" = "Pet";
 "onboarding.feature.multiTool" = "Multi-Tool Monitoring";
 "onboarding.selectPlatforms" = "Select Platforms to Monitor";
 "onboarding.selectPlatforms.subtitle" = "You can modify this in settings at any time";
@@ -196,7 +197,7 @@
 "onboarding.welcome.subtitle.full" = "Your AI Coding Assistant Status Monitor\nReal-time monitoring of Claude Code, OpenCode";
 "onboarding.feature.realTime" = "Real-time Status Awareness";
 "onboarding.feature.sound" = "Sound Alerts";
-"onboarding.feature.pet" = "Pixel Pet";
+"onboarding.feature.pet" = "Pet";
 "onboarding.feature.multiTool" = "Multi-Tool Monitoring";
 "onboarding.selectPlatforms" = "Select Platforms to Monitor";
 "onboarding.selectPlatforms.subtitle" = "You can modify this in settings at any time";

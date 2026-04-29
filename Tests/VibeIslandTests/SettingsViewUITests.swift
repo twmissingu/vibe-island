@@ -337,43 +337,6 @@ final class SettingsViewUITests: XCTestCase {
         XCTAssertEqual(toolsText, "Claude Code, OpenCode", "应显示检测到的工具")
     }
 
-    // MARK: - 上下文感知测试
-
-    /// 测试：上下文监控开关可以切换
-    func testContextMonitorToggle_switches() {
-        var settings = AppSettings()
-
-        settings.contextMonitorEnabled = false
-        XCTAssertFalse(settings.contextMonitorEnabled, "上下文监控应可以关闭")
-
-        settings.contextMonitorEnabled = true
-        XCTAssertTrue(settings.contextMonitorEnabled, "上下文监控应可以开启")
-    }
-
-    /// 测试：警告阈值滑块在有效范围内
-    func testContextWarningThreshold_validRange() {
-        let minValue: Double = 50.0
-        let maxValue: Double = 95.0
-        var threshold: Double = 80.0
-
-        XCTAssertGreaterThanOrEqual(threshold, minValue, "警告阈值应不小于 50%")
-        XCTAssertLessThanOrEqual(threshold, maxValue, "警告阈值应不大于 95%")
-    }
-
-    /// 测试：警告阈值百分比显示正确
-    func testContextWarningThreshold_percentageDisplay() {
-        let thresholds: [(Double, String)] = [
-            (50.0, "50%"),
-            (80.0, "80%"),
-            (95.0, "95%")
-        ]
-
-        for (threshold, expected) in thresholds {
-            let display = "\(Int(threshold))%"
-            XCTAssertEqual(display, expected, "警告阈值 \(threshold) 应显示为 \(expected)")
-        }
-    }
-
     // MARK: - 刷新设置测试
 
     /// 测试：轮询间隔选项存在

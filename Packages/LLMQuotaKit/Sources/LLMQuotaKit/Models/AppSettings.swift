@@ -6,8 +6,8 @@ public enum AppTheme: String, Codable, Sendable, CaseIterable {
 
     public var displayName: String {
         switch self {
-        case .pixel: "像素复古"
-        case .glass: "毛玻璃现代"
+        case .pixel: "极客暗黑"
+        case .glass: "极简透明"
         }
     }
 }
@@ -34,11 +34,6 @@ public struct AppSettings: Codable, Sendable {
     public var openCodeMonitorEnabled: Bool
     public var codexMonitorEnabled: Bool
 
-
-    // 上下文感知
-    public var contextMonitorEnabled: Bool
-    public var contextWarningThreshold: Double
-
     // 会话跟踪模式
     public var sessionTrackingMode: String  // "auto" 或 "manual"
     public var pinnedSessionId: String?
@@ -57,8 +52,6 @@ public struct AppSettings: Codable, Sendable {
         claudeMonitorEnabled: Bool = true,
         openCodeMonitorEnabled: Bool = true,
         codexMonitorEnabled: Bool = true,
-        contextMonitorEnabled: Bool = true,
-        contextWarningThreshold: Double = 80.0,
         sessionTrackingMode: String = "auto",
         pinnedSessionId: String? = nil
     ) {
@@ -76,8 +69,6 @@ public struct AppSettings: Codable, Sendable {
         self.openCodeMonitorEnabled = openCodeMonitorEnabled
         self.codexMonitorEnabled = codexMonitorEnabled
 
-        self.contextMonitorEnabled = contextMonitorEnabled
-        self.contextWarningThreshold = contextWarningThreshold
         self.sessionTrackingMode = sessionTrackingMode
         self.pinnedSessionId = pinnedSessionId
     }

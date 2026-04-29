@@ -2,6 +2,11 @@ import XCTest
 import SwiftUI
 @testable import VibeIsland
 
+// MARK: - 测试常量
+
+private let testWarningThreshold: Double = 0.80
+private let testCriticalThreshold: Double = 0.95
+
 // MARK: - 上下文使用率 UI 测试
 
 /// 测试 ContextUsageView 的核心用户交互流程
@@ -139,7 +144,7 @@ final class ContextUsageUITests: XCTestCase {
 
     /// 测试：使用率达到警告阈值时警告
     func testWarningThreshold_at_isWarning() {
-        let atWarning = contextWarningThreshold  // 80%
+        let atWarning = testWarningThreshold  // 80%
         let snapshot = makeSnapshot(usageRatio: atWarning)
 
         XCTAssertTrue(snapshot.isWarning, "达到警告阈值时应警告")
@@ -389,7 +394,7 @@ final class ContextUsageUITests: XCTestCase {
     /// 测试：紧凑指示器在低使用率时显示绿色
     func testCompactIndicator_lowUsage_greenColor() {
         let usageRatio = 0.30
-        let isWarning = usageRatio >= contextWarningThreshold
+        let isWarning = usageRatio >= testWarningThreshold
         let isCritical = usageRatio >= contextCriticalThreshold
 
         XCTAssertFalse(isWarning, "低使用率时不应警告")
@@ -398,9 +403,9 @@ final class ContextUsageUITests: XCTestCase {
 
     /// 测试：紧凑指示器在警告阈值时显示橙色
     func testCompactIndicator_warningThreshold_orangeColor() {
-        let usageRatio = contextWarningThreshold
-        let isWarning = usageRatio >= contextWarningThreshold
-        let isCritical = usageRatio >= contextCriticalThreshold
+        let usageRatio = testWarningThreshold
+        let isWarning = usageRatio >= testWarningThreshold
+        let isCritical = usageRatio >= testCriticalThreshold
 
         XCTAssertTrue(isWarning, "警告阈值时应警告")
         XCTAssertFalse(isCritical, "警告阈值时不应危险")

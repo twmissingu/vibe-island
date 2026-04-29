@@ -25,7 +25,8 @@
 
 "settings.title" = "设置";
 "settings.section.appearance" = "外观";
-"settings.hudStyle" = "HUD 风格";
+"settings.hudStyle" = "风格";
+"settings.hud.style" = "风格";
 "settings.section.claudeHook" = "Claude Code Hook";
 "settings.hookStatus" = "Hook 状态";
 "settings.hook.installed" = "已安装";
@@ -43,8 +44,8 @@
 "settings.sound.completed" = "完成";
 "settings.sound.error" = "错误";
 "settings.sound.compacting" = "压缩";
-"settings.section.pet" = "像素宠物";
-"settings.pet.enable" = "启用像素宠物";
+"settings.section.pet" = "宠物";
+"settings.pet.enable" = "启用宠物";
 "settings.pet.type" = "宠物类型";
 "settings.pet.size" = "宠物大小";
 "settings.section.multiTool" = "多工具监控";
@@ -110,7 +111,7 @@
 "settings.throttle" = "节流";
 "settings.warningThreshold" = "警告阈值";
 "settings.contextMonitoring" = "上下文监控";
-"settings.petMonitoring" = "像素宠物监控";
+"settings.petMonitoring" = "宠物监控";
 "settings.appearance" = "外观";
 "settings.system" = "系统";
 
@@ -131,7 +132,7 @@
 "onboarding.welcome.subtitle" = "你的 AI 编码助手状态监控平台\n实时监控 Claude Code、OpenCode 的运行状态";
 "onboarding.feature.realTime" = "实时状态感知";
 "onboarding.feature.sound" = "声音提醒";
-"onboarding.feature.pet" = "像素宠物";
+"onboarding.feature.pet" = "宠物";
 "onboarding.feature.multiTool" = "多工具监控";
 "onboarding.selectPlatforms" = "选择要监控的平台";
 "onboarding.selectPlatforms.subtitle" = "你可以随时在设置中修改";
@@ -145,7 +146,7 @@
 "onboarding.completion.platforms" = "已选择 %d 个平台";
 "onboarding.completion.hookInstalled" = "Hook 已安装";
 "onboarding.completion.hookNotInstalled" = "Hook 未安装（可在设置中安装）";
-"onboarding.completion.petEnabled" = "像素宠物已启用";
+"onboarding.completion.petEnabled" = "宠物已启用";
 "onboarding.completion.soundEnabled" = "声音提醒已启用";
 "onboarding.completion.instruction" = "点击「开始使用」进入主界面";
 "onboarding.button.previous" = "上一步";
@@ -196,7 +197,7 @@
 "onboarding.welcome.subtitle.full" = "你的 AI 编码助手状态监控平台\n实时监控 Claude Code、OpenCode 的运行状态";
 "onboarding.feature.realTime" = "实时状态感知";
 "onboarding.feature.sound" = "声音提醒";
-"onboarding.feature.pet" = "像素宠物";
+"onboarding.feature.pet" = "宠物";
 "onboarding.feature.multiTool" = "多工具监控";
 "onboarding.selectPlatforms" = "选择要监控的平台";
 "onboarding.selectPlatforms.subtitle" = "你可以随时在设置中修改";
@@ -210,7 +211,7 @@
 "onboarding.completion.platforms" = "已选择 %d 个平台";
 "onboarding.completion.hookInstalled" = "Hook 已安装";
 "onboarding.completion.hookNotInstalled" = "Hook 未安装（可在设置中安装）";
-"onboarding.completion.petEnabled" = "像素宠物已启用";
+"onboarding.completion.petEnabled" = "宠物已启用";
 "onboarding.completion.soundEnabled" = "声音提醒已启用";
 "onboarding.completion.instruction" = "点击「开始使用」进入主界面";
 
@@ -352,7 +353,7 @@
 "onboarding.completion.platforms" = "已选择 %d 个平台";
 "onboarding.completion.hookInstalled" = "Hook 已安装";
 "onboarding.completion.hookNotInstalled" = "Hook 未安装（可在设置中安装）";
-"onboarding.completion.petEnabled" = "像素宠物已启用";
+"onboarding.completion.petEnabled" = "宠物已启用";
 "onboarding.completion.soundEnabled" = "声音提醒已启用";
 "onboarding.completion.instruction" = "点击「开始使用」进入主界面";
 "onboarding.button.previous" = "上一步";
