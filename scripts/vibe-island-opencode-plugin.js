@@ -143,17 +143,100 @@ export const vibeIsland = async ({ directory }) => {
 
   const sessionId = `opencode-${process.pid}`;
   let sessionName = null;
-  let modelContextLimit = 200000; // default to 200K
   const defaultContextLimit = readModelContextLimit() || 200000;
+  let modelContextLimit = defaultContextLimit; // default to config or 200K
   let toolCounts = {}; // Track tool usage counts for this session
   let skillCounts = {}; // Track skill usage counts for this session
-  
-  // Use config limit if available
-  if (defaultContextLimit) {
-    modelContextLimit = defaultContextLimit;
-    debugLog('Using context limit from config:', modelContextLimit);
-  } else {
-    debugLog('Using default context limit:', modelContextLimit);
+  let cachedSortedTools = null;
+  let cachedSortedSkills = null;
+  let lastToolCountsHash = '';
+  let lastSkillCountsHash = '';
+
+  debugLog('Using context limit:', modelContextLimit);
+
+  // ---------------------------------------------------------------------------
+  // Shared: Calculate context usage and send hook
+  // ---------------------------------------------------------------------------
+  function sendContextUsageHook(eventName = 'UserPromptSubmit') {
+    // Simple hash to detect if counts changed
+    const toolCountsHash = JSON.stringify(toolCounts);
+    const skillCountsHash = JSON.stringify(skillCounts);
+
+    // Only re-sort if counts changed
+    if (toolCountsHash !== lastToolCountsHash) {
+      cachedSortedTools = Object.entries(toolCounts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, count]) => ({ name, count }));
+      lastToolCountsHash = toolCountsHash;
+    }
+
+    if (skillCountsHash !== lastSkillCountsHash) {
+      cachedSortedSkills = Object.entries(skillCounts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, count]) => ({ name, count }));
+      lastSkillCountsHash = skillCountsHash;
+    }
+
+    return {
+      tool_usage: cachedSortedTools || [],
+      skill_usage: cachedSortedSkills || []
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Shared: Calculate and send context usage from token data
+  // ---------------------------------------------------------------------------
+  function handleTokenUpdate(tokens, source) {
+    if (!tokens) return;
+
+    // Calculate total context usage
+    const inputTokens = tokens.input || 0;
+    const outputTokens = tokens.output || 0;
+    const reasoningTokens = tokens.reasoning || 0;
+    const cacheRead = tokens.cache?.read || 0;
+    const cacheWrite = tokens.cache?.write || 0;
+
+    const totalTokens = inputTokens + outputTokens + reasoningTokens + cacheRead + cacheWrite;
+    const usagePercent = modelContextLimit > 0
+      ? Math.round((totalTokens / modelContextLimit) * 100)
+      : 0;
+
+    debugLog(`${source} context calculation:`, {
+      totalTokens,
+      modelContextLimit,
+      usagePercent,
+      tokensBreakdown: {
+        input: inputTokens,
+        output: outputTokens,
+        reasoning: reasoningTokens,
+        cacheRead,
+        cacheWrite,
+        total: tokens.total
+      }
+    });
+
+    const { tool_usage, skill_usage } = sendContextUsageHook();
+
+    // Send context usage info with the message
+    const contextMsg = `Context usage: ${usagePercent}% (${totalTokens}/${modelContextLimit} tokens)`;
+    debugLog(`Sending context usage hook (${source}):`, {
+      context_usage: usagePercent / 100,
+      context_tokens_used: totalTokens,
+      context_tokens_total: modelContextLimit
+    });
+
+    callHook(hookBin, "UserPromptSubmit", {
+      ...basePayload(),
+      prompt: contextMsg,
+      context_usage: usagePercent / 100,
+      context_tokens_used: totalTokens,
+      context_tokens_total: modelContextLimit,
+      context_input_tokens: inputTokens,
+      context_output_tokens: outputTokens,
+      context_reasoning_tokens: reasoningTokens,
+      tool_usage,
+      skill_usage,
+    });
   }
   
   function basePayload() {
@@ -190,6 +273,10 @@ export const vibeIsland = async ({ directory }) => {
           modelContextLimit = defaultContextLimit;
           toolCounts = {};
           skillCounts = {};
+          cachedSortedTools = null;
+          cachedSortedSkills = null;
+          lastToolCountsHash = '';
+          lastSkillCountsHash = '';
           callHook(hookBin, "SessionStart", basePayload());
           break;
 
@@ -252,130 +339,14 @@ export const vibeIsland = async ({ directory }) => {
     "message.part.updated": async ({ part }) => {
       // Track context usage from step-finish token data
       if (!part || part.type !== "step-finish") return;
-      
-      const tokens = part.tokens;
-      if (!tokens) return;
-      
-      // Calculate total context usage
-      const inputTokens = tokens.input || 0;
-      const outputTokens = tokens.output || 0;
-      const reasoningTokens = tokens.reasoning || 0;
-      const cacheRead = tokens.cache?.read || 0;
-      const cacheWrite = tokens.cache?.write || 0;
-      
-      const totalTokens = inputTokens + outputTokens + reasoningTokens + cacheRead + cacheWrite;
-      const usagePercent = modelContextLimit > 0 
-        ? Math.round((totalTokens / modelContextLimit) * 100)
-        : 0;
-      
-      debugLog('message.part.updated context calculation:', {
-        totalTokens,
-        modelContextLimit,
-        usagePercent,
-        tokensBreakdown: {
-          input: inputTokens,
-          output: outputTokens,
-          reasoning: reasoningTokens,
-          cacheRead,
-          cacheWrite,
-          total: tokens.total
-        }
-      });
-      
-      // Sort tool usage by count descending
-      const sortedToolUsage = Object.entries(toolCounts)
-        .sort((a, b) => b[1] - a[1])
-        .map(([name, count]) => ({ name, count }));
-      
-      // Sort skill usage by count descending
-      const sortedSkillUsage = Object.entries(skillCounts)
-        .sort((a, b) => b[1] - a[1])
-        .map(([name, count]) => ({ name, count }));
-      
-      // Send context usage info with the message
-      const contextMsg = `Context usage: ${usagePercent}% (${totalTokens}/${modelContextLimit} tokens)`;
-      debugLog('Sending context usage hook (message.part.updated):', {
-        context_usage: usagePercent / 100,
-        context_tokens_used: totalTokens,
-        context_tokens_total: modelContextLimit
-      });
-      callHook(hookBin, "UserPromptSubmit", {
-        ...basePayload(),
-        prompt: contextMsg,
-        context_usage: usagePercent / 100,
-        context_tokens_used: totalTokens,
-        context_tokens_total: modelContextLimit,
-        context_input_tokens: inputTokens,
-        context_output_tokens: outputTokens,
-        context_reasoning_tokens: reasoningTokens,
-        tool_usage: sortedToolUsage,
-        skill_usage: sortedSkillUsage,
-      });
+      handleTokenUpdate(part.tokens, 'message.part.updated');
     },
 
     // ---- Message events: track token usage ----
     "message.updated": async ({ message }) => {
       // Track context usage from message token data
       if (!message) return;
-      
-      const tokens = message.tokens;
-      if (!tokens) return;
-      
-      // Calculate total context usage
-      const inputTokens = tokens.input || 0;
-      const outputTokens = tokens.output || 0;
-      const reasoningTokens = tokens.reasoning || 0;
-      const cacheRead = tokens.cache?.read || 0;
-      const cacheWrite = tokens.cache?.write || 0;
-      
-      const totalTokens = inputTokens + outputTokens + reasoningTokens + cacheRead + cacheWrite;
-      const usagePercent = modelContextLimit > 0 
-        ? Math.round((totalTokens / modelContextLimit) * 100)
-        : 0;
-      
-      debugLog('message.updated context calculation:', {
-        totalTokens,
-        modelContextLimit,
-        usagePercent,
-        tokensBreakdown: {
-          input: inputTokens,
-          output: outputTokens,
-          reasoning: reasoningTokens,
-          cacheRead,
-          cacheWrite,
-          total: tokens.total
-        }
-      });
-      
-      // Sort tool usage by count descending
-      const sortedToolUsage = Object.entries(toolCounts)
-        .sort((a, b) => b[1] - a[1])
-        .map(([name, count]) => ({ name, count }));
-      
-      // Sort skill usage by count descending
-      const sortedSkillUsage = Object.entries(skillCounts)
-        .sort((a, b) => b[1] - a[1])
-        .map(([name, count]) => ({ name, count }));
-      
-      // Send context usage info with the message
-      const contextMsg = `Context usage: ${usagePercent}% (${totalTokens}/${modelContextLimit} tokens)`;
-      debugLog('Sending context usage hook (message.updated):', {
-        context_usage: usagePercent / 100,
-        context_tokens_used: totalTokens,
-        context_tokens_total: modelContextLimit
-      });
-      callHook(hookBin, "UserPromptSubmit", {
-        ...basePayload(),
-        prompt: contextMsg,
-        context_usage: usagePercent / 100,
-        context_tokens_used: totalTokens,
-        context_tokens_total: modelContextLimit,
-        context_input_tokens: inputTokens,
-        context_output_tokens: outputTokens,
-        context_reasoning_tokens: reasoningTokens,
-        tool_usage: sortedToolUsage,
-        skill_usage: sortedSkillUsage,
-      });
+      handleTokenUpdate(message.tokens, 'message.updated');
     },
 
     // Keep chat.complete as fallback for compatibility
@@ -383,65 +354,7 @@ export const vibeIsland = async ({ directory }) => {
       // Track context usage after each assistant response
       const message = output?.message;
       if (!message) return;
-      
-      const tokens = message.tokens;
-      if (!tokens) return;
-      
-      // Calculate total context usage
-      const inputTokens = tokens.input || 0;
-      const outputTokens = tokens.output || 0;
-      const reasoningTokens = tokens.reasoning || 0;
-      const cacheRead = tokens.cache?.read || 0;
-      const cacheWrite = tokens.cache?.write || 0;
-      
-      const totalTokens = inputTokens + outputTokens + reasoningTokens + cacheRead + cacheWrite;
-      const usagePercent = modelContextLimit > 0 
-        ? Math.round((totalTokens / modelContextLimit) * 100)
-        : 0;
-      
-      debugLog('chat.complete context calculation:', {
-        totalTokens,
-        modelContextLimit,
-        usagePercent,
-        tokensBreakdown: {
-          input: inputTokens,
-          output: outputTokens,
-          reasoning: reasoningTokens,
-          cacheRead,
-          cacheWrite,
-          total: tokens.total
-        }
-      });
-      
-      // Sort tool usage by count descending
-      const sortedToolUsage = Object.entries(toolCounts)
-        .sort((a, b) => b[1] - a[1])
-        .map(([name, count]) => ({ name, count }));
-      
-      // Sort skill usage by count descending
-      const sortedSkillUsage = Object.entries(skillCounts)
-        .sort((a, b) => b[1] - a[1])
-        .map(([name, count]) => ({ name, count }));
-      
-      // Send context usage info with the message
-      const contextMsg = `Context usage: ${usagePercent}% (${totalTokens}/${modelContextLimit} tokens)`;
-      debugLog('Sending context usage hook (chat.complete):', {
-        context_usage: usagePercent / 100,
-        context_tokens_used: totalTokens,
-        context_tokens_total: modelContextLimit
-      });
-      callHook(hookBin, "UserPromptSubmit", {
-        ...basePayload(),
-        prompt: contextMsg,
-        context_usage: usagePercent / 100,
-        context_tokens_used: totalTokens,
-        context_tokens_total: modelContextLimit,
-        context_input_tokens: inputTokens,
-        context_output_tokens: outputTokens,
-        context_reasoning_tokens: reasoningTokens,
-        tool_usage: sortedToolUsage,
-        skill_usage: sortedSkillUsage,
-      });
+      handleTokenUpdate(message.tokens, 'chat.complete');
     },
 
     // ---- Tool execution events ----

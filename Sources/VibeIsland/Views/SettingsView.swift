@@ -55,6 +55,7 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                .tint(.white)
             }
 
             // MARK: - Hook 管理
@@ -247,7 +248,10 @@ struct SettingsView: View {
             }
         }
             .formStyle(.grouped)
-            .frame(width: 450, height: 680)
+            .frame(width: 450, height: 400)
+            .background(Color(white: 0.08))
+            .scrollContentBackground(.hidden)
+            .preferredColorScheme(.dark)
             .navigationTitle(NSLocalizedString("settings.title", comment: "Settings"))
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {

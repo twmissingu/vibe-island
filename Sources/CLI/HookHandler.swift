@@ -19,6 +19,18 @@ enum HookHandler {
     /// Maximum age (seconds) for stale sessions without PID tracking
     private static let noPIDMaxAge: TimeInterval = 300
 
+    /// 日志文件路径: ~/.vibe-island/hook-debug.log
+    private static let debugLogFile: URL = {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".vibe-island")
+            .appendingPathComponent("hook-debug.log")
+    }()
+
+    /// 是否启用调试日志（通过环境变量 VIBE_ISLAND_DEBUG=1 开启）
+    private static var isDebugEnabled: Bool {
+        ProcessInfo.processInfo.environment["VIBE_ISLAND_DEBUG"] == "1"
+    }
+
     // MARK: - Public Entry Point
 
     /// Handle a single hook event.
@@ -72,29 +84,35 @@ enum HookHandler {
             session.sessionName = event.sessionName ?? session.sessionName
             session.notificationMessage = event.message
 
-            // Parse and persist context usage from PreCompact message or UserPromptSubmit (for token tracking)
-            if event.hookEventName == .preCompact || event.hookEventName == .userPromptSubmit || event.hookEventName == .refreshContext {
-                if let usage = event.contextUsage {
-                    session.contextUsage = usage
-                    session.contextTokensUsed = event.contextTokensUsed
-                    session.contextTokensTotal = event.contextTokensTotal
-                    session.contextInputTokens = event.contextInputTokens
-                    session.contextOutputTokens = event.contextOutputTokens
-                    session.contextReasoningTokens = event.contextReasoningTokens
-                    session.toolUsage = event.toolUsage
-                    session.skillUsage = event.skillUsage
-                } else if let message = event.message {
-                    parseAndStoreContextUsage(message, into: &session)
-                }
-                
-                // Always update tool and skill usage if present in event
-                // (handles cases where event is processed outside the if let block above)
-                if let toolUsage = event.toolUsage {
-                    session.toolUsage = toolUsage
-                }
-                if let skillUsage = event.skillUsage {
-                    session.skillUsage = skillUsage
-                }
+            // Process context usage data in ALL events (if available)
+            if let usage = event.contextUsage {
+                session.contextUsage = usage
+                session.contextTokensUsed = event.contextTokensUsed
+                session.contextTokensTotal = event.contextTokensTotal
+                session.contextInputTokens = event.contextInputTokens
+                session.contextOutputTokens = event.contextOutputTokens
+                session.contextReasoningTokens = event.contextReasoningTokens
+            } else if let message = event.message {
+                // Fallback: parse from message if no direct context usage fields
+                parseAndStoreContextUsage(message, into: &session)
+            }
+
+            // FIRST: Increment tool usage count in PreToolUse events
+            if event.hookEventName == .preToolUse, let toolName = event.toolName {
+                updateToolUsage(&session, toolName: toolName)
+            }
+
+            // THEN: Merge tool and skill usage from event if present
+            if let eventToolUsage = event.toolUsage {
+                mergeToolUsage(&session, with: eventToolUsage)
+            }
+            if let skillUsage = event.skillUsage {
+                session.skillUsage = skillUsage
+            }
+
+            // FINALLY: Sort tool usage once after all updates
+            if var toolUsage = session.toolUsage {
+                session.toolUsage = sortedToolUsage(toolUsage)
             }
 
             // Ensure PID tracking is always current
@@ -151,9 +169,8 @@ enum HookHandler {
         pidStartTime: TimeInterval?,
         source: String?
     ) -> Session {
-        // Try to load existing session
-        if FileManager.default.fileExists(atPath: path.path),
-           let existing = try? Session.loadFromFile(url: path) {
+        // Try to load existing session (no TOCTOU check - just try to load)
+        if let existing = try? Session.loadFromFile(url: path) {
             // Check PID reuse: different process start time means a new process reused this PID
             if event.hookEventName == .sessionStart,
                let currentStart = pidStartTime,
@@ -341,13 +358,13 @@ enum HookHandler {
         let label = (cwd as NSString).lastPathComponent
         let timestamp = ISO8601DateFormatter().string(from: Date())
         let message = "[\(timestamp)] [\(eventName)] [\(label)] [PID:\(pid)] -> \(newStatus)\n"
-        FileHandle.standardError.write(message.data(using: .utf8) ?? Data())
+        appendToDebugLog(message)
     }
 
     private static func logCleanup(sessionId: String, pid: UInt32?) {
         let pidStr = pid.map { "PID:\($0)" } ?? "PID:unknown"
         let message = "[vibe-island] Cleanup stale session: \(sessionId) (\(pidStr))\n"
-        FileHandle.standardError.write(message.data(using: .utf8) ?? Data())
+        appendToDebugLog(message)
     }
 
     // MARK: - Context Usage Parsing
@@ -376,6 +393,75 @@ enum HookHandler {
         if let totalRange = Range(match.range(at: 3), in: message),
            let total = Int(message[totalRange]) {
             session.contextTokensTotal = total
+        }
+    }
+
+    // MARK: - Tool Usage Statistics
+
+    /// Shared: Sort tool usage by count descending
+    private static func sortedToolUsage(_ usage: [ToolUsage]) -> [ToolUsage] {
+        usage.sorted { $0.count > $1.count }
+    }
+
+    /// Update tool usage count for a specific tool
+    /// - Parameters:
+    ///   - session: The session to update
+    ///   - toolName: The name of the tool being used
+    private static func updateToolUsage(_ session: inout Session, toolName: String) {
+        // Initialize or update tool usage array
+        if var existingUsage = session.toolUsage {
+            // Find if this tool already exists in the list
+            if let index = existingUsage.firstIndex(where: { $0.name == toolName }) {
+                // Increment existing count
+                let existing = existingUsage[index]
+                existingUsage[index] = ToolUsage(name: toolName, count: existing.count + 1)
+            } else {
+                // Add new tool with count 1
+                existingUsage.append(ToolUsage(name: toolName, count: 1))
+            }
+            session.toolUsage = existingUsage
+        } else {
+            // No existing usage, create new array with this tool
+            session.toolUsage = [ToolUsage(name: toolName, count: 1)]
+        }
+    }
+
+    /// Merge tool usage from event with existing session data
+    /// - Parameters:
+    ///   - session: The session to update
+    ///   - eventToolUsage: Tool usage data from the event
+    private static func mergeToolUsage(_ session: inout Session, with eventToolUsage: [ToolUsage]) {
+        if var existingUsage = session.toolUsage {
+            // Merge event tool usage with existing
+            for eventTool in eventToolUsage {
+                if let index = existingUsage.firstIndex(where: { $0.name == eventTool.name }) {
+                    // Take the maximum count (event might have more recent/accurate data)
+                    let existing = existingUsage[index]
+                    existingUsage[index] = ToolUsage(name: eventTool.name, count: max(existing.count, eventTool.count))
+                } else {
+                    existingUsage.append(eventTool)
+                }
+            }
+            session.toolUsage = existingUsage
+        } else {
+            // No existing usage, use event data directly
+            session.toolUsage = eventToolUsage
+        }
+    }
+
+    // MARK: - Shared Logging Helper
+
+    private static func appendToDebugLog(_ message: String) {
+        guard isDebugEnabled else { return }
+        guard let data = message.data(using: .utf8) else { return }
+        if FileManager.default.fileExists(atPath: debugLogFile.path) {
+            if let fileHandle = try? FileHandle(forWritingTo: debugLogFile) {
+                fileHandle.seekToEndOfFile()
+                fileHandle.write(data)
+                fileHandle.closeFile()
+            }
+        } else {
+            try? data.write(to: debugLogFile)
         }
     }
 }

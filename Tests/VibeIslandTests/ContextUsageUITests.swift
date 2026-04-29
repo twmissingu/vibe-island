@@ -54,7 +54,7 @@ final class ContextUsageUITests: XCTestCase {
             tokensTotal: 200_000,
             usageRatio: 0.25
         )
-        let card = ContextUsageCard(session: session, snapshot: snapshot)
+        let card = ContextUsageCard(session: session, snapshot: snapshot, theme: .pixel)
         XCTAssertNotNil(card, "ContextUsageCard 应成功初始化")
     }
 

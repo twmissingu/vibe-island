@@ -54,7 +54,7 @@ struct ContextUsageView: View {
             if let remaining = snapshot.tokensRemaining {
                 Text(formatTokenCount(remaining))
                     .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.gray.opacity(0.5))
             }
         }
         .onChange(of: isWarning) { _, flashing in
@@ -111,13 +111,15 @@ struct ContextUsageView: View {
 struct ContextUsageCard: View {
     let session: Session
     let snapshot: ContextUsageSnapshot
+    let theme: AppTheme
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: theme == .pixel ? 6 : 8) {
             // 标题行：会话名 + 持续时间
             HStack {
                 Text(session.sessionName ?? session.cwd.shortenedCwd())
                     .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(titleColor)
                     .lineLimit(1)
                     .truncationMode(.tail)
 
@@ -125,14 +127,14 @@ struct ContextUsageCard: View {
 
                 Text(sessionDuration)
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(durationColor)
             }
 
             // 进度条：包含百分比
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(.fill.quaternary)
+                        .fill(progressBackgroundColor)
 
                     Capsule()
                         .fill(statusColor.gradient)
@@ -144,10 +146,10 @@ struct ContextUsageCard: View {
                         .foregroundStyle(statusColor)
                 }
             }
-            .frame(height: 8)
+            .frame(height: theme == .pixel ? 6 : 8)
 
             // Token 统计表格（两行三列对齐）
-            Grid(alignment: .center, horizontalSpacing: 8, verticalSpacing: 8) {
+            Grid(alignment: .center, horizontalSpacing: 8, verticalSpacing: theme == .pixel ? 6 : 8) {
                 // 第一行：USED / TOTAL / REMAIN
                 if let used = snapshot.tokensUsed, let total = snapshot.tokensTotal {
                     GridRow {
@@ -160,7 +162,7 @@ struct ContextUsageCard: View {
                         }
                     }
                 }
-                
+
                 // 第二行：INPUT / OUTPUT / REASONING
                 if hasCategoryTokens || snapshot.inputTokens != nil || snapshot.outputTokens != nil || snapshot.reasoningTokens != nil {
                     GridRow {
@@ -176,19 +178,19 @@ struct ContextUsageCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("TOOL USAGE")
                         .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(sectionLabelColor)
 
                     ForEach(tools, id: \.name) { tool in
                         HStack {
                             Text(tool.name.uppercased())
                                 .font(.system(size: 10))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(itemNameColor)
 
                             Spacer()
 
                             Text("\(tool.count) (\(toolPercent(tool))%)")
                                 .font(.system(size: 10, design: .monospaced))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(itemValueColor)
                         }
                     }
                 }
@@ -197,39 +199,77 @@ struct ContextUsageCard: View {
             // 技能使用行
             if let skills = snapshot.skillUsage, !skills.isEmpty {
                 Divider()
-                    .opacity(0.2)
+                    .opacity(theme == .pixel ? 0.15 : 0.2)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("SKILL USAGE")
                         .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(sectionLabelColor)
 
                     ForEach(skills, id: \.name) { skill in
                         HStack {
                             Text(skill.name.uppercased())
                                 .font(.system(size: 10))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(itemNameColor)
 
                             Spacer()
 
                             Text("\(skill.count) (\(skillPercent(skill))%)")
                                 .font(.system(size: 10, design: .monospaced))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(itemValueColor)
                         }
                     }
                 }
             }
         }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
+        .padding(theme == .pixel ? 8 : 10)
+        .background(cardBackground)
+        .animation(.easeInOut(duration: 0.3), value: snapshot.usageRatio)
+    }
+
+    // MARK: - 主题感知的颜色
+
+    private var titleColor: Color {
+        theme == .pixel ? .white : .primary
+    }
+
+    private var durationColor: Color {
+        theme == .pixel ? .gray.opacity(0.6) : .gray.opacity(0.7)
+    }
+
+    private var progressBackgroundColor: Color {
+        theme == .pixel ? Color(white: 0.2) : Color.gray.opacity(0.2)
+    }
+
+    private var sectionLabelColor: Color {
+        theme == .pixel ? .gray.opacity(0.5) : .gray.opacity(0.6)
+    }
+
+    private var itemNameColor: Color {
+        theme == .pixel ? .white : .primary
+    }
+
+    private var itemValueColor: Color {
+        theme == .pixel ? .gray.opacity(0.5) : .gray.opacity(0.6)
+    }
+
+    private var cardBackground: some View {
+        switch theme {
+        case .pixel:
+            return RoundedRectangle(cornerRadius: 8)
+                .fill(Color(white: 0.12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(statusColor.opacity(snapshot.isWarning ? 0.4 : 0.15), lineWidth: 1)
+                )
+        case .glass:
+            return RoundedRectangle(cornerRadius: 10)
                 .fill(.white.opacity(0.03))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
                         .strokeBorder(statusColor.opacity(snapshot.isWarning ? 0.3 : 0), lineWidth: 1)
                 )
-        )
-        .animation(.easeInOut(duration: 0.3), value: snapshot.usageRatio)
+        }
     }
 
     private var statusColor: Color {
@@ -292,18 +332,31 @@ struct ContextUsageCard: View {
         VStack(spacing: 2) {
             Text(label)
                 .font(.system(size: 9, weight: .medium))
-                .foregroundStyle((value == nil || (value! == 0 && !showIfZero)) ? .tertiary : .secondary)
+                .foregroundStyle(tokenLabelColor(value: value, showIfZero: showIfZero))
             if let val = value, (val > 0 || showIfZero) {
                 Text(formatTokenCount(val))
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(tokenValueColor)
             } else {
                 Text("--")
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(theme == .pixel ? .gray.opacity(0.4) : .gray.opacity(0.5))
             }
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private func tokenLabelColor(value: Int?, showIfZero: Bool) -> Color {
+        let isDimmed = value == nil || (value! == 0 && !showIfZero)
+        if theme == .pixel {
+            return isDimmed ? .gray.opacity(0.4) : .gray.opacity(0.5)
+        } else {
+            return isDimmed ? .gray.opacity(0.5) : .gray.opacity(0.6)
+        }
+    }
+
+    private var tokenValueColor: Color {
+        theme == .pixel ? .white.opacity(0.9) : .white
     }
 
 
@@ -314,13 +367,15 @@ struct ContextUsageCard: View {
 /// 当 trackedSession 存在但无 context_usage 数据时展示的基本会话信息
 struct SessionInfoCard: View {
     let session: Session
+    let theme: AppTheme
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: theme == .pixel ? 8 : 10) {
             // 标题行：会话名 + 状态
             HStack {
                 Text(session.sessionName ?? session.cwd.shortenedCwd())
                     .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(titleColor)
                     .lineLimit(1)
                     .truncationMode(.tail)
 
@@ -343,37 +398,67 @@ struct SessionInfoCard: View {
                     systemImage: session.toolSourceIcon
                 )
                 .font(.system(size: 10))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(metaColor)
 
                 Spacer()
 
                 Text(session.cwd.shortenedCwd())
                     .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(cwdColor)
                     .lineLimit(1)
             }
 
-            Divider().opacity(0.2)
+            Divider().opacity(theme == .pixel ? 0.15 : 0.2)
 
             // 等待数据提示
             HStack(spacing: 6) {
                 Image(systemName: "arrow.trianglehead.2.clockwise")
                     .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(hintColor)
                 Text("上下文数据将在会话运行后自动更新")
                     .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(hintColor)
             }
         }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
+        .padding(theme == .pixel ? 8 : 10)
+        .background(cardBackground)
+    }
+
+    // MARK: - 主题感知的颜色
+
+    private var titleColor: Color {
+        theme == .pixel ? .white : .primary
+    }
+
+    private var metaColor: Color {
+        theme == .pixel ? .gray.opacity(0.6) : .gray.opacity(0.7)
+    }
+
+    private var cwdColor: Color {
+        theme == .pixel ? .gray.opacity(0.5) : .gray.opacity(0.6)
+    }
+
+    private var hintColor: Color {
+        theme == .pixel ? .gray.opacity(0.5) : .gray.opacity(0.6)
+    }
+
+    private var cardBackground: some View {
+        switch theme {
+        case .pixel:
+            return RoundedRectangle(cornerRadius: 8)
+                .fill(Color(white: 0.12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(Color.gray.opacity(0.2), lineWidth: 1)
+                )
+        case .glass:
+            return RoundedRectangle(cornerRadius: 10)
                 .fill(.white.opacity(0.03))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
                         .strokeBorder(.gray.opacity(0.15), lineWidth: 1)
                 )
-        )
+        }
     }
 }
 

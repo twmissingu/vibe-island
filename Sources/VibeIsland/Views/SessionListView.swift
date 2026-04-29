@@ -12,6 +12,7 @@ struct SessionListView: View {
         let session: Session
         let isSelected: Bool
         let onSelect: () -> Void
+        let theme: AppTheme
 
         var body: some View {
             Button(action: onSelect) {
@@ -19,7 +20,7 @@ struct SessionListView: View {
                     // 会话名
                     Text(session.sessionName ?? session.cwd.shortenedCwd())
                         .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(sessionNameColor)
                         .lineLimit(1)
                         .truncationMode(.tail)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -27,7 +28,7 @@ struct SessionListView: View {
                     // 工具来源
                     Text(session.toolDisplayName)
                         .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(toolSourceColor)
                         .frame(width: 50, alignment: .trailing)
 
                     // 状态图标 + 名称
@@ -41,29 +42,77 @@ struct SessionListView: View {
                     }
                     .frame(width: 70, alignment: .trailing)
                 }
-                .padding(.vertical, 6)
+                .padding(.vertical, theme == .pixel ? 5 : 6)
                 .padding(.horizontal, 8)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(isSelected ? Color.blue.opacity(0.15) : Color.gray.opacity(0.08))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .strokeBorder(
-                            isSelected ? Color.blue.opacity(0.6) : Color.gray.opacity(0.15),
-                            lineWidth: isSelected ? 1.5 : 0.5
-                        )
-                )
-                .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
+                .background(rowBackground)
+                .overlay(rowBorder)
+                .shadow(color: shadowColor, radius: theme == .pixel ? 0 : 2, y: theme == .pixel ? 0 : 1)
             }
             .buttonStyle(.plain)
+        }
+
+        // MARK: - 主题感知的颜色
+
+        private var sessionNameColor: Color {
+            switch theme {
+            case .pixel:
+                return .white
+            case .glass:
+                return .primary
+            }
+        }
+
+        private var toolSourceColor: Color {
+            switch theme {
+            case .pixel:
+                return .gray.opacity(0.5)
+            case .glass:
+                return .secondary
+            }
+        }
+
+        private var rowBackground: some View {
+            switch theme {
+            case .pixel:
+                return RoundedRectangle(cornerRadius: 4)
+                    .fill(isSelected ? Color.blue.opacity(0.25) : Color(white: 0.15))
+            case .glass:
+                return RoundedRectangle(cornerRadius: 6)
+                    .fill(isSelected ? Color.blue.opacity(0.15) : Color.gray.opacity(0.08))
+            }
+        }
+
+        private var rowBorder: some View {
+            switch theme {
+            case .pixel:
+                return RoundedRectangle(cornerRadius: 4)
+                    .strokeBorder(
+                        isSelected ? Color.cyan.opacity(0.6) : Color.gray.opacity(0.2),
+                        lineWidth: isSelected ? 1.5 : 0.5
+                    )
+            case .glass:
+                return RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(
+                        isSelected ? Color.blue.opacity(0.5) : Color.gray.opacity(0.15),
+                        lineWidth: isSelected ? 1.5 : 0.5
+                    )
+            }
+        }
+
+        private var shadowColor: Color {
+            switch theme {
+            case .pixel:
+                return .clear
+            case .glass:
+                return .black.opacity(0.05)
+            }
         }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: themeSpacing) {
             if sessionManager.sortedSessions.isEmpty {
                 emptyState
             } else {
@@ -73,12 +122,17 @@ struct SessionListView: View {
                         isSelected: isSessionSelected(session),
                         onSelect: {
                             selectSession(session)
-                        }
+                        },
+                        theme: viewModel.settings.theme
                     )
                 }
             }
         }
         .padding(.horizontal, 4)
+    }
+
+    private var themeSpacing: CGFloat {
+        viewModel.settings.theme == .pixel ? 4 : 6
     }
 
     // MARK: - 辅助方法
@@ -110,13 +164,21 @@ struct SessionListView: View {
         VStack(spacing: 6) {
             Image(systemName: "terminal")
                 .font(.system(size: 16))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(emptyIconColor)
             Text("No active sessions")
                 .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(emptyTextColor)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
+    }
+
+    private var emptyIconColor: Color {
+        viewModel.settings.theme == .pixel ? .gray.opacity(0.4) : .gray.opacity(0.5)
+    }
+
+    private var emptyTextColor: Color {
+        viewModel.settings.theme == .pixel ? .gray.opacity(0.5) : .gray.opacity(0.6)
     }
 }
 

@@ -43,9 +43,10 @@ struct ExpandedIslandView: View {
         .background(backgroundView)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: sessionManager.sortedSessions.first?.sessionId)
-        .sheet(isPresented: $showSettings) {
+        .popover(isPresented: $showSettings, arrowEdge: .top) {
             SettingsView()
                 .environment(viewModel)
+                .frame(width: 450)
         }
     }
 
@@ -72,21 +73,56 @@ struct ExpandedIslandView: View {
                 Text(tab.rawValue)
                     .font(.system(size: 11, weight: .medium))
             }
-            .foregroundStyle(selectedTab == tab ? .white : .secondary)
+            .foregroundStyle(tabForegroundStyle(for: tab))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(selectedTab == tab ? Color.blue : Color.gray.opacity(0.1))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(selectedTab == tab ? Color.blue.opacity(0.3) : Color.clear, lineWidth: 1)
-            )
+            .background(tabBackground(for: tab))
+            .overlay(tabBorder(for: tab))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(tab.rawValue)
         .contentShape(Rectangle())
+    }
+
+    // MARK: - 主题感知的标签样式
+
+    private func tabForegroundStyle(for tab: ExpandedTab) -> some ShapeStyle {
+        let isSelected = selectedTab == tab
+        switch viewModel.settings.theme {
+        case .pixel:
+            return isSelected ? .white : .gray.opacity(0.6)
+        case .glass:
+            return isSelected ? .white : .secondary
+        }
+    }
+
+    @ViewBuilder
+    private func tabBackground(for tab: ExpandedTab) -> some View {
+        let isSelected = selectedTab == tab
+        switch viewModel.settings.theme {
+        case .pixel:
+            RoundedRectangle(cornerRadius: 6)
+                .fill(isSelected ? Color.blue.opacity(0.8) : Color.clear)
+        case .glass:
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isSelected ? Color.blue : Color.gray.opacity(0.15))
+        }
+    }
+
+    @ViewBuilder
+    private func tabBorder(for tab: ExpandedTab) -> some View {
+        let isSelected = selectedTab == tab
+        switch viewModel.settings.theme {
+        case .pixel:
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(
+                    isSelected ? Color.cyan.opacity(0.5) : Color.gray.opacity(0.2),
+                    lineWidth: isSelected ? 1.5 : 0.5
+                )
+        case .glass:
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(isSelected ? Color.blue.opacity(0.3) : Color.clear, lineWidth: 1)
+        }
     }
 
     // MARK: - 标签内容
@@ -124,7 +160,7 @@ struct ExpandedIslandView: View {
     private var contextTab: some View {
         VStack(spacing: 8) {
             ScrollView {
-                VStack(spacing: 8) {
+                VStack(spacing: themeSpacing) {
                     if let session = sessionManager.trackedSession {
                         if let usage = session.contextUsage, usage > 0 {
                             let snapshot = ContextUsageSnapshot(
@@ -139,9 +175,9 @@ struct ExpandedIslandView: View {
                                 skillUsage: session.skillUsage,
                                 timestamp: Date()
                             )
-                            ContextUsageCard(session: session, snapshot: snapshot)
+                            ContextUsageCard(session: session, snapshot: snapshot, theme: viewModel.settings.theme)
                         } else {
-                            SessionInfoCard(session: session)
+                            SessionInfoCard(session: session, theme: viewModel.settings.theme)
                         }
                     } else {
                         emptyContextView
@@ -151,18 +187,22 @@ struct ExpandedIslandView: View {
             }
             .frame(maxHeight: .infinity)
 
-footer
+            footer
         }
+    }
+
+    private var themeSpacing: CGFloat {
+        viewModel.settings.theme == .pixel ? 6 : 8
     }
 
     private var emptyContextView: some View {
         VStack(spacing: 8) {
             Image(systemName: "brain")
                 .font(.system(size: 24))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.gray.opacity(0.6))
             Text("暂无会话数据")
                 .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.gray.opacity(0.7))
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
@@ -178,7 +218,7 @@ footer
                     .font(.system(size: 11))
             }
             .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.gray.opacity(0.7))
 
             Spacer()
 
@@ -198,7 +238,7 @@ footer
                     .font(.system(size: 11))
             }
             .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.gray.opacity(0.7))
         }
         .padding(.top, 4)
     }
