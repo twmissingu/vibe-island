@@ -17,6 +17,7 @@ struct SettingsView: View {
     // 声音设置
     @State private var soundEnabled = true
     @State private var soundVolume: Float = 1.0
+    @State private var showPluginInfo = false
 
     // 多工具监控
     @State private var detectedTools: [ToolSource] = []
@@ -44,8 +45,9 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+            // MARK: - 外观
             Section(NSLocalizedString("settings.appearance", comment: "Appearance")) {
-                Picker(NSLocalizedString("settings.hud.style", comment: "HUD Style"), selection: Binding(
+                Picker(NSLocalizedString("settings.hud.style", comment: "Style"), selection: Binding(
                     get: { viewModel.settings.theme },
                     set: { viewModel.settings.theme = $0; saveSettings() }
                 )) {
@@ -57,82 +59,6 @@ struct SettingsView: View {
                 .tint(.white)
             }
 
-            // MARK: - Hook 管理
-            Section(NSLocalizedString("settings.section.claudeHook", comment: "Claude Code Hook")) {
-                hookStatusRow
-
-                Button(hookActionTitle) {
-                    Task { await performHookAction() }
-                }
-                .disabled(hookButtonDisabled)
-
-                if let msg = hookMessage {
-                    Text(msg)
-                        .font(.system(size: 11))
-                        .foregroundStyle(hookMessageIsError ? .red : .green)
-                }
-
-                // 安装帮助提示
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("💡 \(NSLocalizedString("settings.hook.installationGuide", comment: "Installation Guide")):")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Text("1. \(NSLocalizedString("settings.hook.install.claude.required", comment: "Ensure Claude Code is installed"))")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                    Text("2. \(NSLocalizedString("settings.hook.install.disk.access", comment: "Enable full disk access"))")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                    Text("3. \(NSLocalizedString("settings.hook.install.restart.app", comment: "Restart app and try again"))")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.top, 4)
-
-                HStack {
-                    Text(NSLocalizedString("settings.claudeStatus", comment: "Claude Code Status"))
-                    Spacer()
-                    Text(claudeRunning ? NSLocalizedString("settings.claude.running", comment: "Running") : NSLocalizedString("settings.claude.notRunning", comment: "Not Running"))
-                        .font(.system(size: 12))
-                        .foregroundStyle(claudeRunning ? .green : .secondary)
-                }
-            }
-
-            // MARK: - OpenCode 插件管理
-            Section(NSLocalizedString("settings.section.opencodePlugin", comment: "OpenCode Plugin")) {
-                openCodePluginStatusRow
-
-                Button(openCodePluginActionTitle) {
-                    Task { await performOpenCodePluginAction() }
-                }
-                .disabled(openCodePluginButtonDisabled)
-
-                if let msg = openCodePluginMessage {
-                    Text(msg)
-                        .font(.system(size: 11))
-                        .foregroundStyle(openCodePluginMessageIsError ? .red : .green)
-                }
-
-                HStack {
-                    Text(NSLocalizedString("settings.opencodeStatus", comment: "OpenCode Status"))
-                    Spacer()
-                    Text(openCodeRunning ? NSLocalizedString("settings.claude.running", comment: "Running") : NSLocalizedString("settings.claude.notRunning", comment: "Not Running"))
-                        .font(.system(size: 12))
-                        .foregroundStyle(openCodeRunning ? .green : .secondary)
-                }
-
-                // 安装帮助提示
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("💡 \(NSLocalizedString("settings.restartRequired", comment: "Restart required"))")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Text(NSLocalizedString("settings.plugin.installationGuide", comment: "Plugin Installation Guide"))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.top, 4)
-            }
-
             // MARK: - 声音设置
             Section(NSLocalizedString("settings.section.sound", comment: "Sound")) {
                 Toggle(NSLocalizedString("settings.sound.enable", comment: "Enable Sound Effects"), isOn: Binding(
@@ -142,6 +68,7 @@ struct SettingsView: View {
                         viewModel.soundManager.setEnabled($0)
                     }
                 ))
+                .toggleStyle(SwitchToggleStyle(tint: .blue))
 
                 HStack {
                     Text(NSLocalizedString("settings.sound.volume", comment: "Volume"))
@@ -150,6 +77,7 @@ struct SettingsView: View {
                             viewModel.soundManager.setVolume(soundVolume)
                         }
                     }
+                    .tint(.blue)
                     Text("\(Int(soundVolume * 100))%")
                         .font(.system(size: 12))
                         .frame(width: 40)
@@ -158,29 +86,32 @@ struct SettingsView: View {
                 testSoundButtons
             }
 
-            // MARK: - 宠物设置（增强版：含皮肤选择）
-            Section(NSLocalizedString("settings.section.pet", comment: "Pixel Pet")) {
-                Toggle(NSLocalizedString("settings.pet.enable", comment: "Enable Pixel Pet"), isOn: Binding(
+            // MARK: - 宠物设置
+            Section(NSLocalizedString("settings.section.pet", comment: "Pet")) {
+                Toggle(NSLocalizedString("settings.pet.enable", comment: "Enable Pet"), isOn: Binding(
                     get: { viewModel.settings.petEnabled },
                     set: { viewModel.settings.petEnabled = $0; saveSettings() }
                 ))
+                .toggleStyle(SwitchToggleStyle(tint: .blue))
 
                 if viewModel.settings.petEnabled {
                     petSkinSelectorView
                 }
             }
 
-            // MARK: - 多工具监控
-            Section(NSLocalizedString("settings.section.multiTool", comment: "Multi-Tool Monitoring")) {
-                Toggle(NSLocalizedString("settings.claudeMonitor", comment: "Claude Code Monitor"), isOn: Binding(
+            // MARK: - 监控
+            Section(NSLocalizedString("settings.section.monitor", comment: "Monitor")) {
+                Toggle(NSLocalizedString("settings.claudeMonitor", comment: "Claude Code"), isOn: Binding(
                     get: { isToolEnabled(.claudeCode) },
                     set: { setToolEnabled(.claudeCode, $0) }
                 ))
+                .toggleStyle(SwitchToggleStyle(tint: .blue))
 
-                Toggle(NSLocalizedString("settings.openCodeMonitor", comment: "OpenCode Monitor"), isOn: Binding(
+                Toggle(NSLocalizedString("settings.openCodeMonitor", comment: "OpenCode"), isOn: Binding(
                     get: { isToolEnabled(.openCode) },
                     set: { setToolEnabled(.openCode, $0) }
                 ))
+                .toggleStyle(SwitchToggleStyle(tint: .blue))
                 .disabled(openCodePluginStatus != .installed)
 
                 if openCodePluginStatus != .installed {
@@ -188,7 +119,7 @@ struct SettingsView: View {
                         Image(systemName: "lock.shield")
                             .foregroundStyle(.orange)
                             .font(.system(size: 11))
-                        Text("需先安装插件")
+                        Text("需安装插件")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
@@ -196,7 +127,7 @@ struct SettingsView: View {
 
                 if !detectedTools.isEmpty {
                     HStack {
-                        Text(NSLocalizedString("settings.detectedTools", comment: "Detected Tools"))
+                        Text(NSLocalizedString("settings.detectedTools", comment: "Detected"))
                         Spacer()
                         ForEach(detectedTools, id: \.self) { tool in
                             Label(tool.displayName, systemImage: "checkmark.circle.fill")
@@ -206,12 +137,35 @@ struct SettingsView: View {
                     }
                 } else {
                     HStack {
-                        Text(NSLocalizedString("settings.detectedTools", comment: "Detected Tools"))
+                        Text(NSLocalizedString("settings.detectedTools", comment: "Detected"))
                         Spacer()
                         Text(NSLocalizedString("settings.none", comment: "None"))
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }
+                }
+            }
+
+            // MARK: - 插件
+            Section {
+                HStack {
+                    Text("Claude Code")
+                    Spacer()
+                    pluginButton(isInstalled: hookStatus == .installed, action: {
+                        Task { await performHookAction() }
+                    })
+                }
+                HStack {
+                    Text("OpenCode")
+                    Spacer()
+                    pluginButton(isInstalled: openCodePluginStatus == .installed, action: {
+                        Task { await performOpenCodePluginAction() }
+                    })
+                }
+            } header: {
+                HStack {
+                    Text(NSLocalizedString("settings.section.plugin", comment: "Plugin"))
+                    pluginInfoButton
                 }
             }
 
@@ -221,6 +175,7 @@ struct SettingsView: View {
                     get: { viewModel.settings.launchAtLogin },
                     set: { viewModel.settings.launchAtLogin = $0; saveSettings() }
                 ))
+                .toggleStyle(SwitchToggleStyle(tint: .blue))
             }
         }
             .formStyle(.grouped)
@@ -228,6 +183,12 @@ struct SettingsView: View {
             .background(Color(white: 0.08))
             .scrollContentBackground(.hidden)
             .preferredColorScheme(.dark)
+.tint(.blue)
+            .onAppear {
+                // Force state refresh on appear
+                loadSoundSettings()
+                detectRunningTools()
+            }
             .navigationTitle(NSLocalizedString("settings.title", comment: "Settings"))
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -235,12 +196,11 @@ struct SettingsView: View {
                         dismiss()
                     }
                 }
+
             }
             .task {
                 await refreshHookStatus()
                 await refreshOpenCodePluginStatus()
-                loadSoundSettings()
-                detectRunningTools()
             }
         }
     }
@@ -406,6 +366,49 @@ struct SettingsView: View {
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
+    }
+
+    private func pluginButton(isInstalled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: isInstalled ? "minus.circle.fill" : "plus.circle.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(isInstalled ? .red : .blue)
+                Text(isInstalled ? NSLocalizedString("settings.plugin.uninstall", comment: "Uninstall") : NSLocalizedString("settings.plugin.install", comment: "Install"))
+                    .font(.system(size: 11))
+                    .foregroundStyle(isInstalled ? .red : .blue)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var pluginInfoButton: some View {
+        Button {
+            showPluginInfo = true
+        } label: {
+            Image(systemName: "questionmark.circle")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showPluginInfo, arrowEdge: .top) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(NSLocalizedString("settings.plugin.purpose", comment: "Purpose"))
+                    .font(.system(size: 12, weight: .semibold))
+                Text(NSLocalizedString("settings.plugin.purpose.desc", comment: "Monitor AI coding tool status"))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Divider()
+                Text(NSLocalizedString("settings.plugin.security", comment: "Data Security"))
+                    .font(.system(size: 12, weight: .semibold))
+                Text(NSLocalizedString("settings.plugin.security.desc", comment: "Security description"))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            .padding()
+            .frame(width: 180)
+        }
     }
 
     private func loadSoundSettings() {

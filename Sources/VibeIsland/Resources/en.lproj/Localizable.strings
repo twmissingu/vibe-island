@@ -45,10 +45,18 @@
 "settings.sound.error" = "Error";
 "settings.sound.compacting" = "Compacting";
 "settings.section.pet" = "Pet";
+"settings.section.monitor" = "Monitor";
+"settings.section.plugin" = "Plugin";
+"settings.plugin.install" = "Install";
+"settings.plugin.uninstall" = "Uninstall";
+"settings.plugin.purpose" = "Purpose";
+"settings.plugin.purpose.desc" = "Monitor AI coding tool status";
+"settings.plugin.security" = "Data Security";
+"settings.plugin.security.desc" = "• Read tool status only\n• Process locally, no cloud upload\n• No privacy risk";
 "settings.pet.enable" = "Enable Pet";
 "settings.pet.type" = "Pet Type";
 "settings.pet.size" = "Pet Size";
-"settings.section.multiTool" = "Multi-Tool Monitoring";
+
 "settings.section.context" = "Context Awareness";
 "settings.context.enable" = "Enable Context Monitoring";
 "settings.context.warningThreshold" = "Warning Threshold";
@@ -67,6 +75,7 @@
 "settings.refreshNow" = "Refresh Now";
 "settings.configured" = "Configured";
 "settings.notConfigured" = "Not Configured";
+"settings.none" = "None";
 "settings.delete" = "Delete";
 "settings.addKeyTitle" = "Add API Key";
 "settings.platform" = "Platform";
@@ -74,10 +83,9 @@
 "settings.cancel" = "Cancel";
 "settings.save" = "Save";
 "settings.saveFailed" = "Save failed: %@";
-"settings.detectedTools" = "Detected Tools";
-"settings.none" = "None";
-"settings.claudeMonitor" = "Claude Code Monitor";
-"settings.openCodeMonitor" = "OpenCode Monitor";
+"settings.detectedTools" = "Dev Tools";
+"settings.claudeMonitor" = "Claude Code";
+"settings.openCodeMonitor" = "OpenCode";
 "settings.installHook" = "Install Hook";
 "settings.uninstallHook" = "Uninstall Hook";
 "settings.installPlugin" = "Install Plugin";

@@ -45,10 +45,18 @@
 "settings.sound.error" = "错误";
 "settings.sound.compacting" = "压缩";
 "settings.section.pet" = "宠物";
+"settings.section.monitor" = "监控";
+"settings.section.plugin" = "插件";
+"settings.plugin.install" = "安装";
+"settings.plugin.uninstall" = "卸载";
+"settings.plugin.purpose" = "插件作用";
+"settings.plugin.purpose.desc" = "监控 AI 编程工具的运行状态";
+"settings.plugin.security" = "数据安全";
+"settings.plugin.security.desc" = "• 仅读取工具状态信息\n• 本地处理，不上传云端\n• 无隐私风险";
 "settings.pet.enable" = "启用宠物";
 "settings.pet.type" = "宠物类型";
 "settings.pet.size" = "宠物大小";
-"settings.section.multiTool" = "多工具监控";
+
 "settings.section.context" = "上下文感知";
 "settings.context.enable" = "启用上下文监控";
 "settings.context.warningThreshold" = "警告阈值";
@@ -67,6 +75,7 @@
 "settings.refreshNow" = "立即刷新所有";
 "settings.configured" = "已配置 ✅";
 "settings.notConfigured" = "未配置";
+"settings.none" = "无";
 "settings.delete" = "删除";
 "settings.addKeyTitle" = "添加 API Key";
 "settings.platform" = "平台";
@@ -74,10 +83,9 @@
 "settings.cancel" = "取消";
 "settings.save" = "保存";
 "settings.saveFailed" = "保存失败: %@";
-"settings.detectedTools" = "检测到的工具";
-"settings.none" = "无";
-"settings.claudeMonitor" = "Claude Code 监控";
-"settings.openCodeMonitor" = "OpenCode 监控";
+"settings.detectedTools" = "编程工具";
+"settings.claudeMonitor" = "Claude Code";
+"settings.openCodeMonitor" = "OpenCode";
 "settings.installHook" = "安装 Hook";
 "settings.uninstallHook" = "卸载 Hook";
 "settings.installPlugin" = "安装插件";

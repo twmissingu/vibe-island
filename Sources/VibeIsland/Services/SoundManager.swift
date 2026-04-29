@@ -73,7 +73,7 @@ final class SoundManager: Sendable {
     // MARK: - 常量
 
     /// 默认音量（0.0 - 1.0）
-    static let defaultVolume: Float = 0.7
+    static let defaultVolume: Float = 1.0
 
     /// 声音文件目录名称
     private static let soundsDirectoryName = "Sounds"
