@@ -19,6 +19,10 @@ struct SettingsView: View {
     @State private var soundVolume: Float = 1.0
     @State private var showPluginInfo = false
 
+    // 宠物解锁/升级通知
+    @State private var showPetNotification = false
+    @State private var pendingNotification: PetUnlockNotification?
+
     // 多工具监控
     @State private var detectedTools: [ToolSource] = []
 
@@ -45,135 +49,135 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-            // MARK: - 外观
-            Section(NSLocalizedString("settings.appearance", comment: "Appearance")) {
-                Picker(NSLocalizedString("settings.hud.style", comment: "Style"), selection: Binding(
-                    get: { viewModel.settings.theme },
-                    set: { viewModel.settings.theme = $0; saveSettings() }
-                )) {
-                    ForEach(AppTheme.allCases, id: \.self) { theme in
-                        Text(theme.displayName).tag(theme)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .tint(.white)
-            }
-
-            // MARK: - 声音设置
-            Section(NSLocalizedString("settings.section.sound", comment: "Sound")) {
-                Toggle(NSLocalizedString("settings.sound.enable", comment: "Enable Sound Effects"), isOn: Binding(
-                    get: { soundEnabled },
-                    set: {
-                        soundEnabled = $0
-                        viewModel.soundManager.setEnabled($0)
-                    }
-                ))
-                .toggleStyle(SwitchToggleStyle(tint: .blue))
-
-                HStack {
-                    Text(NSLocalizedString("settings.sound.volume", comment: "Volume"))
-                    Slider(value: $soundVolume, in: 0...1) { editing in
-                        if !editing {
-                            viewModel.soundManager.setVolume(soundVolume)
+                // MARK: - 外观
+                Section(NSLocalizedString("settings.appearance", comment: "Appearance")) {
+                    Picker(NSLocalizedString("settings.hud.style", comment: "Style"), selection: Binding(
+                        get: { viewModel.settings.theme },
+                        set: { viewModel.settings.theme = $0; saveSettings() }
+                    )) {
+                        ForEach(AppTheme.allCases, id: \.self) { theme in
+                            Text(theme.displayName).tag(theme)
                         }
                     }
-                    .tint(.blue)
-                    Text("\(Int(soundVolume * 100))%")
-                        .font(.system(size: 12))
-                        .frame(width: 40)
+                    .pickerStyle(.segmented)
+                    .tint(.white)
                 }
 
-                testSoundButtons
-            }
+                // MARK: - 声音设置
+                Section(NSLocalizedString("settings.section.sound", comment: "Sound")) {
+                    Toggle(NSLocalizedString("settings.sound.enable", comment: "Enable Sound Effects"), isOn: Binding(
+                        get: { soundEnabled },
+                        set: {
+                            soundEnabled = $0
+                            viewModel.soundManager.setEnabled($0)
+                        }
+                    ))
+                    .toggleStyle(SwitchToggleStyle(tint: .blue))
 
-            // MARK: - 宠物设置
-            Section(NSLocalizedString("settings.section.pet", comment: "Pet")) {
-                Toggle(NSLocalizedString("settings.pet.enable", comment: "Enable Pet"), isOn: Binding(
-                    get: { viewModel.settings.petEnabled },
-                    set: { viewModel.settings.petEnabled = $0; saveSettings() }
-                ))
-                .toggleStyle(SwitchToggleStyle(tint: .blue))
-
-                if viewModel.settings.petEnabled {
-                    petSkinSelectorView
-                }
-            }
-
-            // MARK: - 监控
-            Section(NSLocalizedString("settings.section.monitor", comment: "Monitor")) {
-                Toggle(NSLocalizedString("settings.claudeMonitor", comment: "Claude Code"), isOn: Binding(
-                    get: { isToolEnabled(.claudeCode) },
-                    set: { setToolEnabled(.claudeCode, $0) }
-                ))
-                .toggleStyle(SwitchToggleStyle(tint: .blue))
-
-                Toggle(NSLocalizedString("settings.openCodeMonitor", comment: "OpenCode"), isOn: Binding(
-                    get: { isToolEnabled(.openCode) },
-                    set: { setToolEnabled(.openCode, $0) }
-                ))
-                .toggleStyle(SwitchToggleStyle(tint: .blue))
-                .disabled(openCodePluginStatus != .installed)
-
-                if openCodePluginStatus != .installed {
                     HStack {
-                        Image(systemName: "lock.shield")
-                            .foregroundStyle(.orange)
-                            .font(.system(size: 11))
-                        Text("需安装插件")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                        Text(NSLocalizedString("settings.sound.volume", comment: "Volume"))
+                        Slider(value: $soundVolume, in: 0...1) { editing in
+                            if !editing {
+                                viewModel.soundManager.setVolume(soundVolume)
+                            }
+                        }
+                        .tint(.blue)
+                        Text("\(Int(soundVolume * 100))%")
+                            .font(.system(size: 12))
+                            .frame(width: 40)
+                    }
+
+                    testSoundButtons
+                }
+
+                // MARK: - 宠物设置
+                Section(NSLocalizedString("settings.section.pet", comment: "Pet")) {
+                    Toggle(NSLocalizedString("settings.pet.enable", comment: "Enable Pet"), isOn: Binding(
+                        get: { viewModel.settings.petEnabled },
+                        set: { viewModel.settings.petEnabled = $0; saveSettings() }
+                    ))
+                    .toggleStyle(SwitchToggleStyle(tint: .blue))
+
+                    if viewModel.settings.petEnabled {
+                        petSkinSelectorView
                     }
                 }
-            }
 
-            // MARK: - 插件
-            Section {
-                HStack {
-                    Text("Claude Code")
-                    Spacer()
-                    pluginButton(isInstalled: hookStatus == .installed, action: {
-                        Task { await performHookAction() }
-                    })
+                // MARK: - 监控
+                Section(NSLocalizedString("settings.section.monitor", comment: "Monitor")) {
+                    Toggle(NSLocalizedString("settings.claudeMonitor", comment: "Claude Code"), isOn: Binding(
+                        get: { isToolEnabled(.claudeCode) },
+                        set: { setToolEnabled(.claudeCode, $0) }
+                    ))
+                    .toggleStyle(SwitchToggleStyle(tint: .blue))
+
+                    Toggle(NSLocalizedString("settings.openCodeMonitor", comment: "OpenCode"), isOn: Binding(
+                        get: { isToolEnabled(.openCode) },
+                        set: { setToolEnabled(.openCode, $0) }
+                    ))
+                    .toggleStyle(SwitchToggleStyle(tint: .blue))
+                    .disabled(openCodePluginStatus != .installed)
+
+                    if openCodePluginStatus != .installed {
+                        HStack {
+                            Image(systemName: "lock.shield")
+                                .foregroundStyle(.orange)
+                                .font(.system(size: 11))
+                            Text("需安装插件")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
-                if let msg = hookMessage {
+
+                // MARK: - 插件
+                Section {
                     HStack {
-                        Text(msg)
-                            .font(.system(size: 10))
-                            .foregroundStyle(msg.hasPrefix("失败") || msg.hasPrefix("错误") ? .red : .green)
+                        Text("Claude Code")
                         Spacer()
+                        pluginButton(isInstalled: hookStatus == .installed, action: {
+                            Task { await performHookAction() }
+                        })
                     }
-                }
-                HStack {
-                    Text("OpenCode")
-                    Spacer()
-                    pluginButton(isInstalled: openCodePluginStatus == .installed, action: {
-                        Task { await performOpenCodePluginAction() }
-                    })
-                }
-                if let msg = openCodePluginMessage {
+                    if let msg = hookMessage {
+                        HStack {
+                            Text(msg)
+                                .font(.system(size: 10))
+                                .foregroundStyle(msg.hasPrefix("失败") || msg.hasPrefix("错误") ? .red : .green)
+                            Spacer()
+                        }
+                    }
                     HStack {
-                        Text(msg)
-                            .font(.system(size: 10))
-                            .foregroundStyle(openCodePluginMessageIsError ? .red : .green)
+                        Text("OpenCode")
                         Spacer()
+                        pluginButton(isInstalled: openCodePluginStatus == .installed, action: {
+                            Task { await performOpenCodePluginAction() }
+                        })
+                    }
+                    if let msg = openCodePluginMessage {
+                        HStack {
+                            Text(msg)
+                                .font(.system(size: 10))
+                                .foregroundStyle(openCodePluginMessageIsError ? .red : .green)
+                            Spacer()
+                        }
+                    }
+                } header: {
+                    HStack {
+                        Text(NSLocalizedString("settings.section.plugin", comment: "Plugin"))
+                        pluginInfoButton
                     }
                 }
-            } header: {
-                HStack {
-                    Text(NSLocalizedString("settings.section.plugin", comment: "Plugin"))
-                    pluginInfoButton
+
+                // MARK: - 系统
+                Section(NSLocalizedString("settings.section.system", comment: "System")) {
+                    Toggle(NSLocalizedString("settings.launchAtLogin", comment: "Launch at Login"), isOn: Binding(
+                        get: { viewModel.settings.launchAtLogin },
+                        set: { viewModel.settings.launchAtLogin = $0; saveSettings() }
+                    ))
+                    .toggleStyle(SwitchToggleStyle(tint: .blue))
                 }
             }
-
-            // MARK: - 系统
-            Section(NSLocalizedString("settings.section.system", comment: "System")) {
-                Toggle(NSLocalizedString("settings.launchAtLogin", comment: "Launch at Login"), isOn: Binding(
-                    get: { viewModel.settings.launchAtLogin },
-                    set: { viewModel.settings.launchAtLogin = $0; saveSettings() }
-                ))
-                .toggleStyle(SwitchToggleStyle(tint: .blue))
-            }
-        }
             .formStyle(.grouped)
             .frame(width: 450, height: 400)
             .background(Color(white: 0.08))
@@ -181,9 +185,9 @@ struct SettingsView: View {
             .preferredColorScheme(.dark)
             .tint(.blue)
             .onAppear {
-                // Force state refresh on appear
                 loadSoundSettings()
                 detectRunningTools()
+                setupPetNotificationObserver()
             }
             .navigationTitle(NSLocalizedString("settings.title", comment: "Settings"))
             .toolbar {
@@ -192,12 +196,14 @@ struct SettingsView: View {
                         dismiss()
                     }
                 }
-
             }
             .task {
                 await refreshHookStatus()
                 await refreshOpenCodePluginStatus()
             }
+        }
+        .sheet(isPresented: $showPetNotification) {
+            petNotificationSheet
         }
     }
 
@@ -570,6 +576,29 @@ struct SettingsView: View {
 
     private func savePetLevel() {
         PetProgressManager.shared.selectedPet = PetType(rawValue: viewModel.settings.selectedPetID) ?? .cat
+    }
+
+    private func setupPetNotificationObserver() {
+        PetUnlockNotificationManager.shared.onNewNotification = { [self] notification in
+            DispatchQueue.main.async {
+                self.pendingNotification = notification
+                self.showPetNotification = true
+            }
+        }
+    }
+}
+
+// MARK: - 宠物通知弹窗
+
+extension SettingsView {
+    private var petNotificationSheet: some View {
+        PetUnlockView(
+            notification: pendingNotification ?? PetUnlockNotification(type: .unlock, pet: .cat, unlockTime: Date()),
+            onDismiss: {
+                showPetNotification = false
+                PetUnlockNotificationManager.shared.clearLatestNotification()
+            }
+        )
     }
 }
 

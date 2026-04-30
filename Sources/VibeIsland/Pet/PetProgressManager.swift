@@ -4,10 +4,20 @@ import SwiftUI
 
 // MARK: - 宠物解锁通知
 
-/// 宠物解锁通知
+/// 通知类型
+enum PetNotificationType: String, Sendable {
+    case unlock    // 宠物解锁
+    case levelUp  // 皮肤升级
+}
+
+/// 宠物解锁/升级通知
 struct PetUnlockNotification: Equatable, Sendable {
-    /// 解锁的宠物
+    /// 通知类型
+    let type: PetNotificationType
+    /// 宠物
     let pet: PetType
+    /// 升级后的等级（仅 levelUp 时有效）
+    var newLevel: PetLevel?
     /// 解锁时间
     let unlockTime: Date
     /// 通知ID（用于去重）
@@ -16,11 +26,14 @@ struct PetUnlockNotification: Equatable, Sendable {
 
 /// 宠物解锁通知管理器
 @MainActor
-final class PetUnlockNotificationManager {
+final class PetUnlockNotificationManager: ObservableObject {
     static let shared = PetUnlockNotificationManager()
 
     /// 最近的通知（保留最近5条）
     private(set) var recentNotifications: [PetUnlockNotification] = []
+
+    /// 最新通知（用于 SwiftUI 绑定）
+    @Published var latestNotification: PetUnlockNotification?
 
     /// 新通知回调
     var onNewNotification: ((PetUnlockNotification) -> Void)?
@@ -30,16 +43,22 @@ final class PetUnlockNotificationManager {
     /// 添加新通知
     func addNotification(_ notification: PetUnlockNotification) {
         recentNotifications.insert(notification, at: 0)
-        // 保留最近5条
         if recentNotifications.count > 5 {
             recentNotifications.removeLast()
         }
+        latestNotification = notification
         onNewNotification?(notification)
+    }
+
+    /// 清除最新通知
+    func clearLatestNotification() {
+        latestNotification = nil
     }
 
     /// 清除所有通知
     func clearNotifications() {
         recentNotifications.removeAll()
+        latestNotification = nil
     }
 }
 
@@ -466,7 +485,7 @@ final class PetProgressManager {
                 Self.logger.info("🎉 新宠物解锁: \(pet.displayName)")
 
                 // 发送解锁通知
-                let notification = PetUnlockNotification(pet: pet, unlockTime: Date())
+                let notification = PetUnlockNotification(type: .unlock, pet: pet, unlockTime: Date())
                 PetUnlockNotificationManager.shared.addNotification(notification)
 
                 // 触发视觉反馈（粒子效果）
@@ -486,8 +505,8 @@ final class PetProgressManager {
     private func checkPetLevelUp(pet: PetType, oldLevel: PetLevel, newLevel: PetLevel) {
         Self.logger.info("🎉 宠物升级: \(pet.displayName) \(oldLevel.displayName) → \(newLevel.displayName)")
 
-        // 发送解锁通知（复用通知系统）
-        let notification = PetUnlockNotification(pet: pet, unlockTime: Date())
+        // 发送升级通知
+        let notification = PetUnlockNotification(type: .levelUp, pet: pet, newLevel: newLevel, unlockTime: Date())
         PetUnlockNotificationManager.shared.addNotification(notification)
 
         // 触发庆祝动画
