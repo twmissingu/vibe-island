@@ -512,3 +512,72 @@ struct SessionInfoCard: View {
     }
 }
 
+// MARK: - OpenCode 无上下文数据卡片
+
+struct OpenCodeNoContextCard: View {
+    let session: Session
+    let theme: AppTheme
+
+    var body: some View {
+        Group {
+            switch theme {
+            case .pixel:
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.gray.opacity(0.1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
+                    )
+            case .glass:
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(.white.opacity(0.05))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(.gray.opacity(0.2), lineWidth: 1)
+                    )
+            }
+        }
+        .padding(12)
+        .overlay {
+            VStack(spacing: 8) {
+                HStack {
+                    Image(systemName: "terminal.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.orange)
+                    Text("OpenCode")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(session.status.color)
+                            .frame(width: 6, height: 6)
+                        Text(session.status.statusName)
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if let name = session.sessionName {
+                    Text(name)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.orange)
+                    Text("OpenCode 暂不支持上下文监控")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.top, 4)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+

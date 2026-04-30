@@ -185,13 +185,61 @@ final class OpenCodeMonitor: SessionAggregatable {
 
     // MARK: - 同步到 SessionManager
 
+    /// 从会话文件读取最新的 context usage 数据
+    private func readContextUsageFromFile(for sessionId: String) -> (usage: Double, tokensUsed: Int?, tokensTotal: Int?, inputTokens: Int?, outputTokens: Int?, reasoningTokens: Int?)? {
+        let sessionsDir = SessionFileWatcher.sessionsDirectory
+
+        guard let enumerator = FileManager.default.enumerator(
+            at: sessionsDir,
+            includingPropertiesForKeys: nil
+        ) else { return nil }
+
+        for case let fileURL as URL in enumerator {
+            guard fileURL.pathExtension == "json" else { continue }
+
+            do {
+                let data = try Data(contentsOf: fileURL)
+                guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
+
+                let fileSessionId = json["session_id"] as? String
+                guard fileSessionId == sessionId else { continue }
+
+                if let usage = json["context_usage"] as? Double {
+                    let tokensUsed = json["context_tokens_used"] as? Int
+                    let tokensTotal = json["context_tokens_total"] as? Int
+                    let inputTokens = json["context_input_tokens"] as? Int
+                    let outputTokens = json["context_output_tokens"] as? Int
+                    let reasoningTokens = json["context_reasoning_tokens"] as? Int
+                    return (usage, tokensUsed, tokensTotal, inputTokens, outputTokens, reasoningTokens)
+                }
+            } catch {
+                continue
+            }
+        }
+        return nil
+    }
+
     /// 将 OpenCode 会话同步注册到 SessionManager
     private func syncToSessionManager(_ openCodeSessions: [OpenCodeSession]) {
         let sm = SessionManager.shared
-        // 注册当前会话
+
         for session in openCodeSessions {
-            sm.registerExternalSession(session.toSession())
+            let sessionId = "opencode_\(session.sessionId)"
+            var sessionData = session.toSession()
+
+            // 从会话文件读取最新的 context usage 数据
+            if let contextData = readContextUsageFromFile(for: sessionId) {
+                sessionData.contextUsage = contextData.usage
+                sessionData.contextTokensUsed = contextData.tokensUsed
+                sessionData.contextTokensTotal = contextData.tokensTotal
+                sessionData.contextInputTokens = contextData.inputTokens
+                sessionData.contextOutputTokens = contextData.outputTokens
+                sessionData.contextReasoningTokens = contextData.reasoningTokens
+            }
+
+            sm.registerExternalSession(sessionData)
         }
+
         // 清理不再存在的会话
         let currentIds = Set(openCodeSessions.map { "opencode_\($0.sessionId)" })
         let staleIds = sm.sessions(from: "opencode").map(\.sessionId).filter { !currentIds.contains($0) }

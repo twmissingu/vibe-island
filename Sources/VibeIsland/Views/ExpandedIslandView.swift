@@ -200,6 +200,8 @@ struct ExpandedIslandView: View {
                                 timestamp: Date()
                             )
                             ContextUsageCard(session: session, snapshot: snapshot, theme: viewModel.settings.theme)
+                        } else if session.source == "opencode" {
+                            OpenCodeNoContextCard(session: session, theme: viewModel.settings.theme)
                         } else {
                             SessionInfoCard(session: session, theme: viewModel.settings.theme)
                         }
