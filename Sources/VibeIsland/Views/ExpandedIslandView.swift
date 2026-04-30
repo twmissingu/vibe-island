@@ -28,8 +28,26 @@ struct ExpandedIslandView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 标签页切换
-            tabBar
+            // 标签页切换 + 关闭按钮
+            HStack(spacing: 4) {
+                ForEach(ExpandedTab.allCases, id: \.self) { tab in
+                    tabButton(tab)
+                }
+                
+                Spacer()
+                
+                // 关闭按钮
+                Button {
+                    closeExpanded()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.gray.opacity(0.6))
+                }
+                .buttonStyle(.plain)
+                .help("关闭")
+            }
+            .padding(.bottom, 8)
 
             Divider()
                 .opacity(0.2)
@@ -48,6 +66,12 @@ struct ExpandedIslandView: View {
                 .environment(viewModel)
                 .frame(width: 450)
         }
+    }
+
+    // MARK: - 关闭展开视图
+
+    private func closeExpanded() {
+        NotificationCenter.default.post(name: .toggleIslandState, object: nil)
     }
 
     // MARK: - 标签栏

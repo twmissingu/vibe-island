@@ -520,6 +520,7 @@ struct SettingsView: View {
         .buttonStyle(.plain)
         .disabled(!canUnlock)
         .opacity(canUnlock ? 1 : 0.5)
+        .id(viewModel.settings.selectedPetID)
     }
 
     @ViewBuilder
@@ -585,10 +586,8 @@ struct PetCatalog {
         PetInfo(id: "cat", name: NSLocalizedString("pet.cat", comment: "Cat"), systemImage: "cat"),
         PetInfo(id: "dog", name: NSLocalizedString("pet.dog", comment: "Dog"), systemImage: "dog"),
         PetInfo(id: "rabbit", name: NSLocalizedString("pet.rabbit", comment: "Rabbit"), systemImage: "hare"),
-        PetInfo(id: "hamster", name: NSLocalizedString("pet.hamster", comment: "Hamster"), systemImage: "pawprint"),
         PetInfo(id: "fox", name: NSLocalizedString("pet.fox", comment: "Fox"), systemImage: "leaf"),
         PetInfo(id: "penguin", name: NSLocalizedString("pet.penguin", comment: "Penguin"), systemImage: "cloud"),
-        PetInfo(id: "owl", name: NSLocalizedString("pet.owl", comment: "Owl"), systemImage: "moon"),
         PetInfo(id: "robot", name: NSLocalizedString("pet.robot", comment: "Robot"), systemImage: "robot"),
     ]
 }

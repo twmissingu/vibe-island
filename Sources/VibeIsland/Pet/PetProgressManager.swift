@@ -179,7 +179,6 @@ enum PetType: String, Codable, CaseIterable, Sendable {
     case robot     // 机器人
     case ghost     // 幽灵
     case dragon    // 小龙
-    case hamster   // 仓鼠（测试用）
     
     /// 显示名称
     var displayName: String {
@@ -192,7 +191,6 @@ enum PetType: String, Codable, CaseIterable, Sendable {
         case .robot: return "机器人"
         case .ghost: return "幽灵"
         case .dragon: return "小龙"
-        case .hamster: return "仓鼠"
         }
     }
 
@@ -207,7 +205,6 @@ enum PetType: String, Codable, CaseIterable, Sendable {
         case .robot: return "cpu"
         case .ghost: return "bolt.fill"
         case .dragon: return "flame"
-        case .hamster: return "pawprint.fill"
         }
     }
 
@@ -222,7 +219,6 @@ enum PetType: String, Codable, CaseIterable, Sendable {
         case .robot: return PetUnlockRequirement(requiredMinutes: 480)   // 8 小时
         case .ghost: return PetUnlockRequirement(requiredMinutes: 960)   // 16 小时
         case .dragon: return PetUnlockRequirement(requiredMinutes: 1920) // 32 小时
-        case .hamster: return PetUnlockRequirement(requiredMinutes: 0)   // 测试用，始终可用
         }
     }
     

@@ -64,9 +64,12 @@ struct IslandView: View {
             }
         }
         .onTapGesture {
-            // 通知切换
-            NotificationCenter.default.post(name: .toggleIslandState, object: nil)
+            // 仅在紧凑模式下点击才触发切换
+            if !displayExpanded {
+                NotificationCenter.default.post(name: .toggleIslandState, object: nil)
+            }
         }
+        .contentShape(Rectangle()) // 确保点击区域正确
     }
 }
 
@@ -182,6 +185,7 @@ struct CompactIslandView: View {
                     let selectedPet = PetType(rawValue: viewModel.settings.selectedPetID) ?? .cat
                     let skinLevel = PetProgressManager.shared.selectedLevel(for: selectedPet)
                     PetView(petId: viewModel.settings.selectedPetID, level: skinLevel, scale: petScale, initialState: Self.mapToPetState(aggregateState))
+                        .id(viewModel.settings.selectedPetID + "-" + String(skinLevel.rawValue))
                         .modifier(SessionPetEffect(state: aggregateState))
                 } else {
                     Color.clear

@@ -22,9 +22,9 @@ struct PetView: View {
     private let petLevel: PetLevel  // 皮肤等级
     /// 外部驱动的宠物状态（从 SessionState 映射而来）
     let externalState: PetState
+    private let viewId: String
 
     init(petId: String = "cat", level: PetLevel = .basic, scale: CGFloat = 4.0, initialState: PetState = .idle) {
-        // 根据petId和level加载对应的动画集
         let petType = PetType(rawValue: petId) ?? .cat
         let animationSet = PetAnimationSet.forPet(petType, level: level)
         _petEngine = State(initialValue: PetEngine(state: initialState, animationSet: animationSet))
@@ -32,9 +32,9 @@ struct PetView: View {
         self.petId = petId
         self.petLevel = level
         self.externalState = initialState
+        self.viewId = petId + "-" + String(level.rawValue)
     }
 
-    // 支持 Int 类型的初始化
     init(petId: String, level: Int, scale: CGFloat = 4.0, initialState: PetState = .idle) {
         let petLevel = PetLevel(rawValue: level) ?? .basic
         let petType = PetType(rawValue: petId) ?? .cat
@@ -44,6 +44,7 @@ struct PetView: View {
         self.petId = petId
         self.petLevel = petLevel
         self.externalState = initialState
+        self.viewId = petId + "-" + String(petLevel.rawValue)
     }
     
     var body: some View {
@@ -54,6 +55,7 @@ struct PetView: View {
             // 宠物渲染
             petCanvas
         }
+        .id(viewId)
         // 外部状态变化时同步到内部引擎
         .onChange(of: externalState) { _, newState in
             petEngine.state = newState
