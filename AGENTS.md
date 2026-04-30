@@ -76,10 +76,18 @@ xcodebuild test -scheme VibeIsland -destination 'platform=macOS' -only-testing:V
 - **OpenCode monitoring**: 4-level fallback (Plugin Hook → SSE event stream → File monitoring → Process detection)
 - **SessionManager**: Manages all tool sessions (Claude Code via CLI hook, OpenCode via OpenCodeMonitor sync); island always shows highest-priority state
 - **Blinking indicators**: Attention-needed states (approval, compression) blink; others are constant color
+- **Pet system**: 8 pet types × 5 skin tiers × 8 state animations; 16x16 pixel art with hex colors
 - **Localization**: `en.lproj` + `zh-Hans.lproj` in `Sources/VibeIsland/Resources/`
 
-## IDENTIFIERS
+## ENTRY POINTS
 
+- **App**: `Sources/VibeIsland/App/VibeIslandApp.swift` — creates `DynamicIslandPanel`, calls `StateManager.startMonitoring()`
+- **CLI**: `Sources/CLI/vibe-island.swift` — `hook <EventType>` reads stdin JSON, delegates to `HookHandler`
+- **Shared models (CLI ↔ App)**: `Sources/CLI/SharedModels.swift` — `Session`, `SessionEvent`, `SessionState`, file locking
+
+## RUNTIME DATA
+
+- Session files: `~/.vibe-island/sessions/<pid>.json` (flock-locked)
 - App group: `group.com.twmissingu.VibeIsland`
 - Bundle ID prefix: `com.twmissingu`
 - OpenCode plugin: `./scripts/install-opencode-plugin.sh`

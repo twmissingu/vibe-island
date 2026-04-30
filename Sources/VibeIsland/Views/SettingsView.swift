@@ -40,7 +40,8 @@ struct SettingsView: View {
     // 已解锁的皮肤等级
     private var unlockedLevels: [PetLevel] {
         let progress = PetProgressManager.shared
-        let currentLevel = progress.level(for: progress.selectedPet)
+        let selectedPet = PetType(rawValue: viewModel.settings.selectedPetID) ?? .cat
+        let currentLevel = progress.level(for: selectedPet)
         return PetLevel.allCases.filter { level in level <= currentLevel }
     }
 
@@ -526,7 +527,7 @@ struct SettingsView: View {
         .buttonStyle(.plain)
         .disabled(!canUnlock)
         .opacity(canUnlock ? 1 : 0.5)
-        .id(viewModel.settings.selectedPetID)
+        .id(viewModel.settings.selectedPetID + "-" + String(level.rawValue))
     }
 
     @ViewBuilder
