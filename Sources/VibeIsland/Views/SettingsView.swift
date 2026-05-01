@@ -262,7 +262,7 @@ struct SettingsView: View {
             hookMessage = msg
             await refreshHookStatus()
         case .failure(let error):
-            hookMessage = "保存失败: \(error.localizedDescription)"
+            hookMessage = "失败: \(error.localizedDescription)"
             await refreshHookStatus()
         }
     }

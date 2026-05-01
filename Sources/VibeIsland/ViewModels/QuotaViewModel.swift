@@ -117,8 +117,8 @@ final class StateManager {
         switch result {
         case .success(let backupPath):
             let msg = backupPath != nil 
-                ? String(format: NSLocalizedString("hook.install.success.detail", value: "Hooks 安装成功，备份位置: %@", comment: ""), backupPath!)
-                : NSLocalizedString("hook.install.success.title", value: "Hooks 安装成功", comment: "")
+                ? String(format: NSLocalizedString("hook.install.success.detail", value: "插件安装成功，备份位置: %@", comment: ""), backupPath!)
+                : NSLocalizedString("hook.install.success.title", value: "插件安装成功", comment: "")
             return .success(msg)
         case .failure(let error):
             return .failure(error)
@@ -131,8 +131,8 @@ final class StateManager {
         switch result {
         case .success(let backupPath):
             let msg = backupPath != nil
-                ? String(format: NSLocalizedString("hook.uninstall.success.detail", value: "Hooks 卸载成功，备份位置: %@", comment: ""), backupPath!)
-                : NSLocalizedString("hook.uninstall.success.title", value: "Hooks 卸载成功", comment: "")
+                ? String(format: NSLocalizedString("hook.uninstall.success.detail", value: "插件卸载成功，备份位置: %@", comment: ""), backupPath!)
+                : NSLocalizedString("hook.uninstall.success.title", value: "插件卸载成功", comment: "")
             return .success(msg)
         case .failure(let error):
             return .failure(error)

@@ -19,6 +19,7 @@ public enum SessionEventName: String, Codable, Sendable, CaseIterable {
     case subagentStop = "SubagentStop"
     case notification = "Notification"
     case refreshContext = "RefreshContext"
+    case contextUpdate = "ContextUpdate"
 
     public var displayName: String {
         switch self {
@@ -37,10 +38,11 @@ public enum SessionEventName: String, Codable, Sendable, CaseIterable {
         case .subagentStop: return "子代理停止"
         case .notification: return "通知"
         case .refreshContext: return "刷新上下文"
+        case .contextUpdate: return "上下文更新"
         }
     }
 
-    public func toSessionState() -> SessionState {
+    public func toSessionState() -> SessionState? {
         switch self {
         case .sessionStart: return .idle
         case .userPromptSubmit, .preToolUse, .postToolUse: return .coding
@@ -53,6 +55,7 @@ public enum SessionEventName: String, Codable, Sendable, CaseIterable {
         case .postToolUseFailure: return .error
         case .sessionEnd: return .idle
         case .refreshContext: return .coding
+        case .contextUpdate: return nil // nil = 不改变状态
         }
     }
 
@@ -70,7 +73,7 @@ public enum SessionEventName: String, Codable, Sendable, CaseIterable {
             return "Subagent"
         case .notification:
             return "Notification"
-        case .refreshContext:
+        case .refreshContext, .contextUpdate:
             return "Context"
         }
     }

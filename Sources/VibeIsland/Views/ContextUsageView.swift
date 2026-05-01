@@ -36,7 +36,7 @@ struct ContextUsageView: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(Color.white.opacity(0.15))
+                        .fill(Color.white.opacity(0.2))
 
                     Capsule()
                         .fill(warningColor.gradient)
@@ -199,7 +199,7 @@ struct ContextUsageCard: View {
 
                             Text("(\(toolPercent(tool))%)")
                                 .font(.system(size: 9, design: .monospaced))
-                                .foregroundStyle(.gray.opacity(0.6))
+                                .foregroundStyle(theme == .pixel ? .gray.opacity(0.7) : .gray.opacity(0.6))
                         }
                     }
 
@@ -259,15 +259,15 @@ struct ContextUsageCard: View {
     }
 
     private var durationColor: Color {
-        theme == .pixel ? .gray.opacity(0.6) : .gray.opacity(0.7)
+        theme == .pixel ? .gray.opacity(0.8) : .gray.opacity(0.7)
     }
 
     private var progressBackgroundColor: Color {
-        theme == .pixel ? Color(white: 0.2) : Color.gray.opacity(0.2)
+        theme == .pixel ? Color(white: 0.25) : Color.gray.opacity(0.2)
     }
 
     private var sectionLabelColor: Color {
-        theme == .pixel ? .gray.opacity(0.5) : .gray.opacity(0.6)
+        theme == .pixel ? .gray.opacity(0.7) : .gray.opacity(0.6)
     }
 
     private var itemNameColor: Color {
@@ -275,17 +275,17 @@ struct ContextUsageCard: View {
     }
 
     private var itemValueColor: Color {
-        theme == .pixel ? .gray.opacity(0.5) : .gray.opacity(0.6)
+        theme == .pixel ? .white.opacity(0.85) : .gray.opacity(0.6)
     }
 
     private var cardBackground: some View {
         switch theme {
         case .pixel:
             return RoundedRectangle(cornerRadius: 8)
-                .fill(Color(white: 0.12))
+                .fill(Color(white: 0.15))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(statusColor.opacity(snapshot.isWarning ? 0.4 : 0.15), lineWidth: 1)
+                        .strokeBorder(statusColor.opacity(snapshot.isWarning ? 0.6 : 0.25), lineWidth: 1)
                 )
         case .glass:
             return RoundedRectangle(cornerRadius: 10)
@@ -390,7 +390,7 @@ struct ContextUsageCard: View {
             } else {
                 Text("--")
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundStyle(theme == .pixel ? .gray.opacity(0.4) : .gray.opacity(0.5))
+                    .foregroundStyle(theme == .pixel ? .gray.opacity(0.5) : .gray.opacity(0.5))
             }
         }
         .frame(maxWidth: .infinity)
@@ -399,15 +399,13 @@ struct ContextUsageCard: View {
     private func tokenLabelColor(value: Int?, showIfZero: Bool) -> Color {
         let isDimmed = value == nil || (value! == 0 && !showIfZero)
         if theme == .pixel {
-            return isDimmed ? .gray.opacity(0.4) : .gray.opacity(0.5)
+            return isDimmed ? .gray.opacity(0.5) : .gray.opacity(0.7)
         } else {
             return isDimmed ? .gray.opacity(0.5) : .gray.opacity(0.6)
         }
     }
 
-    private var tokenValueColor: Color {
-        theme == .pixel ? .white.opacity(0.9) : .white
-    }
+    private var tokenValueColor: Color { .white }
 
 
 }
@@ -481,25 +479,25 @@ struct SessionInfoCard: View {
     }
 
     private var metaColor: Color {
-        theme == .pixel ? .gray.opacity(0.6) : .gray.opacity(0.7)
+        theme == .pixel ? .gray.opacity(0.8) : .gray.opacity(0.7)
     }
 
     private var cwdColor: Color {
-        theme == .pixel ? .gray.opacity(0.5) : .gray.opacity(0.6)
+        theme == .pixel ? .gray.opacity(0.7) : .gray.opacity(0.6)
     }
 
     private var hintColor: Color {
-        theme == .pixel ? .gray.opacity(0.5) : .gray.opacity(0.6)
+        theme == .pixel ? .gray.opacity(0.7) : .gray.opacity(0.6)
     }
 
     private var cardBackground: some View {
         switch theme {
         case .pixel:
             return RoundedRectangle(cornerRadius: 8)
-                .fill(Color(white: 0.12))
+                .fill(Color(white: 0.15))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(Color.gray.opacity(0.2), lineWidth: 1)
+                        .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
                 )
         case .glass:
             return RoundedRectangle(cornerRadius: 10)
@@ -523,10 +521,10 @@ struct OpenCodeNoContextCard: View {
             switch theme {
             case .pixel:
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.gray.opacity(0.1))
+                    .fill(Color(white: 0.15))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
+                            .strokeBorder(Color.gray.opacity(0.35), lineWidth: 1)
                     )
             case .glass:
                 RoundedRectangle(cornerRadius: 10)

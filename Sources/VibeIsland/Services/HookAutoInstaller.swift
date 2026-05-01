@@ -581,7 +581,8 @@ final class HookAutoInstaller {
         return ClaudeSettings(
             hooks: merged,
             disableAllHooks: existing.disableAllHooks ?? false,
-            allowManagedHooksOnly: existing.allowManagedHooksOnly ?? false
+            allowManagedHooksOnly: existing.allowManagedHooksOnly ?? false,
+            env: existing.env
         )
     }
     
@@ -624,10 +625,14 @@ final class HookAutoInstaller {
             }
         }
         
+        let allHooksRemoved = hooks.isEmpty
         return ClaudeSettings(
-            hooks: hooks.isEmpty ? nil : hooks,
-            disableAllHooks: settings.disableAllHooks,
-            allowManagedHooksOnly: settings.allowManagedHooksOnly
+            hooks: allHooksRemoved ? nil : hooks,
+            // 删除所有 hooks 时也清除这两个字段（恢复到用户未配置状态）
+            disableAllHooks: allHooksRemoved ? nil : settings.disableAllHooks,
+            allowManagedHooksOnly: allHooksRemoved ? nil : settings.allowManagedHooksOnly,
+            // env 是用户的环境变量配置，删除 hooks 时应保留
+            env: settings.env
         )
     }
     
@@ -915,9 +920,11 @@ extension HookAutoInstaller {
     private static let openCodePluginSource = """
 // vibe-island plugin for opencode
 import { execFileSync } from "child_process";
-import { existsSync } from "fs";
+import { existsSync, unlinkSync, readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
+
+const sessionsDir = join(homedir(), ".vibe-island", "sessions");
 
 const TOOL_NAME_MAP = {
   bash: "Bash", read: "Read", edit: "Edit", write: "Write",
@@ -953,24 +960,6 @@ function normalizeToolInput(args) {
   return result;
 }
 
-function extractUsage(output) {
-  const usage = output?.usage || output?.message?.usage;
-  if (!usage || typeof usage !== "object") return {};
-  const result = {};
-  if (typeof usage.input_tokens === "number") result.context_input_tokens = usage.input_tokens;
-  if (typeof usage.output_tokens === "number") result.context_output_tokens = usage.output_tokens;
-  if (typeof usage.cache_read_input_tokens === "number") result.context_input_tokens = (result.context_input_tokens || 0) + usage.cache_read_input_tokens;
-  // OpenCode exposes total context limit via model info
-  const totalTokens = output?.model_context_limit || output?.context_limit || null;
-  if (totalTokens) {
-    result.context_tokens_total = totalTokens;
-    const usedTokens = (result.context_input_tokens || 0) + (result.context_output_tokens || 0);
-    result.context_tokens_used = usedTokens;
-    result.context_usage = Math.min(usedTokens / totalTokens, 1.0);
-  }
-  return result;
-}
-
 function callHook(hookBin, eventName, payload) {
   try {
     const json = JSON.stringify({ ...payload, hook_event_name: eventName });
@@ -978,41 +967,137 @@ function callHook(hookBin, eventName, payload) {
   } catch { /* Best-effort — never crash opencode */ }
 }
 
+function readModelContextLimit() {
+  try {
+    const configPath = join(homedir(), '.config', 'opencode', 'opencode.json');
+    if (!existsSync(configPath)) return null;
+    const config = JSON.parse(readFileSync(configPath, 'utf8'));
+    if (config.provider) {
+      for (const providerName of Object.keys(config.provider)) {
+        const provider = config.provider[providerName];
+        if (provider.models) {
+          for (const modelId of Object.keys(provider.models)) {
+            const model = provider.models[modelId];
+            if (model.limit?.context) return model.limit.context;
+          }
+        }
+      }
+    }
+    return null;
+  } catch { return null; }
+}
+
 export const vibeIsland = async ({ directory }) => {
   const hookBin = findHookBinary();
   if (!hookBin) return {};
   const sessionId = `opencode-${process.pid}`;
   let sessionName = null;
+  const defaultContextLimit = readModelContextLimit() || 200000;
+  let modelContextLimit = defaultContextLimit;
+  let toolCounts = {};
+  let skillCounts = {};
+
   function basePayload() {
     return { session_id: sessionId, cwd: directory, source: "opencode", ...(sessionName && { session_name: sessionName }) };
   }
+
+  function handleTokenUpdate(tokens, source) {
+    if (!tokens) return;
+    const inputTokens = tokens.input || 0;
+    const outputTokens = tokens.output || 0;
+    const reasoningTokens = tokens.reasoning || 0;
+    const cacheRead = tokens.cache?.read || 0;
+    const cacheWrite = tokens.cache?.write || 0;
+    // cacheRead represents tokens retrieved from cache, not stored in context
+    const totalTokens = inputTokens + outputTokens + reasoningTokens + cacheWrite;
+    const usagePercent = modelContextLimit > 0 ? Math.round((totalTokens / modelContextLimit) * 100) : 0;
+    const sortedToolUsage = Object.entries(toolCounts).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }));
+    const sortedSkillUsage = Object.entries(skillCounts).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }));
+    const contextMsg = `Context usage: ${usagePercent}% (${totalTokens}/${modelContextLimit} tokens)`;
+    callHook(hookBin, "ContextUpdate", {
+      ...basePayload(), message: contextMsg,
+      context_usage: usagePercent / 100, context_tokens_used: totalTokens, context_tokens_total: modelContextLimit,
+      context_input_tokens: inputTokens, context_output_tokens: outputTokens, context_reasoning_tokens: reasoningTokens,
+      tool_usage: sortedToolUsage, skill_usage: sortedSkillUsage,
+    });
+  }
+
+  function checkRefreshFile() {
+    const refreshFile = join(sessionsDir, `${sessionId}.refresh`);
+    if (existsSync(refreshFile)) {
+      try { unlinkSync(refreshFile); } catch {}
+      callHook(hookBin, "RefreshContext", basePayload());
+    }
+  }
+
   callHook(hookBin, "SessionStart", basePayload());
+
   return {
+    "chat.params": async ({ params }) => {
+      if (params?.model?.limit?.context) modelContextLimit = params.model.limit.context;
+    },
     event: async ({ event }) => {
       if (!event || !event.type) return;
       switch (event.type) {
-        case "session.created": callHook(hookBin, "SessionStart", basePayload()); break;
+        case "session.created":
+          modelContextLimit = defaultContextLimit;
+          toolCounts = {};
+          skillCounts = {};
+          callHook(hookBin, "SessionStart", basePayload());
+          break;
         case "session.idle": callHook(hookBin, "Stop", basePayload()); break;
         case "session.error": {
           const errMsg = event.error?.message || event.message || null;
           callHook(hookBin, "SessionError", { ...basePayload(), ...(errMsg && { error: errMsg }), ...(event.message && { message: event.message }) });
           break;
         }
-        case "session.compacted": callHook(hookBin, "PostCompact", basePayload()); break;
+        case "session.status": {
+          const type = event.properties?.status?.type || event.properties?.type || event.status?.type;
+          if (type === "retry") callHook(hookBin, "SessionError", { ...basePayload(), error: "Retry" });
+          break;
+        }
         case "session.updated": { const t = event.properties?.info?.title; if (t) sessionName = t; break; }
+        case "session.compacted":
+          checkRefreshFile();
+          callHook(hookBin, "PostCompact", basePayload());
+          break;
+        case "session.deleted":
+        case "permission.replied":
+          break;
       }
+      checkRefreshFile();
+    },
+    "message.part.updated": async ({ part }) => {
+      if (!part || part.type !== "step-finish") return;
+      handleTokenUpdate(part.tokens, 'message.part.updated');
+    },
+    "message.updated": async ({ message }) => {
+      if (!message) return;
+      handleTokenUpdate(message.tokens, 'message.updated');
+    },
+    "chat.complete": async (_input, output) => {
+      const message = output?.message;
+      if (!message) return;
+      handleTokenUpdate(message.tokens, 'chat.complete');
     },
     "chat.message": async (_input, output) => {
       const prompt = output?.message?.content || output?.content || (typeof output?.text === "string" ? output.text : null);
-      const usageData = extractUsage(output);
-      callHook(hookBin, "UserPromptSubmit", { ...basePayload(), ...(prompt && { prompt }), ...usageData });
+      callHook(hookBin, "UserPromptSubmit", { ...basePayload(), ...(prompt && { prompt }) });
     },
     "tool.execute.before": async (_input, output) => {
       const tool = normalizeTool(output?.tool || _input?.tool);
       const args = output?.args || _input?.args;
+      if (tool) toolCounts[tool] = (toolCounts[tool] || 0) + 1;
       callHook(hookBin, "PreToolUse", { ...basePayload(), ...(tool && { tool_name: tool }), ...(args && { tool_input: normalizeToolInput(args) }) });
     },
-    "tool.execute.after": async () => { callHook(hookBin, "PostToolUse", basePayload()); },
+    "tool.execute.after": async (_input, output) => {
+      const tool = normalizeTool(output?.tool || _input?.tool);
+      callHook(hookBin, "PostToolUse", { ...basePayload(), ...(tool && { tool_name: tool }) });
+    },
+    "skill.execute.before": async (_input, output) => {
+      const skill = output?.skill || _input?.skill;
+      if (skill) skillCounts[skill] = (skillCounts[skill] || 0) + 1;
+    },
     "permission.ask": async (input) => {
       const tool = normalizeTool(input?.tool);
       const args = input?.args;
@@ -1067,11 +1152,13 @@ struct ClaudeSettings: Codable {
     var hooks: [String: [HookRule]]?
     var disableAllHooks: Bool?
     var allowManagedHooksOnly: Bool?
+    var env: [String: String]?
     
     enum CodingKeys: String, CodingKey {
         case hooks
         case disableAllHooks
         case allowManagedHooksOnly
+        case env
     }
 }
 

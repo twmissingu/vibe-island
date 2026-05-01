@@ -75,8 +75,10 @@ enum HookHandler {
                 source: resolvedSource
             )
 
-            // Apply the event to update session state
-            session.status = event.hookEventName.toSessionState()
+            // Apply the event to update session state (nil means don't change)
+            if let newState = event.hookEventName.toSessionState() {
+                session.status = newState
+            }
             session.lastActivity = Date()
 
             // Propagate event fields to session

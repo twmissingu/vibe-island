@@ -366,7 +366,7 @@ extension Session {
         case .postCompact:
             notificationMessage = "上下文已压缩"
 
-        case .sessionStart, .sessionEnd, .stop, .refreshContext:
+        case .sessionStart, .sessionEnd, .stop, .refreshContext, .contextUpdate:
             break
         }
     }
