@@ -86,6 +86,20 @@ enum HookHandler {
             session.sessionName = event.sessionName ?? session.sessionName
             session.notificationMessage = event.message
 
+            // 存储 transcript_path（SessionStart 事件提供）
+            if event.hookEventName == .sessionStart, let tp = event.transcriptPath {
+                session.transcriptPath = tp
+                session.transcriptOffset = 0
+            }
+
+            // 自动查找 transcript_path（如果 SessionStart 未提供）
+            if session.transcriptPath == nil, resolvedSource != "opencode" {
+                session.transcriptPath = findTranscriptPath(sessionId: safeId, pid: pid)
+                if session.transcriptPath != nil {
+                    session.transcriptOffset = 0
+                }
+            }
+
             // Process context usage data in ALL events (if available)
             if let usage = event.contextUsage {
                 session.contextUsage = usage
@@ -97,6 +111,11 @@ enum HookHandler {
             } else if let message = event.message {
                 // Fallback: parse from message if no direct context usage fields
                 parseAndStoreContextUsage(message, into: &session)
+            }
+
+            // 从 transcript JSONL 解析上下文使用量（Claude Code 会话）
+            if resolvedSource != "opencode", let transcriptPath = session.transcriptPath {
+                parseTranscriptContext(into: &session, transcriptPath: transcriptPath)
             }
 
             // FIRST: Increment tool usage count in PreToolUse events
@@ -395,7 +414,162 @@ enum HookHandler {
         if let totalRange = Range(match.range(at: 3), in: message),
            let total = Int(message[totalRange]) {
             session.contextTokensTotal = total
+            session.contextLimit = total
         }
+    }
+
+    // MARK: - Transcript 路径查找
+
+    /// 自动查找 Claude Code 的 transcript 文件路径
+    ///
+    /// 查找策略：
+    /// 1. 通过 session_id 精确匹配
+    /// 2. 通过 PID 查找最近修改的 transcript
+    ///
+    /// - Parameters:
+    ///   - sessionId: 当前会话 ID
+    ///   - pid: 当前进程 PID
+    /// - Returns: 找到的 transcript 文件路径，未找到返回 nil
+    private static func findTranscriptPath(sessionId: String, pid: UInt32) -> String? {
+        let claudeProjectsDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".claude")
+            .appendingPathComponent("projects")
+
+        guard let projectDirs = try? FileManager.default.contentsOfDirectory(
+            at: claudeProjectsDir,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return nil }
+
+        // 1. 尝试通过 session_id 精确匹配
+        for projectDir in projectDirs {
+            let jsonlPath = projectDir.appendingPathComponent("\(sessionId).jsonl")
+            if FileManager.default.fileExists(atPath: jsonlPath.path) {
+                appendToDebugLog("[findTranscriptPath] Found by session_id: \(jsonlPath.path)\n")
+                return jsonlPath.path
+            }
+        }
+
+        // 2. 尝试通过 PID 查找（遍历所有项目的 session 文件，查找最近修改的）
+        var candidates: [(path: String, modDate: Date)] = []
+        let pidString = String(pid)
+
+        for projectDir in projectDirs {
+            guard let enumerator = FileManager.default.enumerator(
+                at: projectDir,
+                includingPropertiesForKeys: [.contentModificationDateKey],
+                options: [.skipsHiddenFiles]
+            ) else { continue }
+
+            for case let fileURL as URL in enumerator {
+                guard fileURL.pathExtension == "jsonl" else { continue }
+
+                // 读取文件内容，检查是否包含当前 PID
+                if let data = try? Data(contentsOf: fileURL, options: .mappedIfSafe),
+                   let content = String(data: data, encoding: .utf8),
+                   content.contains(pidString) {
+                    if let attrs = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
+                       let modDate = attrs[.modificationDate] as? Date {
+                        candidates.append((path: fileURL.path, modDate: modDate))
+                    }
+                }
+            }
+        }
+
+        // 返回最近修改的文件
+        let result = candidates.sorted { $0.modDate > $1.modDate }.first?.path
+        if let result = result {
+            appendToDebugLog("[findTranscriptPath] Found by PID \(pid): \(result)\n")
+        }
+        return result
+    }
+
+    // MARK: - Transcript JSONL 解析
+
+    /// 从 Claude Code 的 transcript JSONL 文件解析上下文 token 使用量。
+    /// 增量读取：仅处理 offset 之后的新数据，避免重复解析大文件。
+    private static func parseTranscriptContext(into session: inout Session, transcriptPath: String) {
+        let fileURL = URL(fileURLWithPath: transcriptPath)
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: transcriptPath),
+              let fileSize = attrs[.size] as? Int, fileSize > 0 else { return }
+
+        var offset = session.transcriptOffset ?? 0
+
+        // 文件变小 = 轮转或替换，重置 offset
+        if offset > fileSize { offset = 0 }
+
+        // 无需读取
+        guard offset < fileSize else { return }
+
+        // 增量读取，上限 512KB
+        let maxRead = 512 * 1024
+        let readSize = min(fileSize - offset, maxRead)
+
+        guard let handle = try? FileHandle(forReadingFrom: fileURL) else { return }
+        defer { handle.closeFile() }
+        handle.seek(toFileOffset: UInt64(offset))
+        let newData = handle.readData(ofLength: readSize)
+
+        // 按行扫描，找最后一条含 usage 的 assistant 消息
+        var lastInput = 0
+        var lastOutput = 0
+        var lastCacheRead = 0
+        var found = false
+
+        newData.withUnsafeBytes { rawBuffer in
+            guard let basePtr = rawBuffer.baseAddress else { return }
+            let ptr = basePtr.assumingMemoryBound(to: UInt8.self)
+            var lineStart = 0
+
+            for i in 0..<newData.count {
+                if ptr[i] == UInt8(ascii: "\n") || i == newData.count - 1 {
+                    let lineEnd = (i == newData.count - 1 && ptr[i] != UInt8(ascii: "\n")) ? i + 1 : i
+                    if lineEnd > lineStart {
+                        let lineData = Data(bytes: ptr + lineStart, count: lineEnd - lineStart)
+                        if let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+                           let type = json["type"] as? String, type == "assistant",
+                           let message = json["message"] as? [String: Any],
+                           let usage = message["usage"] as? [String: Any] {
+                            let input = usage["input_tokens"] as? Int ?? 0
+                            let output = usage["output_tokens"] as? Int ?? 0
+                            if input > 0 || output > 0 {
+                                lastInput = input
+                                lastOutput = output
+                                lastCacheRead = usage["cache_read_input_tokens"] as? Int ?? 0
+                                found = true
+                            }
+                        }
+                    }
+                    lineStart = i + 1
+                }
+            }
+        }
+
+        // 更新 offset
+        session.transcriptOffset = fileSize
+
+        guard found else { return }
+
+        let totalUsed = lastInput + lastCacheRead
+        session.contextInputTokens = lastInput
+        session.contextOutputTokens = lastOutput
+        session.contextTokensUsed = totalUsed
+
+        // 上下文上限：使用已缓存的 contextLimit，或模型默认值
+        if let limit = session.contextLimit, limit > 0 {
+            session.contextTokensTotal = limit
+            session.contextUsage = Double(totalUsed) / Double(limit)
+        } else {
+            let limit = defaultContextLimit()
+            session.contextLimit = limit
+            session.contextTokensTotal = limit
+            session.contextUsage = Double(totalUsed) / Double(limit)
+        }
+    }
+
+    /// 模型默认上下文窗口大小（Claude 4 系列均为 200K）
+    private static func defaultContextLimit() -> Int {
+        200_000
     }
 
     // MARK: - Tool Usage Statistics

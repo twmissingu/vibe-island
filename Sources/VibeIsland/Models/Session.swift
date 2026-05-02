@@ -123,6 +123,9 @@ public struct Session: Codable, Equatable, Sendable {
     public var contextReasoningTokens: Int?
     public var toolUsage: [ToolUsage]?
     public var skillUsage: [ToolUsage]?
+    public var transcriptPath: String?
+    public var transcriptOffset: Int?
+    public var contextLimit: Int?
     public var fileURL: URL?
 
     enum CodingKeys: String, CodingKey {
@@ -148,6 +151,9 @@ public struct Session: Codable, Equatable, Sendable {
         case contextReasoningTokens, context_reasoning_tokens
         case toolUsage, tool_usage
         case skillUsage, skill_usage
+        case transcriptPath, transcript_path
+        case transcriptOffset, transcript_offset
+        case contextLimit, context_limit
     }
 
     public init(
@@ -173,6 +179,9 @@ public struct Session: Codable, Equatable, Sendable {
         contextReasoningTokens: Int? = nil,
         toolUsage: [ToolUsage]? = nil,
         skillUsage: [ToolUsage]? = nil,
+        transcriptPath: String? = nil,
+        transcriptOffset: Int? = nil,
+        contextLimit: Int? = nil,
         fileURL: URL? = nil
     ) {
         self.sessionId = sessionId
@@ -197,6 +206,9 @@ public struct Session: Codable, Equatable, Sendable {
         self.contextReasoningTokens = contextReasoningTokens
         self.toolUsage = toolUsage
         self.skillUsage = skillUsage
+        self.transcriptPath = transcriptPath
+        self.transcriptOffset = transcriptOffset
+        self.contextLimit = contextLimit
         self.fileURL = fileURL
     }
 
@@ -224,6 +236,9 @@ public struct Session: Codable, Equatable, Sendable {
         contextReasoningTokens = try Self.decodeFirstOptional(container, key1: .contextReasoningTokens, key2: .context_reasoning_tokens) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
         toolUsage = try Self.decodeFirstOptional(container, key1: .toolUsage, key2: .tool_usage) { c, k in try c.decodeIfPresent([ToolUsage].self, forKey: k) }
         skillUsage = try Self.decodeFirstOptional(container, key1: .skillUsage, key2: .skill_usage) { c, k in try c.decodeIfPresent([ToolUsage].self, forKey: k) }
+        transcriptPath = try Self.decodeFirstOptional(container, key1: .transcriptPath, key2: .transcript_path) { c, k in try c.decodeIfPresent(String.self, forKey: k) }
+        transcriptOffset = try Self.decodeFirstOptional(container, key1: .transcriptOffset, key2: .transcript_offset) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
+        contextLimit = try Self.decodeFirstOptional(container, key1: .contextLimit, key2: .context_limit) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
         fileURL = nil
     }
 
@@ -261,6 +276,9 @@ public struct Session: Codable, Equatable, Sendable {
         try container.encodeIfPresent(contextReasoningTokens, forKey: .context_reasoning_tokens)
         try container.encodeIfPresent(toolUsage, forKey: .tool_usage)
         try container.encodeIfPresent(skillUsage, forKey: .skill_usage)
+        try container.encodeIfPresent(transcriptPath, forKey: .transcript_path)
+        try container.encodeIfPresent(transcriptOffset, forKey: .transcript_offset)
+        try container.encodeIfPresent(contextLimit, forKey: .context_limit)
     }
 
     public func writeToFile() throws {
