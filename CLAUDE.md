@@ -61,9 +61,9 @@ SessionFileWatcher (DispatchSource) → detects file changes → SessionManager
 OpenCodeMonitor (4-level fallback: plugin hook → SSE → file monitoring → pgrep)
 CodexMonitor (process detection via pgrep)
   ↓
-SessionManager (unified session store, sorts by priority)
+SessionManager (unified session store, sorts by lastActivity)
   ↓
-DynamicIslandPanel (NSPanel at notch) → IslandView (highest-priority session)
+DynamicIslandPanel (NSPanel at notch) → IslandView (most recently active session)
   ↓
 SoundManager (audio cues) + PetEngine (pixel pet animations)
 ```
@@ -73,6 +73,8 @@ SoundManager (audio cues) + PetEngine (pixel pet animations)
 `Approval > Error > Compression > Coding > Thinking > Waiting > Completed > Idle`
 
 Attention-needed states (approval, compression) blink; others are constant color.
+
+**Session list sorting**: `sortedSessions` 按 `lastActivity` 降序排列（最近活跃在前），这是设计意图——用户最关心的是最近正在使用的会话。状态优先级（`SessionState.priority`）仅用于 `aggregateState` 聚合计算和 `ContextMonitor` 告警阈值判断。
 
 ### Where to Look
 

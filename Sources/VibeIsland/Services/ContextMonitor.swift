@@ -9,6 +9,18 @@ let contextWarningThreshold: Double = 0.80
 /// 危险阈值：上下文使用率超过此值时发出红色警告
 let contextCriticalThreshold: Double = 0.95
 
+// MARK: - 解析后的上下文数据
+
+/// 从 notificationMessage 解析出的上下文数据，用于回写 Session 模型
+struct ParsedContextData: Sendable {
+    let usage: Double
+    let tokensUsed: Int?
+    let tokensTotal: Int?
+    let inputTokens: Int?
+    let outputTokens: Int?
+    let reasoningTokens: Int?
+}
+
 // MARK: - 上下文使用快照
 
 /// 单次上下文使用情况的快照数据
@@ -166,13 +178,15 @@ final class ContextMonitor {
 
     // MARK: 事件处理
 
-    /// 处理会话更新事件（由 SessionFileWatcher 回调触发）
-    func handleSessionUpdate(_ session: Session) {
-        // 尝试从 session 的 notificationMessage 中解析上下文使用率
-        // 这通常在 PreCompact 事件时被设置
+    /// 处理会话更新事件（由 SessionManager.updateSession 调用）
+    ///
+    /// - 返回: 如果从 notificationMessage 解析出了上下文数据，返回 `ParsedContextData` 供调用方回写 Session 模型；
+    ///         如果 Session 模型本身已有 contextUsage 或无数据可解析，返回 nil。
+    @discardableResult
+    func handleSessionUpdate(_ session: Session) -> ParsedContextData? {
+        // 路径 A: 从 notificationMessage 解析（PreCompact 事件的 "Context usage: 85% (...)" 格式）
         if let message = session.notificationMessage {
-            if var snapshot = parseContextUsage(from: message, sessionId: session.sessionId) {
-                // 如果原始快照缺少 skillUsage 但会话有数据，补充进去
+            if let snapshot = parseContextUsage(from: message, sessionId: session.sessionId) {
                 let updatedSnapshot = ContextUsageSnapshot(
                     sessionId: snapshot.sessionId,
                     usageRatio: snapshot.usageRatio,
@@ -187,13 +201,19 @@ final class ContextMonitor {
                 )
                 updateSnapshot(sessionId: session.sessionId, snapshot: updatedSnapshot)
 
-                // 同步更新 Session 模型的上下文属性
-                updateSessionContext(session, snapshot: updatedSnapshot)
-                return
+                // 返回解析数据，由调用方回写 Session 模型
+                return ParsedContextData(
+                    usage: updatedSnapshot.usageRatio,
+                    tokensUsed: updatedSnapshot.tokensUsed,
+                    tokensTotal: updatedSnapshot.tokensTotal,
+                    inputTokens: updatedSnapshot.inputTokens,
+                    outputTokens: updatedSnapshot.outputTokens,
+                    reasoningTokens: updatedSnapshot.reasoningTokens
+                )
             }
         }
 
-        // 如果 session 模型已有上下文数据，也同步到快照
+        // 路径 B: Session 模型已有 contextUsage，同步到快照
         if let usage = session.contextUsage {
             let snapshot = ContextUsageSnapshot(
                 sessionId: session.sessionId,
@@ -209,6 +229,8 @@ final class ContextMonitor {
             )
             updateSnapshot(sessionId: session.sessionId, snapshot: snapshot)
         }
+
+        return nil
     }
 
     /// 手动设置会话的上下文使用情况
@@ -462,12 +484,4 @@ final class ContextMonitor {
         }
     }
 
-    /// 更新 Session 模型的上下文属性
-    private func updateSessionContext(_ session: Session, snapshot: ContextUsageSnapshot) {
-        // 通过 SessionManager 更新（因为 session 是值类型）
-        // 这里直接记录日志，实际更新由调用方通过 SessionFileWatcher 完成
-        Self.logger.debug(
-            "更新会话 \(session.sessionId) 上下文: \(snapshot.usagePercent)%, tokens: \(snapshot.tokensUsed?.description ?? "n/a")/\(snapshot.tokensTotal?.description ?? "n/a")"
-        )
-    }
 }

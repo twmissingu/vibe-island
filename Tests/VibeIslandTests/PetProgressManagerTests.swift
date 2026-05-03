@@ -88,8 +88,8 @@ final class PetProgressManagerTests: XCTestCase {
 
     /// 测试：所有 8 种宠物
     func testPetType_allCases() {
-        let pets: [PetType] = [.cat, .dog, .rabbit, .hamster, .fox, .penguin, .robot, .ghost, .dragon]
-        XCTAssertEqual(pets.count, 9)
+        let pets: [PetType] = [.cat, .dog, .rabbit, .fox, .penguin, .robot, .ghost, .dragon]
+        XCTAssertEqual(pets.count, PetType.allCases.count)
     }
 
     /// 测试：宠物 displayName
@@ -97,7 +97,6 @@ final class PetProgressManagerTests: XCTestCase {
         XCTAssertEqual(PetType.cat.displayName, "小猫")
         XCTAssertEqual(PetType.dog.displayName, "小狗")
         XCTAssertEqual(PetType.rabbit.displayName, "小兔")
-        XCTAssertEqual(PetType.hamster.displayName, "仓鼠")
         XCTAssertEqual(PetType.fox.displayName, "小狐")
         XCTAssertEqual(PetType.penguin.displayName, "企鹅")
         XCTAssertEqual(PetType.robot.displayName, "机器人")
@@ -110,11 +109,11 @@ final class PetProgressManagerTests: XCTestCase {
         XCTAssertEqual(PetType.cat.systemImage, "cat")
         XCTAssertEqual(PetType.dog.systemImage, "dog")
         XCTAssertEqual(PetType.rabbit.systemImage, "hare")
-        XCTAssertEqual(PetType.hamster.systemImage, "pawprint.fill")
         XCTAssertEqual(PetType.fox.systemImage, "leaf.fill")
         XCTAssertEqual(PetType.penguin.systemImage, "snowflake")
         XCTAssertEqual(PetType.robot.systemImage, "cpu")
         XCTAssertEqual(PetType.ghost.systemImage, "bolt.fill")
+        XCTAssertEqual(PetType.dragon.systemImage, "flame")
     }
 
     // MARK: - PetUnlockRequirement 测试
@@ -143,7 +142,7 @@ final class PetProgressManagerTests: XCTestCase {
 
     /// 测试：宠物解锁通知
     func testPetUnlockNotification_struct() {
-        let notification = PetUnlockNotification(pet: .cat, unlockTime: Date())
+        let notification = PetUnlockNotification(type: .unlock, pet: .cat, unlockTime: Date())
         XCTAssertEqual(notification.pet, .cat)
         XCTAssertNotNil(notification.unlockTime)
     }
@@ -261,7 +260,7 @@ final class PetProgressManagerTests: XCTestCase {
         let notificationManager = PetUnlockNotificationManager.shared
         notificationManager.clearNotifications()
 
-        let notification = PetUnlockNotification(pet: .dog, unlockTime: Date())
+        let notification = PetUnlockNotification(type: .unlock, pet: .dog, unlockTime: Date())
         notificationManager.addNotification(notification)
 
         XCTAssertFalse(notificationManager.recentNotifications.isEmpty)
@@ -273,8 +272,8 @@ final class PetProgressManagerTests: XCTestCase {
         notificationManager.clearNotifications()
 
         // 添加 6 条通知
-        for pet in [PetType.cat, .dog, .rabbit, .hamster, .fox, .penguin] {
-            let notification = PetUnlockNotification(pet: pet, unlockTime: Date())
+        for pet in [PetType.cat, .dog, .rabbit, .robot, .fox, .penguin] {
+            let notification = PetUnlockNotification(type: .unlock, pet: pet, unlockTime: Date())
             notificationManager.addNotification(notification)
         }
 
@@ -284,7 +283,7 @@ final class PetProgressManagerTests: XCTestCase {
     /// 测试：清除通知
     func testClearNotifications() {
         let notificationManager = PetUnlockNotificationManager.shared
-        let notification = PetUnlockNotification(pet: .cat, unlockTime: Date())
+        let notification = PetUnlockNotification(type: .unlock, pet: .cat, unlockTime: Date())
         notificationManager.addNotification(notification)
 
         notificationManager.clearNotifications()

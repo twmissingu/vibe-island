@@ -220,15 +220,27 @@ final class SessionManager: SessionAggregatable {
     /// 更新单个会话状态（文件回调入口）
     private func updateSession(_ sessionId: String, _ session: Session) {
         let oldState = aggregateState
-
-        sessions[sessionId] = session
-        recomputeSortedSessions()
+        var session = session
 
         if session.status == .completed {
             contextMonitor.clearSnapshot(for: sessionId)
         } else {
-            contextMonitor.handleSessionUpdate(session)
+            // 让 ContextMonitor 解析 notificationMessage 中的上下文数据
+            // 如果解析成功（PreCompact 事件），将数据回写到 Session 模型
+            if let parsed = contextMonitor.handleSessionUpdate(session) {
+                session.contextUsage = parsed.usage
+                session.contextTokensUsed = parsed.tokensUsed
+                session.contextTokensTotal = parsed.tokensTotal
+                // 只回写非 nil 的字段，避免覆盖 ContextUpdate/transcript 已设置的分类数据
+                if let v = parsed.inputTokens { session.contextInputTokens = v }
+                if let v = parsed.outputTokens { session.contextOutputTokens = v }
+                if let v = parsed.reasoningTokens { session.contextReasoningTokens = v }
+            }
         }
+
+        sessions[sessionId] = session
+        recomputeSortedSessions()
+
         CodingTimeTracker.shared.handleSessionStateChange(sessionId: sessionId, state: session.status)
 
         // 同步到宠物进度管理器
@@ -246,9 +258,33 @@ final class SessionManager: SessionAggregatable {
     /// 注册外部工具的会话（OpenCode 等）
     /// - Parameter session: 外部工具会话（sessionId 已由调用方加前缀，如 "opencode_xxx"）
     func registerExternalSession(_ session: Session) {
+        let oldState = aggregateState
+        var session = session
+
+        // 通知 ContextMonitor 更新快照，并回写解析的上下文数据
+        if session.status == .completed {
+            contextMonitor.clearSnapshot(for: session.sessionId)
+        } else {
+            if let parsed = contextMonitor.handleSessionUpdate(session) {
+                session.contextUsage = parsed.usage
+                session.contextTokensUsed = parsed.tokensUsed
+                session.contextTokensTotal = parsed.tokensTotal
+                if let v = parsed.inputTokens { session.contextInputTokens = v }
+                if let v = parsed.outputTokens { session.contextOutputTokens = v }
+                if let v = parsed.reasoningTokens { session.contextReasoningTokens = v }
+            }
+        }
+
         sessions[session.sessionId] = session
         recomputeSortedSessions()
+
         Self.logger.debug("注册外部会话: \(session.sessionId) (source: \(session.source ?? "unknown"))")
+
+        // 检测聚合状态变化，触发回调（播放提示音）
+        let newState = aggregateState
+        if newState != oldState {
+            onAggregateStateChanged?(oldState, newState)
+        }
     }
 
     /// 移除外部工具的会话
@@ -259,6 +295,9 @@ final class SessionManager: SessionAggregatable {
     }
 
     /// 使排序缓存失效（sessions 字典变更时调用）
+    /// 排序按 lastActivity 降序（最近活跃在前），这是设计意图——
+    /// 用户最关心的是最近正在使用的会话，而非状态优先级。
+    /// 状态优先级（SessionState.priority）仅用于 aggregateState 聚合计算。
     private func recomputeSortedSessions() {
         sortedSessions = sessions.values.sorted { $0.lastActivity > $1.lastActivity }
     }
