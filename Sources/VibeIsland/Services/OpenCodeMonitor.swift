@@ -49,7 +49,7 @@ struct OpenCodeSession: Equatable, Sendable {
     /// 转换为 Session 模型
     func toSession() -> Session {
         Session(
-            sessionId: "opencode_\(sessionId)",
+            sessionId: "opencode-\(sessionId)",
             cwd: cwd,
             status: status.toSessionState,
             lastActivity: lastActivity,
@@ -224,7 +224,7 @@ final class OpenCodeMonitor: SessionAggregatable {
         let sm = SessionManager.shared
 
         for session in openCodeSessions {
-            let sessionId = "opencode_\(session.sessionId)"
+            let sessionId = "opencode-\(session.sessionId)"
             var sessionData = session.toSession()
 
             // 从会话文件读取最新的 context usage 数据
@@ -241,7 +241,7 @@ final class OpenCodeMonitor: SessionAggregatable {
         }
 
         // 清理不再存在的会话
-        let currentIds = Set(openCodeSessions.map { "opencode_\($0.sessionId)" })
+        let currentIds = Set(openCodeSessions.map { "opencode-\($0.sessionId)" })
         let staleIds = sm.sessions(from: "opencode").map(\.sessionId).filter { !currentIds.contains($0) }
         for id in staleIds {
             sm.removeExternalSession(id)

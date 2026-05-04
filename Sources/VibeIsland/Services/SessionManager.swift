@@ -124,17 +124,19 @@ final class SessionManager: SessionAggregatable {
         fileWatcher.onSessionUpdated { [weak self] sessionId, session in
             Task { @MainActor in
                 self?.updateSession(sessionId, session)
+                
+                // 检查 OpenCode 压缩状态（通过数据库）
+                if session.source == "opencode" {
+                    await self?.contextMonitor.checkOpenCodeCompaction(sessionId: sessionId, cwd: session.cwd)
+                }
             }
         }
 
         fileWatcher.startWatching()
 
-        // 启动上下文监控
+        // 启动上下文监控（OpenCode SQLite 读取）
         contextMonitor.start()
-        
-        // 启动 context usage 定时刷新
-        startContextUsageTicker()
-        
+
         // 启动编码时长追踪
         CodingTimeTracker.shared.start()
         CodingTimeTracker.shared.tick()
@@ -147,9 +149,7 @@ final class SessionManager: SessionAggregatable {
     func stop() {
         hasSetup = false
         codingTimeTicker?.cancel()
-        contextUsageTicker?.cancel()
         codingTimeTicker = nil
-        contextUsageTicker = nil
         fileWatcher.stopWatching()
         contextMonitor.stop()
         CodingTimeTracker.shared.stop()
@@ -160,10 +160,11 @@ final class SessionManager: SessionAggregatable {
     
     /// 编码时长定时更新（每 30 秒）
     @ObservationIgnored private var codingTimeTicker: Task<Void, Never>?
-    
-    /// Context usage 定时刷新（每 60 秒 = 1 分钟）
-    @ObservationIgnored private var contextUsageTicker: Task<Void, Never>?
-    
+
+    /// OpenCode DB 查询冷却：记录每个 cwd 上次查询时间，避免频繁 fork sqlite3 进程
+    @ObservationIgnored private var lastOpenCodeQueryTime: [String: Date] = [:]
+    private static let openCodeQueryCooldown: TimeInterval = 5.0
+
     private func startCodingTimeTicker() {
         codingTimeTicker?.cancel()
         codingTimeTicker = Task {
@@ -179,62 +180,90 @@ final class SessionManager: SessionAggregatable {
         }
     }
     
-    private func startContextUsageTicker() {
-        contextUsageTicker?.cancel()
-        contextUsageTicker = Task {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(60))
-                guard !Task.isCancelled else { break }
-                await MainActor.run {
-                    self.fetchActiveSessionContext()
+    /// 手动刷新所有会话
+    func refresh() {
+        fileWatcher.refreshAll()
+    }
+
+    // MARK: 会话更新
+
+    /// 带冷却的 OpenCode DB 查询：避免每次文件变化都 fork sqlite3 进程
+    private func fetchOpenCodeContextIfNeeded(cwd: String) -> ContextMonitor.OpenCodeContextData? {
+        let now = Date()
+        if let lastTime = lastOpenCodeQueryTime[cwd],
+           now.timeIntervalSince(lastTime) < Self.openCodeQueryCooldown {
+            return nil
+        }
+        lastOpenCodeQueryTime[cwd] = now
+        return contextMonitor.fetchContextUsageFromOpenCodeDB(cwd: cwd)
+    }
+
+    /// 处理 OpenCode 压缩完成事件
+    func handleOpenCodeCompaction(sessionId: String, compactionTime: Int64) {
+        guard let session = sessions[sessionId] else { return }
+        
+        // 如果会话之前不是压缩状态，切换到压缩状态
+        if session.status != .compacting {
+            Self.logger.info("检测到 OpenCode 压缩: \(sessionId)")
+            
+            var updated = session
+            updated.status = .compacting
+            
+            // 写回 session 文件
+            try? updated.writeToFile()
+            
+            sessions[sessionId] = updated
+            recomputeSortedSessions()
+            
+            let oldState = aggregateState
+            onAggregateStateChanged?(oldState, aggregateState)
+            
+            // 延迟刷新 token 数据（压缩完成后 context 已重置）
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2))
+
+                // 重置冷却以确保压缩后立即查询
+                self.lastOpenCodeQueryTime.removeValue(forKey: session.cwd)
+
+                // 压缩完成后恢复到 coding 状态，并从 OpenCode DB 刷新 token 数据
+                if var updated = self.sessions[sessionId] {
+                    if let data = self.contextMonitor.fetchContextUsageFromOpenCodeDB(cwd: session.cwd) {
+                        updated.contextUsage = data.usage
+                        updated.contextTokensUsed = data.tokensUsed
+                        updated.contextTokensTotal = data.tokensTotal
+                        updated.contextInputTokens = data.inputTokens
+                        updated.contextOutputTokens = data.outputTokens
+                        updated.contextReasoningTokens = data.reasoningTokens
+                    }
+
+                    let preRestoreState = self.aggregateState
+                    updated.status = .coding
+                    try? updated.writeToFile()
+
+                    self.sessions[sessionId] = updated
+                    self.recomputeSortedSessions()
+
+                    let newState = self.aggregateState
+                    self.onAggregateStateChanged?(preRestoreState, newState)
                 }
             }
         }
     }
-
-    /// 手动刷新所有会话
-    func refresh() {
-        fileWatcher.refreshAll()
-        
-        // 刷新 active 会话的 context_usage
-        fetchActiveSessionContext()
-    }
-    
-    /// 获取 active 会话的 context_usage（手动模式 pinned 会话 或自动模式 top 会话）
-    private func fetchActiveSessionContext() {
-        let targetSessionId: String?
-        
-        switch trackingMode {
-        case .manual(let sessionId):
-            targetSessionId = sessionId
-        case .auto:
-            targetSessionId = sortedSessions.first?.sessionId
-        }
-        
-        guard let sessionId = targetSessionId else { return }
-        contextMonitor.fetchContextUsageFromFile(sessionId: sessionId)
-    }
-
-    // MARK: 会话更新
 
     /// 更新单个会话状态（文件回调入口）
     private func updateSession(_ sessionId: String, _ session: Session) {
         let oldState = aggregateState
         var session = session
 
-        if session.status == .completed {
-            contextMonitor.clearSnapshot(for: sessionId)
-        } else {
-            // 让 ContextMonitor 解析 notificationMessage 中的上下文数据
-            // 如果解析成功（PreCompact 事件），将数据回写到 Session 模型
-            if let parsed = contextMonitor.handleSessionUpdate(session) {
-                session.contextUsage = parsed.usage
-                session.contextTokensUsed = parsed.tokensUsed
-                session.contextTokensTotal = parsed.tokensTotal
-                // 只回写非 nil 的字段，避免覆盖 ContextUpdate/transcript 已设置的分类数据
-                if let v = parsed.inputTokens { session.contextInputTokens = v }
-                if let v = parsed.outputTokens { session.contextOutputTokens = v }
-                if let v = parsed.reasoningTokens { session.contextReasoningTokens = v }
+        // OpenCode 会话：从 SQLite DB 读取最新的 token 使用量（带冷却避免频繁 fork）
+        if session.source == "opencode" {
+            if let data = fetchOpenCodeContextIfNeeded(cwd: session.cwd) {
+                session.contextUsage = data.usage
+                session.contextTokensUsed = data.tokensUsed
+                session.contextTokensTotal = data.tokensTotal
+                session.contextInputTokens = data.inputTokens
+                session.contextOutputTokens = data.outputTokens
+                session.contextReasoningTokens = data.reasoningTokens
             }
         }
 
@@ -261,17 +290,16 @@ final class SessionManager: SessionAggregatable {
         let oldState = aggregateState
         var session = session
 
-        // 通知 ContextMonitor 更新快照，并回写解析的上下文数据
-        if session.status == .completed {
-            contextMonitor.clearSnapshot(for: session.sessionId)
-        } else {
-            if let parsed = contextMonitor.handleSessionUpdate(session) {
-                session.contextUsage = parsed.usage
-                session.contextTokensUsed = parsed.tokensUsed
-                session.contextTokensTotal = parsed.tokensTotal
-                if let v = parsed.inputTokens { session.contextInputTokens = v }
-                if let v = parsed.outputTokens { session.contextOutputTokens = v }
-                if let v = parsed.reasoningTokens { session.contextReasoningTokens = v }
+        // 从 OpenCode 数据库读取最新的 token 使用量（带冷却避免频繁 fork）
+        if session.source == "opencode" {
+            if let data = fetchOpenCodeContextIfNeeded(cwd: session.cwd) {
+                session.contextUsage = data.usage
+                session.contextTokensUsed = data.tokensUsed
+                session.contextTokensTotal = data.tokensTotal
+                session.contextInputTokens = data.inputTokens
+                session.contextOutputTokens = data.outputTokens
+                session.contextReasoningTokens = data.reasoningTokens
+                try? session.writeToFile()
             }
         }
 
@@ -359,7 +387,6 @@ final class SessionManager: SessionAggregatable {
     func clearAll() {
         sessions.removeAll()
         sortedSessions = []
-        contextMonitor.clearAll()
     }
 
     // MARK: 状态聚合
@@ -440,10 +467,6 @@ final class SessionManager: SessionAggregatable {
         viewModel?.settings.sessionTrackingMode = "auto"
         viewModel?.settings.pinnedSessionId = nil
         saveSettings()
-        // 立即获取 top 会话的 context_usage
-        if let session = sortedSessions.first {
-            contextMonitor.fetchContextUsageFromFile(sessionId: session.sessionId)
-        }
         Self.logger.info("切换到自动跟踪模式")
     }
 
@@ -462,7 +485,7 @@ final class SessionManager: SessionAggregatable {
         if case .manual(let oldSessionId) = trackingMode, oldSessionId != sessionId {
             cleanupRefreshFile(sessionId: oldSessionId)
         }
-        
+
         trackingMode = .manual(sessionId: sessionId)
 
         // 创建刷新标记文件，触发插件同步最新上下文
@@ -471,27 +494,7 @@ final class SessionManager: SessionAggregatable {
         try? FileManager.default.createDirectory(at: sessionsDir, withIntermediateDirectories: true)
         let refreshFile = sessionsDir.appendingPathComponent("\(sessionId).refresh")
         try? "".write(to: refreshFile, atomically: true, encoding: .utf8)
-        
-        // 延迟获取新会话的 context_usage（带重试机制）
-        let monitor = contextMonitor
-        
-        // 首次尝试
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            guard let self = self else { return }
-            if let session = self.sessions[sessionId], let usage = session.contextUsage, usage > 0 {
-                monitor.setContextUsage(sessionId: sessionId, usage: usage, tokensUsed: session.contextTokensUsed, tokensTotal: session.contextTokensTotal, inputTokens: session.contextInputTokens, outputTokens: session.contextOutputTokens, reasoningTokens: session.contextReasoningTokens, toolUsage: session.toolUsage)
-            }
-            monitor.fetchContextUsageFromFile(sessionId: sessionId)
-        }
-        
-        // 重试一次（等待文件写入）
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            guard let self = self else { return }
-            if let session = self.sessions[sessionId], let usage = session.contextUsage, usage > 0 {
-                monitor.setContextUsage(sessionId: sessionId, usage: usage, tokensUsed: session.contextTokensUsed, tokensTotal: session.contextTokensTotal, inputTokens: session.contextInputTokens, outputTokens: session.contextOutputTokens, reasoningTokens: session.contextReasoningTokens, toolUsage: session.toolUsage)
-            }
-            monitor.fetchContextUsageFromFile(sessionId: sessionId)
-        }
+
         // 持久化到设置
         viewModel?.settings.sessionTrackingMode = "manual"
         viewModel?.settings.pinnedSessionId = sessionId

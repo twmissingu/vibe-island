@@ -34,6 +34,9 @@ final class DynamicIslandPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         isMovableByWindowBackground = false
         animationBehavior = .utilityWindow
+        // 强制深色外观：Dynamic Island 设计语言要求始终使用深色主题，
+        // 忽略系统外观设置以保持一致的视觉风格。
+        appearance = NSAppearance(named: .darkAqua)
         
         // 单一视图，通过 isExpandedMode 环境变量控制紧凑/展开
         let panelContent = DynamicIslandPanelContent(

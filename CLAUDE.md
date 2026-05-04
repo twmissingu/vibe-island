@@ -55,18 +55,32 @@ Pattern: **MVVM + @Observable**, singletons with `@MainActor`. Swift 6 strict co
 
 ```
 Claude Code hook → stdin JSON → vibe-island CLI → HookHandler
-  → writes session JSON to ~/.vibe-island/sessions/<pid>.json (flock locking)
+  → transcript JSONL 增量解析: token 用量 + skill 调用 (<command-name> 标签)
+  → PreToolUse 事件: 工具调用计数累加
+  → 写入 session JSON: ~/.vibe-island/sessions/<pid>.json (flock locking)
 
-SessionFileWatcher (DispatchSource) → detects file changes → SessionManager
-OpenCodeMonitor (4-level fallback: plugin hook → SSE → file monitoring → pgrep)
-CodexMonitor (process detection via pgrep)
+OpenCodeMonitor → 写入 session JSON (plugin hook / SSE / file monitoring / pgrep)
+CodexMonitor → 检测进程 (pgrep)
   ↓
-SessionManager (unified session store, sorts by lastActivity)
+SessionFileWatcher (DispatchSource) → 检测文件变化 → SessionManager
+  → Session 模型是单一数据源，UI 直接读取
+  → OpenCode 会话: 若无 context_usage，从 SQLite DB 补充
   ↓
-DynamicIslandPanel (NSPanel at notch) → IslandView (most recently active session)
+DynamicIslandPanel (NSPanel at notch) → IslandView
+  → ContextUsageCard (有上下文数据) / OpenCodeNoContextCard (等待态)
   ↓
 SoundManager (audio cues) + PetEngine (pixel pet animations)
 ```
+
+#### 上下文数据来源
+
+| 来源 | 数据 | 路径 |
+|------|------|------|
+| transcript JSONL | token 用量、skill 调用 | CLI `parseTranscriptContext` → Session 文件 |
+| PreToolUse hook | 工具调用计数 | CLI `updateToolUsage` → Session 文件 |
+| OpenCode SQLite | token 用量、压缩检测 | App `ContextMonitor.fetchContextUsageFromOpenCodeDB` → Session 模型 |
+
+**设计原则**: Session 模型是单一数据源。UI（`ExpandedIslandView`）直接从 Session 构建 `ContextUsageSnapshot`，不经过 ContextMonitor 中转。ContextMonitor 仅负责 OpenCode SQLite 读取和压缩事件检测。
 
 ### State Priority
 
@@ -74,7 +88,7 @@ SoundManager (audio cues) + PetEngine (pixel pet animations)
 
 Attention-needed states (approval, compression) blink; others are constant color.
 
-**Session list sorting**: `sortedSessions` 按 `lastActivity` 降序排列（最近活跃在前），这是设计意图——用户最关心的是最近正在使用的会话。状态优先级（`SessionState.priority`）仅用于 `aggregateState` 聚合计算和 `ContextMonitor` 告警阈值判断。
+**Session list sorting**: `sortedSessions` 按 `lastActivity` 降序排列（最近活跃在前），这是设计意图——用户最关心的是最近正在使用的会话。状态优先级（`SessionState.priority`）仅用于 `aggregateState` 聚合计算。
 
 ### Where to Look
 

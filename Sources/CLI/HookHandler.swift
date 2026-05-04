@@ -1,5 +1,16 @@
 import Foundation
 
+// MARK: - Parsed Context Data
+
+struct ParsedContextData {
+    let usage: Double
+    let tokensUsed: Int?
+    let tokensTotal: Int?
+    let inputTokens: Int?
+    let outputTokens: Int?
+    let reasoningTokens: Int?
+}
+
 // MARK: - Hook Handler
 
 /// Processes hook events from stdin, updates session files in ~/.vibe-island/sessions/.
@@ -58,11 +69,11 @@ enum HookHandler {
         // firing simultaneously) race: both read the old file, apply changes
         // independently, and the last writer wins — clobbering the first writer's changes.
         try FileLock.withLock(at: sessionPath) {
-            // 识别opencode进程，覆盖source
-            let parentProcessName = processName(pid_t(pid))
-            let isOpenCodeProcess = parentProcessName.lowercased().contains("opencode")
+            // 识别 opencode 来源：优先信任 event 自身声明的 source，
+            // 仅当 event.source 为 nil 时通过 sessionId 推断。
+            // 不依赖 processName（Claude Code 和 OpenCode 均为 node 进程，不可靠）。
             let isOpenCodeSession = event.sessionId.lowercased().starts(with: "opencode-")
-            let resolvedSource = isOpenCodeProcess || isOpenCodeSession ? "opencode" : event.source
+            let resolvedSource = event.source ?? (isOpenCodeSession ? "opencode" : nil)
             
             var session = loadOrCreateSession(
                 path: sessionPath,
@@ -86,10 +97,27 @@ enum HookHandler {
             session.sessionName = event.sessionName ?? session.sessionName
             session.notificationMessage = event.message
 
+            // Claude Code 会话名生成（Claude Code 不提供 session_name）
+            if session.sessionName == nil, resolvedSource != "opencode" {
+                if event.hookEventName == .userPromptSubmit, let prompt = event.prompt, !prompt.isEmpty {
+                    let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+                    session.sessionName = trimmed.count > 30 ? String(trimmed.prefix(30)) + "…" : trimmed
+                } else {
+                    session.sessionName = (session.cwd as NSString).lastPathComponent
+                }
+            }
+
             // 存储 transcript_path（SessionStart 事件提供）
             if event.hookEventName == .sessionStart, let tp = event.transcriptPath {
                 session.transcriptPath = tp
                 session.transcriptOffset = 0
+            }
+
+            // PostCompact: 上下文压缩后 transcript 被重写，需要重置 offset 重新解析
+            if event.hookEventName == .postCompact {
+                session.transcriptOffset = 0
+                session.contextUsage = nil
+                session.contextTokensUsed = nil
             }
 
             // 自动查找 transcript_path（如果 SessionStart 未提供）
@@ -108,14 +136,24 @@ enum HookHandler {
                 session.contextInputTokens = event.contextInputTokens
                 session.contextOutputTokens = event.contextOutputTokens
                 session.contextReasoningTokens = event.contextReasoningTokens
-            } else if let message = event.message {
-                // Fallback: parse from message if no direct context usage fields
-                parseAndStoreContextUsage(message, into: &session)
             }
 
             // 从 transcript JSONL 解析上下文使用量（Claude Code 会话）
             if resolvedSource != "opencode", let transcriptPath = session.transcriptPath {
                 parseTranscriptContext(into: &session, transcriptPath: transcriptPath)
+            }
+
+            // 从 OpenCode 数据库读取 token 使用量（如果会话文件没有 context_usage）
+            if resolvedSource == "opencode", session.contextUsage == nil {
+                let cwd = session.cwd
+                if let parsed = parseOpenCodeContextFromDB(cwd: cwd) {
+                    session.contextUsage = parsed.usage
+                    session.contextTokensUsed = parsed.tokensUsed
+                    session.contextTokensTotal = parsed.tokensTotal
+                    session.contextInputTokens = parsed.inputTokens
+                    session.contextOutputTokens = parsed.outputTokens
+                    session.contextReasoningTokens = parsed.reasoningTokens
+                }
             }
 
             // FIRST: Increment tool usage count in PreToolUse events
@@ -388,36 +426,6 @@ enum HookHandler {
         appendToDebugLog(message)
     }
 
-    // MARK: - Context Usage Parsing
-
-    /// Parse context usage from PreCompact message and persist to session fields.
-    /// Format: "Context usage: 85% (170000/200000 tokens)"
-    private static let contextUsagePattern = try? NSRegularExpression(
-        pattern: #"(?:Context usage|上下文使用)\s*:\s*(\d+(?:\.\d+)?)\s*%\s*(?:\((\d+)\s*/\s*(\d+)\s*tokens?\))?"#,
-        options: .caseInsensitive
-    )
-
-    private static func parseAndStoreContextUsage(_ message: String, into session: inout Session) {
-        guard let regex = contextUsagePattern else { return }
-        let nsString = message as NSString
-        let range = NSRange(location: 0, length: nsString.length)
-        guard let match = regex.firstMatch(in: message, options: [], range: range) else { return }
-
-        if let percentRange = Range(match.range(at: 1), in: message),
-           let percent = Double(message[percentRange]) {
-            session.contextUsage = percent / 100.0
-        }
-        if let usedRange = Range(match.range(at: 2), in: message),
-           let used = Int(message[usedRange]) {
-            session.contextTokensUsed = used
-        }
-        if let totalRange = Range(match.range(at: 3), in: message),
-           let total = Int(message[totalRange]) {
-            session.contextTokensTotal = total
-            session.contextLimit = total
-        }
-    }
-
     // MARK: - Transcript 路径查找
 
     /// 自动查找 Claude Code 的 transcript 文件路径
@@ -510,11 +518,13 @@ enum HookHandler {
         handle.seek(toFileOffset: UInt64(offset))
         let newData = handle.readData(ofLength: readSize)
 
-        // 按行扫描，找最后一条含 usage 的 assistant 消息
+        // 按行扫描：assistant 消息提取 token 用量，user 消息提取 skill 调用，custom-title 提取会话名
         var lastInput = 0
         var lastOutput = 0
         var lastCacheRead = 0
         var found = false
+        var foundSkills: [String] = []
+        var lastCustomTitle: String?
 
         newData.withUnsafeBytes { rawBuffer in
             guard let basePtr = rawBuffer.baseAddress else { return }
@@ -527,16 +537,35 @@ enum HookHandler {
                     if lineEnd > lineStart {
                         let lineData = Data(bytes: ptr + lineStart, count: lineEnd - lineStart)
                         if let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
-                           let type = json["type"] as? String, type == "assistant",
-                           let message = json["message"] as? [String: Any],
-                           let usage = message["usage"] as? [String: Any] {
-                            let input = usage["input_tokens"] as? Int ?? 0
-                            let output = usage["output_tokens"] as? Int ?? 0
-                            if input > 0 || output > 0 {
-                                lastInput = input
-                                lastOutput = output
-                                lastCacheRead = usage["cache_read_input_tokens"] as? Int ?? 0
-                                found = true
+                           let type = json["type"] as? String {
+                            if type == "assistant",
+                               let message = json["message"] as? [String: Any],
+                               let usage = message["usage"] as? [String: Any] {
+                                let input = usage["input_tokens"] as? Int ?? 0
+                                let output = usage["output_tokens"] as? Int ?? 0
+                                if input > 0 || output > 0 {
+                                    lastInput = input
+                                    lastOutput = output
+                                    lastCacheRead = usage["cache_read_input_tokens"] as? Int ?? 0
+                                    found = true
+                                }
+                            } else if type == "user",
+                                      let message = json["message"] as? [String: Any] {
+                                // content 可能是纯字符串或 [{type:"text", text:"..."}] 数组
+                                let content: String?
+                                if let str = message["content"] as? String {
+                                    content = str
+                                } else if let arr = message["content"] as? [[String: Any]] {
+                                    content = arr.compactMap { $0["text"] as? String }.joined(separator: "\n")
+                                } else {
+                                    content = nil
+                                }
+                                if let content, let skillName = Self.extractSkillName(from: content) {
+                                    foundSkills.append(skillName)
+                                }
+                            } else if type == "custom-title",
+                                      let title = json["customTitle"] as? String, !title.isEmpty {
+                                lastCustomTitle = title
                             }
                         }
                     }
@@ -548,23 +577,62 @@ enum HookHandler {
         // 更新 offset
         session.transcriptOffset = fileSize
 
-        guard found else { return }
-
-        let totalUsed = lastInput + lastCacheRead
-        session.contextInputTokens = lastInput
-        session.contextOutputTokens = lastOutput
-        session.contextTokensUsed = totalUsed
-
-        // 上下文上限：使用已缓存的 contextLimit，或模型默认值
-        if let limit = session.contextLimit, limit > 0 {
-            session.contextTokensTotal = limit
-            session.contextUsage = Double(totalUsed) / Double(limit)
-        } else {
-            let limit = defaultContextLimit()
-            session.contextLimit = limit
-            session.contextTokensTotal = limit
-            session.contextUsage = Double(totalUsed) / Double(limit)
+        // 从 transcript 提取 /rename 设置的自定义会话名
+        if let customTitle = lastCustomTitle {
+            session.sessionName = customTitle
         }
+
+        guard found || !foundSkills.isEmpty else { return }
+
+        // 更新 token 统计
+        if found {
+            let totalUsed = lastInput + lastCacheRead
+            session.contextInputTokens = lastInput
+            session.contextOutputTokens = lastOutput
+            session.contextTokensUsed = totalUsed
+
+            // 上下文上限：使用已缓存的 contextLimit，或模型默认值
+            if let limit = session.contextLimit, limit > 0 {
+                session.contextTokensTotal = limit
+                session.contextUsage = Double(totalUsed) / Double(limit)
+            } else {
+                let limit = defaultContextLimit()
+                session.contextLimit = limit
+                session.contextTokensTotal = limit
+                session.contextUsage = Double(totalUsed) / Double(limit)
+            }
+        }
+
+        // 合并 skill 统计（与增量 offset 之前的计数合并，取 max 避免重复）
+        if !foundSkills.isEmpty {
+            var skillCounts: [String: Int] = [:]
+            for skill in foundSkills {
+                skillCounts[skill, default: 0] += 1
+            }
+            let newSkills = skillCounts.map { ToolUsage(name: $0.key, count: $0.value) }
+            if var existing = session.skillUsage {
+                for newSkill in newSkills {
+                    if let idx = existing.firstIndex(where: { $0.name == newSkill.name }) {
+                        existing[idx] = ToolUsage(name: newSkill.name, count: max(existing[idx].count, newSkill.count))
+                    } else {
+                        existing.append(newSkill)
+                    }
+                }
+                session.skillUsage = existing.sorted { $0.count > $1.count }
+            } else {
+                session.skillUsage = newSkills.sorted { $0.count > $1.count }
+            }
+        }
+    }
+
+    /// 从 user 消息 content 中提取 skill 名称
+    /// 匹配格式: <command-name>/skill-name</command-name>
+    private static func extractSkillName(from content: String) -> String? {
+        guard let startRange = content.range(of: "<command-name>/"),
+              let endRange = content.range(of: "</command-name>", range: startRange.upperBound..<content.endIndex)
+        else { return nil }
+        let skillName = String(content[startRange.upperBound..<endRange.lowerBound])
+        return skillName.isEmpty ? nil : skillName
     }
 
     /// 模型默认上下文窗口大小（Claude 4 系列均为 200K）
@@ -638,6 +706,125 @@ enum HookHandler {
             }
         } else {
             try? data.write(to: debugLogFile)
+        }
+    }
+
+    // MARK: - OpenCode 数据库读取
+    // 注意：runSQL / getOpenCodeModelContextLimit 与 ContextMonitor.swift 中的实现重复。
+    // CLI 和 App 是独立 target，无法直接共享代码。如需修改请同步两处。
+
+    private static let openCodeDatabasePath = NSHomeDirectory() + "/.local/share/opencode/opencode.db"
+
+    private static func parseOpenCodeContextFromDB(cwd: String) -> ParsedContextData? {
+        guard FileManager.default.fileExists(atPath: openCodeDatabasePath) else { return nil }
+
+        let escapedCwd = cwd.replacingOccurrences(of: "'", with: "''")
+        let findSessionSQL = "SELECT id FROM session WHERE directory = '\(escapedCwd)' ORDER BY time_updated DESC LIMIT 1;"
+
+        guard let sessionIdResult = runSQL(findSessionSQL), !sessionIdResult.isEmpty else { return nil }
+        let ocSessionId = sessionIdResult.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // 取最后一条有 token 数据的消息的 total（累计值，不是求和）
+        let tokenSQL = """
+            SELECT
+                json_extract(data, '$.tokens.total') as total,
+                json_extract(data, '$.tokens.input') as input,
+                json_extract(data, '$.tokens.output') as output,
+                json_extract(data, '$.tokens.reasoning') as reasoning
+            FROM message 
+            WHERE session_id = '\(ocSessionId)' 
+            AND json_extract(data, '$.tokens.total') > 0
+            ORDER BY time_updated DESC LIMIT 1;
+            """
+
+        guard let tokenResult = runSQL(tokenSQL), !tokenResult.isEmpty else { return nil }
+
+        let lines = tokenResult.components(separatedBy: "|")
+        guard lines.count >= 4,
+              let totalTokens = Int(lines[0]),
+              totalTokens > 0 else { return nil }
+
+        let inputTokens = Int(lines[1]) ?? 0
+        let outputTokens = Int(lines[2]) ?? 0
+        let reasoningTokens = Int(lines[3]) ?? 0
+
+        let modelLimit = getOpenCodeModelContextLimit(cwd: cwd)
+        let usage = modelLimit > 0 ? Double(totalTokens) / Double(modelLimit) : 0
+
+        return ParsedContextData(
+            usage: usage,
+            tokensUsed: totalTokens,
+            tokensTotal: modelLimit > 0 ? modelLimit : nil,
+            inputTokens: inputTokens,
+            outputTokens: outputTokens,
+            reasoningTokens: reasoningTokens
+        )
+    }
+
+    private static func getOpenCodeModelContextLimit(cwd: String) -> Int {
+        let configPath = NSHomeDirectory() + "/.config/opencode/opencode.json"
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: configPath)),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let provider = json["provider"] as? [String: Any] else { return 200000 }
+
+        // 从数据库获取当前使用的 provider 和 model
+        let escapedCwd = cwd.replacingOccurrences(of: "'", with: "''")
+        let findSessionSQL = "SELECT id FROM session WHERE directory = '\(escapedCwd)' ORDER BY time_updated DESC LIMIT 1;"
+        if let sessionIdResult = runSQL(findSessionSQL), !sessionIdResult.isEmpty {
+            let ocSessionId = sessionIdResult.trimmingCharacters(in: .whitespacesAndNewlines)
+            let modelSQL = """
+                SELECT json_extract(data, '$.providerID'), json_extract(data, '$.modelID')
+                FROM message WHERE session_id = '\(ocSessionId)'
+                AND json_extract(data, '$.providerID') IS NOT NULL
+                ORDER BY time_updated DESC LIMIT 1;
+                """
+            if let modelResult = runSQL(modelSQL), !modelResult.isEmpty {
+                let parts = modelResult.components(separatedBy: "|")
+                if parts.count >= 2 {
+                    let providerID = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                    let modelID = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                    if let providerDict = provider[providerID] as? [String: Any],
+                       let models = providerDict["models"] as? [String: Any],
+                       let modelDict = models[modelID] as? [String: Any],
+                       let limit = modelDict["limit"] as? [String: Any],
+                       let context = limit["context"] as? Int {
+                        return context
+                    }
+                }
+            }
+        }
+
+        // 兜底：遍历所有 provider 找到第一个有效的上下文窗口
+        for (_, providerConfig) in provider {
+            guard let providerDict = providerConfig as? [String: Any],
+                  let models = providerDict["models"] as? [String: Any] else { continue }
+            for (_, model) in models {
+                guard let modelDict = model as? [String: Any],
+                      let limit = modelDict["limit"] as? [String: Any],
+                      let context = limit["context"] as? Int else { continue }
+                return context
+            }
+        }
+        return 200000
+    }
+
+    private static func runSQL(_ sql: String) -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
+        process.arguments = [openCodeDatabasePath, sql]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            return String(data: data, encoding: .utf8)
+        } catch {
+            return nil
         }
     }
 }

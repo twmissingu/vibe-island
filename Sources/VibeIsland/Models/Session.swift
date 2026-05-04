@@ -287,7 +287,8 @@ public struct Session: Codable, Equatable, Sendable {
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(self)
-        try data.write(to: url, options: .atomic)
+        // 不使用 .atomic：atomic write 会创建新 inode，导致 DispatchSource 的 fd 失效
+        try data.write(to: url, options: [])
     }
 
     public static func loadFromFile(url: URL) throws -> Session {
@@ -425,5 +426,14 @@ public extension Session {
         case "opencode": return "terminal"
         default: return "cpu"
         }
+    }
+
+    /// 会话持续时间格式化（HH:MM）
+    var formattedDuration: String {
+        guard let startTime = pidStartTime else { return "--:--" }
+        let elapsed = Date().timeIntervalSince1970 - startTime
+        let hours = Int(elapsed) / 3600
+        let minutes = (Int(elapsed) % 3600) / 60
+        return String(format: "%02d:%02d", hours, minutes)
     }
 }

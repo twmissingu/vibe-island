@@ -172,7 +172,7 @@ final class SessionFileWatcher: SessionAggregatable {
 
         let source = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fd,
-            eventMask: [.write, .rename],
+            eventMask: [.write, .rename, .delete],
             queue: DispatchQueue.main
         )
 
@@ -181,8 +181,19 @@ final class SessionFileWatcher: SessionAggregatable {
             self.handleFileEvent(for: fileURL)
         }
 
-        source.setCancelHandler {
+        source.setCancelHandler { [weak self] in
             close(fd)
+            // 文件被替换（inode 变化）时，DispatchSource 被取消，需要重建
+            DispatchQueue.main.async {
+                guard let self = self, self.isWatching else { return }
+                self.sourcesLock.lock()
+                self.fileSources.removeValue(forKey: fileURL)
+                self.sourcesLock.unlock()
+                // 如果文件仍然存在且仍在监听，重新创建监听源
+                if FileManager.default.fileExists(atPath: fileURL.path) {
+                    self.createDispatchSource(for: fileURL)
+                }
+            }
         }
 
         source.resume()

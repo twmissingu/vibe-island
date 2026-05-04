@@ -545,7 +545,9 @@ public struct Session: Codable, Equatable, Sendable {
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(self)
-        try data.write(to: url, options: .atomic)
+        // 不使用 .atomic：atomic write 会创建新 inode，导致 App 端 DispatchSource 的 fd 失效
+        // CLI 端已有 flock 保护读写周期，无需 atomic 保证
+        try data.write(to: url, options: [])
     }
 
     public static func loadFromFile(url: URL) throws -> Session {

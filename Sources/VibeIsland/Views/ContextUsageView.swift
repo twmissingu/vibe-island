@@ -113,28 +113,32 @@ struct ContextUsageCard: View {
     let snapshot: ContextUsageSnapshot
     let theme: AppTheme
 
+    private var themeManager: ThemeManager {
+        theme.manager
+    }
+
     var body: some View {
-        VStack(spacing: theme == .pixel ? 6 : 8) {
+        VStack(spacing: themeManager.spacing) {
             // 标题行：会话名 + 持续时间
             HStack {
                 Text(session.sessionName ?? session.cwd.shortenedCwd())
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(titleColor)
+                    .foregroundStyle(themeManager.primaryText)
                     .lineLimit(1)
                     .truncationMode(.tail)
 
                 Spacer()
 
-                Text(sessionDuration)
+                Text(session.formattedDuration)
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(durationColor)
+                    .foregroundStyle(themeManager.mutedText)
             }
 
             // 进度条：包含百分比
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(progressBackgroundColor)
+                        .fill(themeManager.progressBackground)
 
                     Capsule()
                         .fill(statusColor.gradient)
@@ -146,10 +150,10 @@ struct ContextUsageCard: View {
                         .foregroundStyle(statusColor)
                 }
             }
-            .frame(height: theme == .pixel ? 6 : 8)
+            .frame(height: themeManager.cornerRadius)
 
             // Token 统计表格（两行三列对齐）
-            Grid(alignment: .center, horizontalSpacing: 8, verticalSpacing: theme == .pixel ? 6 : 8) {
+            Grid(alignment: .center, horizontalSpacing: 8, verticalSpacing: themeManager.spacing) {
                 // 第一行：USED / TOTAL / REMAIN
                 if let used = snapshot.tokensUsed, let total = snapshot.tokensTotal {
                     GridRow {
@@ -178,123 +182,78 @@ struct ContextUsageCard: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("TOOL USAGE")
                         .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(sectionLabelColor)
+                        .foregroundStyle(themeManager.tertiaryText)
 
                     ForEach(tools, id: \.name) { tool in
                         HStack(spacing: 6) {
                             Image(systemName: toolIcon(for: tool.name))
                                 .font(.system(size: 10))
-                                .foregroundStyle(itemNameColor)
+                                .foregroundStyle(themeManager.secondaryText)
                                 .frame(width: 14)
 
                             Text(tool.name.uppercased())
                                 .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(itemNameColor)
+                                .foregroundStyle(themeManager.secondaryText)
 
                             Spacer()
 
                             Text("\(tool.count)")
                                 .font(.system(size: 10, design: .monospaced))
-                                .foregroundStyle(itemValueColor)
+                                .foregroundStyle(themeManager.secondaryText)
 
                             Text("(\(toolPercent(tool))%)")
                                 .font(.system(size: 9, design: .monospaced))
-                                .foregroundStyle(theme == .pixel ? .gray.opacity(0.7) : .gray.opacity(0.6))
+                                .foregroundStyle(themeManager.mutedText)
                         }
                     }
 
-                    // 工具使用进度条
-                    if let maxCount = tools.map({ $0.count }).max(), maxCount > 0 {
-                        let sortedTools = tools.sorted { $0.count > $1.count }
-                        GeometryReader { geo in
-                            ForEach(Array(sortedTools.enumerated()), id: \.element.name) { index, tool in
-                                let width = geo.size.width * CGFloat(tool.count) / CGFloat(maxCount)
-                                Rectangle()
-                                    .fill(toolColor(for: tool.name).opacity(0.6))
-                                    .frame(width: max(2, width), height: 4)
-                                    .cornerRadius(2)
-                                    .offset(y: CGFloat(index) * 6)
-                            }
-                        }
-                        .frame(height: CGFloat(min(tools.count, 5)) * 6)
-                    }
                 }
             }
 
             // 技能使用行
             if let skills = snapshot.skillUsage, !skills.isEmpty {
                 Divider()
-                    .opacity(theme == .pixel ? 0.15 : 0.2)
+                    .opacity(0.2)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("SKILL USAGE")
                         .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(sectionLabelColor)
+                        .foregroundStyle(themeManager.tertiaryText)
 
                     ForEach(skills, id: \.name) { skill in
                         HStack {
                             Text(skill.name.uppercased())
                                 .font(.system(size: 10))
-                                .foregroundStyle(itemNameColor)
+                                .foregroundStyle(themeManager.secondaryText)
 
                             Spacer()
 
-                            Text("\(skill.count) (\(skillPercent(skill))%)")
+                            Text("\(skill.count)")
                                 .font(.system(size: 10, design: .monospaced))
-                                .foregroundStyle(itemValueColor)
+                                .foregroundStyle(themeManager.secondaryText)
+
+                            Text("(\(skillPercent(skill))%)")
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundStyle(themeManager.mutedText)
                         }
                     }
                 }
             }
         }
-        .padding(theme == .pixel ? 8 : 10)
+        .padding(themeManager.padding)
         .background(cardBackground)
         .animation(.easeInOut(duration: 0.3), value: snapshot.usageRatio)
     }
 
     // MARK: - 主题感知的颜色
 
-    private var titleColor: Color {
-        theme == .pixel ? .white : .primary
-    }
-
-    private var durationColor: Color {
-        theme == .pixel ? .gray.opacity(0.8) : .gray.opacity(0.7)
-    }
-
-    private var progressBackgroundColor: Color {
-        theme == .pixel ? Color(white: 0.25) : Color.gray.opacity(0.2)
-    }
-
-    private var sectionLabelColor: Color {
-        theme == .pixel ? .gray.opacity(0.7) : .gray.opacity(0.6)
-    }
-
-    private var itemNameColor: Color {
-        theme == .pixel ? .white : .primary
-    }
-
-    private var itemValueColor: Color {
-        theme == .pixel ? .white.opacity(0.85) : .gray.opacity(0.6)
-    }
-
     private var cardBackground: some View {
-        switch theme {
-        case .pixel:
-            return RoundedRectangle(cornerRadius: 8)
-                .fill(Color(white: 0.15))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(statusColor.opacity(snapshot.isWarning ? 0.6 : 0.25), lineWidth: 1)
-                )
-        case .glass:
-            return RoundedRectangle(cornerRadius: 10)
-                .fill(.white.opacity(0.03))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .strokeBorder(statusColor.opacity(snapshot.isWarning ? 0.3 : 0), lineWidth: 1)
-                )
-        }
+        RoundedRectangle(cornerRadius: themeManager.cornerRadius)
+            .fill(themeManager.cardBackground)
+            .overlay(
+                RoundedRectangle(cornerRadius: themeManager.cornerRadius)
+                    .strokeBorder(statusColor.opacity(snapshot.isWarning ? 0.4 : 0.2), lineWidth: 1)
+            )
     }
 
     private var statusColor: Color {
@@ -306,15 +265,6 @@ struct ContextUsageCard: View {
         } else {
             return .red
         }
-    }
-
-    private var sessionDuration: String {
-        guard let startTime = session.pidStartTime else { return "--:--" }
-        let elapsed = Date().timeIntervalSince1970 - startTime
-        let hours = Int(elapsed) / 3600
-        let minutes = (Int(elapsed) % 3600) / 60
-
-        return String(format: "%02d:%02d", hours, minutes)
     }
 
     private var hasCategoryTokens: Bool {
@@ -336,26 +286,36 @@ struct ContextUsageCard: View {
 
     private func toolIcon(for name: String) -> String {
         switch name.lowercased() {
-        case "read", "glob", "grep": return "doc.text"
-        case "edit", "write": return "pencil"
+        // 文件操作
+        case "read": return "doc.text"
+        case "write": return "pencil"
+        case "edit": return "pencil"
+        case "glob": return "doc.text.magnifyingglass"
+        case "grep": return "text.magnifyingglass"
+        case "notebookedit": return "book"
+        // 终端
         case "bash", "shell", "cmd": return "terminal"
+        // 网络
         case "webfetch", "fetch": return "globe"
-        case "task": return "sparkles"
-        case "tool": return "wrench.and.screwdriver"
+        case "websearch": return "magnifyingglass"
+        // Agent 子代理
+        case "agent": return "person.2"
+        // 任务管理
+        case "taskcreate", "taskupdate", "tasklist", "taskget", "todowrite", "taskoutput": return "checklist"
+        case "taskstop": return "stop.circle"
+        // 计划模式
+        case "enterplanmode", "plan": return "list.bullet"
+        case "exitplanmode": return "checkmark.circle"
+        // 定时任务
+        case "croncreate", "cronlist": return "clock"
+        case "crondelete": return "clock.badge.xmark"
+        // 技能
+        case "skill": return "wand.and.stars"
+        // MCP
         case "mcp": return "puzzlepiece.extension"
+        // 交互
+        case "askuserquestion": return "questionmark.circle"
         default: return "questionmark.circle"
-        }
-    }
-
-    private func toolColor(for name: String) -> Color {
-        switch name.lowercased() {
-        case "read", "glob", "grep": return .blue
-        case "edit", "write": return .orange
-        case "bash", "shell", "cmd": return .green
-        case "webfetch", "fetch": return .purple
-        case "task": return .yellow
-        case "tool": return .cyan
-        default: return .gray
         }
     }
 
@@ -405,7 +365,9 @@ struct ContextUsageCard: View {
         }
     }
 
-    private var tokenValueColor: Color { .white }
+    private var tokenValueColor: Color {
+        theme == .pixel ? .white : .primary
+    }
 
 
 }
@@ -417,13 +379,17 @@ struct SessionInfoCard: View {
     let session: Session
     let theme: AppTheme
 
+    private var themeManager: ThemeManager {
+        theme.manager
+    }
+
     var body: some View {
-        VStack(spacing: theme == .pixel ? 8 : 10) {
+        VStack(spacing: themeManager.spacing + 2) {
             // 标题行：会话名 + 状态
             HStack {
                 Text(session.sessionName ?? session.cwd.shortenedCwd())
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(titleColor)
+                    .foregroundStyle(themeManager.primaryText)
                     .lineLimit(1)
                     .truncationMode(.tail)
 
@@ -446,136 +412,139 @@ struct SessionInfoCard: View {
                     systemImage: session.toolSourceIcon
                 )
                 .font(.system(size: 10))
-                .foregroundStyle(metaColor)
+                .foregroundStyle(themeManager.secondaryText)
 
                 Spacer()
 
                 Text(session.cwd.shortenedCwd())
                     .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(cwdColor)
+                    .foregroundStyle(themeManager.mutedText)
                     .lineLimit(1)
             }
 
-            Divider().opacity(theme == .pixel ? 0.15 : 0.2)
+            Divider().opacity(0.2)
 
             // 等待数据提示
             HStack(spacing: 6) {
                 Image(systemName: "arrow.trianglehead.2.clockwise")
                     .font(.system(size: 10))
-                    .foregroundStyle(hintColor)
+                    .foregroundStyle(themeManager.tertiaryText)
                 Text("上下文数据将在会话运行后自动更新")
                     .font(.system(size: 10))
-                    .foregroundStyle(hintColor)
+                    .foregroundStyle(themeManager.tertiaryText)
             }
         }
-        .padding(theme == .pixel ? 8 : 10)
+        .padding(themeManager.padding)
         .background(cardBackground)
     }
 
     // MARK: - 主题感知的颜色
 
-    private var titleColor: Color {
-        theme == .pixel ? .white : .primary
-    }
-
-    private var metaColor: Color {
-        theme == .pixel ? .gray.opacity(0.8) : .gray.opacity(0.7)
-    }
-
-    private var cwdColor: Color {
-        theme == .pixel ? .gray.opacity(0.7) : .gray.opacity(0.6)
-    }
-
-    private var hintColor: Color {
-        theme == .pixel ? .gray.opacity(0.7) : .gray.opacity(0.6)
-    }
-
     private var cardBackground: some View {
-        switch theme {
-        case .pixel:
-            return RoundedRectangle(cornerRadius: 8)
-                .fill(Color(white: 0.15))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
-                )
-        case .glass:
-            return RoundedRectangle(cornerRadius: 10)
-                .fill(.white.opacity(0.03))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .strokeBorder(.gray.opacity(0.15), lineWidth: 1)
-                )
-        }
+        RoundedRectangle(cornerRadius: themeManager.cornerRadius)
+            .fill(themeManager.cardBackground)
+            .overlay(
+                RoundedRectangle(cornerRadius: themeManager.cornerRadius)
+                    .strokeBorder(themeManager.normalBorder, lineWidth: 1)
+            )
     }
 }
 
-// MARK: - OpenCode 无上下文数据卡片
+// MARK: - OpenCode 上下文卡片（无数据时的等待态）
 
+/// 与 ContextUsageCard 结构一致的 OpenCode 卡片
+/// 当 OpenCode 会话尚无上下文数据时展示等待提示
 struct OpenCodeNoContextCard: View {
     let session: Session
     let theme: AppTheme
 
+    private var themeManager: ThemeManager {
+        theme.manager
+    }
+
     var body: some View {
-        Group {
-            switch theme {
-            case .pixel:
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(white: 0.15))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .strokeBorder(Color.gray.opacity(0.35), lineWidth: 1)
+        VStack(spacing: themeManager.spacing) {
+            // 标题行：会话名 + 来源标签 + 持续时间
+            HStack {
+                Text(session.sessionName ?? session.cwd.shortenedCwd())
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(themeManager.primaryText)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Text("OpenCode")
+                    .font(.system(size: 8, weight: .medium))
+                    .foregroundStyle(.orange.opacity(0.9))
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(
+                        Capsule().fill(.orange.opacity(0.2))
                     )
-            case .glass:
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(.white.opacity(0.05))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .strokeBorder(.gray.opacity(0.2), lineWidth: 1)
-                    )
+
+                Spacer()
+
+                Text(session.formattedDuration)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(themeManager.mutedText)
+            }
+
+            // 进度条占位
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(themeManager.progressBackground)
+
+                    Capsule()
+                        .fill(Color.orange.opacity(0.3).gradient)
+                        .frame(width: 0)
+                }
+            }
+            .frame(height: themeManager.cornerRadius)
+
+            // Token 统计占位（与 ContextUsageCard 同布局）
+            Grid(alignment: .center, horizontalSpacing: 8, verticalSpacing: themeManager.spacing) {
+                GridRow {
+                    tokenCell("USED", value: nil)
+                    tokenCell("TOTAL", value: nil)
+                    tokenCell("REMAIN", value: nil)
+                }
+            }
+
+            // 等待数据提示
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.trianglehead.2.clockwise")
+                    .font(.system(size: 10))
+                    .foregroundStyle(themeManager.tertiaryText)
+                Text("上下文数据将在会话运行后自动更新")
+                    .font(.system(size: 10))
+                    .foregroundStyle(themeManager.tertiaryText)
             }
         }
-        .padding(12)
-        .overlay {
-            VStack(spacing: 8) {
-                HStack {
-                    Image(systemName: "terminal.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.orange)
-                    Text("OpenCode")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(session.status.color)
-                            .frame(width: 6, height: 6)
-                        Text(session.status.statusName)
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                    }
-                }
+        .padding(themeManager.padding)
+        .background(cardBackground)
+    }
 
-                if let name = session.sessionName {
-                    Text(name)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
+    // MARK: - 主题感知的颜色
 
-                HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.orange)
-                    Text("OpenCode 暂不支持上下文监控")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.top, 4)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: themeManager.cornerRadius)
+            .fill(themeManager.cardBackground)
+            .overlay(
+                RoundedRectangle(cornerRadius: themeManager.cornerRadius)
+                    .strokeBorder(.orange.opacity(0.25), lineWidth: 1)
+            )
+    }
+
+    private func tokenCell(_ label: String, value: Int?) -> some View {
+        VStack(spacing: 2) {
+            Text(label)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(themeManager.mutedText)
+            Text("--")
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(themeManager.mutedText)
         }
+        .frame(maxWidth: .infinity)
     }
 }
 

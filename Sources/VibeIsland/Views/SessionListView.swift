@@ -14,13 +14,17 @@ struct SessionListView: View {
         let onSelect: () -> Void
         let theme: AppTheme
 
+        private var themeManager: ThemeManager {
+            theme.manager
+        }
+
         var body: some View {
             Button(action: onSelect) {
                 HStack(spacing: 4) {
                     // 会话名
                     Text(session.sessionName ?? session.cwd.shortenedCwd())
                         .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
-                        .foregroundStyle(sessionNameColor)
+                        .foregroundStyle(themeManager.primaryText)
                         .lineLimit(1)
                         .truncationMode(.tail)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -28,7 +32,7 @@ struct SessionListView: View {
                     // 工具来源
                     Text(session.toolDisplayName)
                         .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(toolSourceColor)
+                        .foregroundStyle(themeManager.toolSourceColor)
                         .frame(width: 50, alignment: .trailing)
 
                     // 状态图标 + 名称
@@ -42,7 +46,7 @@ struct SessionListView: View {
                     }
                     .frame(width: 70, alignment: .trailing)
                 }
-                .padding(.vertical, theme == .pixel ? 5 : 6)
+                .padding(.vertical, 6)
                 .padding(.horizontal, 8)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
@@ -55,50 +59,17 @@ struct SessionListView: View {
 
         // MARK: - 主题感知的颜色
 
-        private var sessionNameColor: Color {
-            switch theme {
-            case .pixel:
-                return .white
-            case .glass:
-                return .primary
-            }
-        }
-
-        private var toolSourceColor: Color {
-            switch theme {
-            case .pixel:
-                return .gray.opacity(0.5)
-            case .glass:
-                return .secondary
-            }
-        }
-
         private var rowBackground: some View {
-            switch theme {
-            case .pixel:
-                return RoundedRectangle(cornerRadius: 4)
-                    .fill(isSelected ? Color.blue.opacity(0.25) : Color(white: 0.15))
-            case .glass:
-                return RoundedRectangle(cornerRadius: 6)
-                    .fill(isSelected ? Color.blue.opacity(0.15) : Color.gray.opacity(0.08))
-            }
+            RoundedRectangle(cornerRadius: themeManager.cornerRadius)
+                .fill(isSelected ? themeManager.selectedBackground : themeManager.normalBackground)
         }
 
         private var rowBorder: some View {
-            switch theme {
-            case .pixel:
-                return RoundedRectangle(cornerRadius: 4)
-                    .strokeBorder(
-                        isSelected ? Color.cyan.opacity(0.6) : Color.gray.opacity(0.2),
-                        lineWidth: isSelected ? 1.5 : 0.5
-                    )
-            case .glass:
-                return RoundedRectangle(cornerRadius: 6)
-                    .strokeBorder(
-                        isSelected ? Color.blue.opacity(0.5) : Color.gray.opacity(0.15),
-                        lineWidth: isSelected ? 1.5 : 0.5
-                    )
-            }
+            RoundedRectangle(cornerRadius: themeManager.cornerRadius)
+                .strokeBorder(
+                    isSelected ? themeManager.selectedBorder : themeManager.normalBorder,
+                    lineWidth: isSelected ? 1.5 : 0.5
+                )
         }
 
         private var shadowColor: Color {
@@ -112,7 +83,8 @@ struct SessionListView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: themeSpacing) {
+        let themeManager = viewModel.settings.theme.manager
+        VStack(alignment: .leading, spacing: themeManager.spacing) {
             if sessionManager.sortedSessions.isEmpty {
                 emptyState
             } else {
@@ -129,10 +101,6 @@ struct SessionListView: View {
             }
         }
         .padding(.horizontal, 4)
-    }
-
-    private var themeSpacing: CGFloat {
-        viewModel.settings.theme == .pixel ? 4 : 6
     }
 
     // MARK: - 辅助方法
@@ -161,24 +129,17 @@ struct SessionListView: View {
 
     @ViewBuilder
     private var emptyState: some View {
+        let themeManager = viewModel.settings.theme.manager
         VStack(spacing: 6) {
             Image(systemName: "terminal")
                 .font(.system(size: 16))
-                .foregroundStyle(emptyIconColor)
+                .foregroundStyle(themeManager.disabledColor)
             Text("No active sessions")
                 .font(.system(size: 10))
-                .foregroundStyle(emptyTextColor)
+                .foregroundStyle(themeManager.mutedText)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
-    }
-
-    private var emptyIconColor: Color {
-        viewModel.settings.theme == .pixel ? .gray.opacity(0.4) : .gray.opacity(0.5)
-    }
-
-    private var emptyTextColor: Color {
-        viewModel.settings.theme == .pixel ? .gray.opacity(0.5) : .gray.opacity(0.6)
     }
 }
 

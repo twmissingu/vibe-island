@@ -3,27 +3,22 @@ import OSLog
 
 // MARK: - 阈值常量
 
+/// OpenCode 数据库路径
+let openCodeDatabasePath: URL = {
+    let home = FileManager.default.homeDirectoryForCurrentUser
+    return home.appendingPathComponent(".local/share/opencode/opencode.db")
+}()
+
 /// 警告阈值：上下文使用率超过此值时发出橙色警告
 let contextWarningThreshold: Double = 0.80
 
 /// 危险阈值：上下文使用率超过此值时发出红色警告
 let contextCriticalThreshold: Double = 0.95
 
-// MARK: - 解析后的上下文数据
-
-/// 从 notificationMessage 解析出的上下文数据，用于回写 Session 模型
-struct ParsedContextData: Sendable {
-    let usage: Double
-    let tokensUsed: Int?
-    let tokensTotal: Int?
-    let inputTokens: Int?
-    let outputTokens: Int?
-    let reasoningTokens: Int?
-}
-
 // MARK: - 上下文使用快照
 
 /// 单次上下文使用情况的快照数据
+/// 由 ExpandedIslandView 直接从 Session 模型构建，ContextMonitor 不再维护快照存储
 struct ContextUsageSnapshot: Equatable, Sendable {
     /// 会话 ID
     let sessionId: String
@@ -72,7 +67,7 @@ struct ContextUsageSnapshot: Equatable, Sendable {
 
     /// 使用率百分比 (0 - 100)
     var usagePercent: Int {
-        Int(usageRatio * 100)
+        Int((usageRatio * 100).rounded())
     }
 
     /// 剩余 token 估算
@@ -94,15 +89,14 @@ struct ContextUsageSnapshot: Equatable, Sendable {
 
 // MARK: - 上下文监控服务
 
-/// 监控 Claude Code 的上下文使用情况
+/// OpenCode 上下文数据读取服务
 ///
-/// 工作原理：
-/// 1. 监听 `SessionFileWatcher` 发出的会话更新事件
-/// 2. 从 PreCompact 事件的 message 字段中解析上下文使用率
-/// 3. 当上下文使用率超过阈值时发出警告通知
+/// 职责：
+/// 1. 从 OpenCode SQLite 数据库读取 token 使用量
+/// 2. 检测 OpenCode 压缩事件
 ///
-/// PreCompact 事件 message 格式示例：
-/// "Context usage: 85% (170000/200000 tokens)"
+/// Claude Code 的上下文数据由 CLI 写入 Session 文件，App 端直接从 Session 模型读取，
+/// 不需要经过 ContextMonitor 中转。
 @MainActor
 @Observable
 final class ContextMonitor {
@@ -110,53 +104,14 @@ final class ContextMonitor {
 
     static let shared = ContextMonitor()
 
-    // MARK: 公开状态
-
-    /// 所有会话的上下文使用快照
-    private(set) var snapshots: [String: ContextUsageSnapshot] = [:]
-
-    /// 获取指定会话的上下文快照
-    func snapshot(for sessionId: String) -> ContextUsageSnapshot? {
-        snapshots[sessionId]
-    }
-
-    /// 最高优先级的上下文使用快照（用于 UI 展示）
-    var topSnapshot: ContextUsageSnapshot? {
-        snapshots.values
-            .filter { $0.usageRatio > 0 }
-            .max { $0.usageRatio < $1.usageRatio }
-    }
-
-    /// 是否有任何会话超过警告阈值
-    var hasWarning: Bool {
-        snapshots.values.contains { $0.isWarning }
-    }
-
-    /// 是否有任何会话超过危险阈值
-    var hasCritical: Bool {
-        snapshots.values.contains { $0.isCritical }
-    }
-
-    /// 是否有需要闪烁警告的会话
-    var shouldFlashWarning: Bool {
-        hasWarning
-    }
-
     // MARK: 内部状态
+
+    /// 已处理的压缩事件时间戳（sessionId -> compactionTime）
+    private var processedCompactions: [String: Int64] = [:]
 
     private static let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "com.twissingu.VibeIsland",
         category: "ContextMonitor"
-    )
-
-    // MARK: 正则表达式
-
-    /// 匹配 PreCompact message 中的上下文使用率
-    /// 格式: "Context usage: 85% (170000/200000 tokens)"
-    /// 或: "上下文使用: 85% (170000/200000 tokens)"
-    private static let usagePattern = try? NSRegularExpression(
-        pattern: #"(?:Context usage|上下文使用)\s*:\s*(\d+(?:\.\d+)?)\s*%\s*(?:\((\d+)\s*/\s*(\d+)\s*tokens?\))?"#,
-        options: .caseInsensitive
     )
 
     // MARK: 初始化
@@ -165,323 +120,186 @@ final class ContextMonitor {
 
     // MARK: 生命周期
 
-    /// 启动监控
     func start() {
         Self.logger.info("ContextMonitor 已启动")
     }
 
-    /// 停止监控
     func stop() {
-        snapshots.removeAll()
+        processedCompactions.removeAll()
         Self.logger.info("ContextMonitor 已停止")
     }
 
-    // MARK: 事件处理
+    // MARK: - OpenCode 数据库读取
+    // 注意：runSQL / getOpenCodeModelContextLimit 与 HookHandler.swift 中的实现重复。
+    // CLI 和 App 是独立 target，无法直接共享代码。如需修改请同步两处。
 
-    /// 处理会话更新事件（由 SessionManager.updateSession 调用）
-    ///
-    /// - 返回: 如果从 notificationMessage 解析出了上下文数据，返回 `ParsedContextData` 供调用方回写 Session 模型；
-    ///         如果 Session 模型本身已有 contextUsage 或无数据可解析，返回 nil。
-    @discardableResult
-    func handleSessionUpdate(_ session: Session) -> ParsedContextData? {
-        // 路径 A: 从 notificationMessage 解析（PreCompact 事件的 "Context usage: 85% (...)" 格式）
-        if let message = session.notificationMessage {
-            if let snapshot = parseContextUsage(from: message, sessionId: session.sessionId) {
-                let updatedSnapshot = ContextUsageSnapshot(
-                    sessionId: snapshot.sessionId,
-                    usageRatio: snapshot.usageRatio,
-                    tokensUsed: snapshot.tokensUsed,
-                    tokensTotal: snapshot.tokensTotal,
-                    inputTokens: snapshot.inputTokens,
-                    outputTokens: snapshot.outputTokens,
-                    reasoningTokens: snapshot.reasoningTokens,
-                    toolUsage: session.toolUsage,
-                    skillUsage: session.skillUsage,
-                    timestamp: session.lastActivity
-                )
-                updateSnapshot(sessionId: session.sessionId, snapshot: updatedSnapshot)
-
-                // 返回解析数据，由调用方回写 Session 模型
-                return ParsedContextData(
-                    usage: updatedSnapshot.usageRatio,
-                    tokensUsed: updatedSnapshot.tokensUsed,
-                    tokensTotal: updatedSnapshot.tokensTotal,
-                    inputTokens: updatedSnapshot.inputTokens,
-                    outputTokens: updatedSnapshot.outputTokens,
-                    reasoningTokens: updatedSnapshot.reasoningTokens
-                )
-            }
-        }
-
-        // 路径 B: Session 模型已有 contextUsage，同步到快照
-        if let usage = session.contextUsage {
-            let snapshot = ContextUsageSnapshot(
-                sessionId: session.sessionId,
-                usageRatio: usage,
-                tokensUsed: session.contextTokensUsed,
-                tokensTotal: session.contextTokensTotal,
-                inputTokens: session.contextInputTokens,
-                outputTokens: session.contextOutputTokens,
-                reasoningTokens: session.contextReasoningTokens,
-                toolUsage: session.toolUsage,
-                skillUsage: session.skillUsage,
-                timestamp: session.lastActivity
-            )
-            updateSnapshot(sessionId: session.sessionId, snapshot: snapshot)
-        }
-
-        return nil
+    /// OpenCode 数据库读取到的上下文数据
+    struct OpenCodeContextData {
+        let usage: Double
+        let tokensUsed: Int
+        let tokensTotal: Int?
+        let inputTokens: Int
+        let outputTokens: Int
+        let reasoningTokens: Int
     }
 
-    /// 手动设置会话的上下文使用情况
-    func setContextUsage(
-        sessionId: String,
-        usage: Double,
-        tokensUsed: Int? = nil,
-        tokensTotal: Int? = nil,
-        inputTokens: Int? = nil,
-        outputTokens: Int? = nil,
-        reasoningTokens: Int? = nil,
-        toolUsage: [ToolUsage]? = nil,
-        skillUsage: [ToolUsage]? = nil
-    ) {
-        let snapshot = ContextUsageSnapshot(
-            sessionId: sessionId,
-            usageRatio: max(0, min(1, usage)),
-            tokensUsed: tokensUsed,
-            tokensTotal: tokensTotal,
-            inputTokens: inputTokens,
-            outputTokens: outputTokens,
-            reasoningTokens: reasoningTokens,
-            toolUsage: toolUsage,
-            skillUsage: skillUsage,
-            timestamp: Date()
-        )
-        updateSnapshot(sessionId: sessionId, snapshot: snapshot)
+    /// 获取 OpenCode 模型的上下文窗口大小
+    private func getOpenCodeModelContextLimit(cwd: String) -> Int {
+        let configPath = NSHomeDirectory() + "/.config/opencode/opencode.json"
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: configPath)),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let provider = json["provider"] as? [String: Any] else { return 200000 }
+
+        // 从数据库获取当前使用的 provider 和 model
+        let findSessionSQL = """
+            SELECT id FROM session WHERE directory = '\(cwd.replacingOccurrences(of: "'", with: "''"))' ORDER BY time_updated DESC LIMIT 1;
+            """
+        guard let sessionIdResult = runSQL(findSessionSQL), !sessionIdResult.isEmpty else {
+            return getDefaultContextLimit(provider: provider)
+        }
+        let ocSessionId = sessionIdResult.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        let modelSQL = """
+            SELECT json_extract(data, '$.providerID'), json_extract(data, '$.modelID')
+            FROM message WHERE session_id = '\(ocSessionId)'
+            AND json_extract(data, '$.providerID') IS NOT NULL
+            ORDER BY time_updated DESC LIMIT 1;
+            """
+        
+        if let modelResult = runSQL(modelSQL), !modelResult.isEmpty {
+            let parts = modelResult.components(separatedBy: "|")
+            if parts.count >= 2 {
+                let providerID = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                let modelID = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                // 查找匹配的 provider 和 model
+                if let providerDict = provider[providerID] as? [String: Any],
+                   let models = providerDict["models"] as? [String: Any],
+                   let modelDict = models[modelID] as? [String: Any],
+                   let limit = modelDict["limit"] as? [String: Any],
+                   let context = limit["context"] as? Int {
+                    return context
+                }
+            }
+        }
+        
+        return getDefaultContextLimit(provider: provider)
     }
     
-    /// 会话文件索引（sessionId → fileURL），批量查询时使用
-    typealias SessionFileIndex = [String: URL]
-
-    /// 构建 sessionId → fileURL 索引（读取一次目录，供多次查询复用）
-    func buildSessionFileIndex() -> SessionFileIndex {
-        let sessionsDir = SessionFileWatcher.sessionsDirectory
-        var index: SessionFileIndex = [:]
-        guard let enumerator = FileManager.default.enumerator(
-            at: sessionsDir,
-            includingPropertiesForKeys: nil
-        ) else { return index }
-        for case let fileURL as URL in enumerator {
-            guard fileURL.pathExtension == "json" else { continue }
-            guard let data = try? Data(contentsOf: fileURL),
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
-            if let sid = json["session_id"] as? String {
-                index[sid] = fileURL
-            } else if let pid = json["pid"] as? Int {
-                index[String(pid)] = fileURL
+    /// 获取默认的上下文窗口大小（遍历所有 provider 找到第一个有效的）
+    private func getDefaultContextLimit(provider: [String: Any]) -> Int {
+        for (_, providerConfig) in provider {
+            guard let providerDict = providerConfig as? [String: Any],
+                  let models = providerDict["models"] as? [String: Any] else { continue }
+            for (_, model) in models {
+                guard let modelDict = model as? [String: Any],
+                      let limit = modelDict["limit"] as? [String: Any],
+                      let context = limit["context"] as? Int else { continue }
+                return context
             }
         }
-        return index
+        return 200000
     }
 
-    /// 使用索引查询（O(1) 查找，批量场景使用）
-    func fetchContextUsageFromFile(sessionId: String, index: SessionFileIndex) {
-        // 先尝试直接匹配
-        if let fileURL = index[sessionId] {
-            parseAndSetContext(from: fileURL, sessionId: sessionId)
+    /// 检查 OpenCode 压缩状态（由文件监听触发）
+    func checkOpenCodeCompaction(sessionId: String, cwd: String) async {
+        guard FileManager.default.fileExists(atPath: openCodeDatabasePath.path) else { return }
+
+        // 从 messages 表检测压缩事件
+        let sql = """
+            SELECT m.time_created, m.data FROM message m
+            JOIN session s ON m.session_id = s.id
+            WHERE s.directory = '\(cwd.replacingOccurrences(of: "'", with: "''"))'
+            AND json_extract(m.data, '$.mode') = 'compaction'
+            ORDER BY m.time_updated DESC LIMIT 1;
+            """
+
+        guard let result = runSQL(sql), !result.isEmpty else { return }
+
+        // 解析时间戳
+        let lines = result.components(separatedBy: "|")
+        guard let timeCreated = Int64(lines.first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""), timeCreated > 0 else { return }
+
+        // 检查是否已处理过此压缩事件
+        if let lastProcessed = processedCompactions[sessionId], lastProcessed >= timeCreated {
             return
         }
-        // 回退：遍历索引做 contains 匹配
-        for (key, fileURL) in index {
-            if key.contains(sessionId) || sessionId.contains(key) {
-                parseAndSetContext(from: fileURL, sessionId: sessionId)
-                return
-            }
-        }
+
+        // 记录已处理的压缩时间
+        processedCompactions[sessionId] = timeCreated
+
+        SessionManager.shared.handleOpenCodeCompaction(sessionId: sessionId, compactionTime: timeCreated)
     }
 
-    /// 从会话文件直接获取 context_usage（单次查询，遍历目录）
-    func fetchContextUsageFromFile(sessionId: String) {
-        let sessionsDir = SessionFileWatcher.sessionsDirectory
+    /// 从 OpenCode 数据库读取会话的 token 使用量
+    /// - Returns: 解析出的上下文数据，无数据时返回 nil
+    func fetchContextUsageFromOpenCodeDB(cwd: String) -> OpenCodeContextData? {
+        guard FileManager.default.fileExists(atPath: openCodeDatabasePath.path) else { return nil }
 
-        // 查找匹配的 session 文件（pid 或 session_id）
-        guard let enumerator = FileManager.default.enumerator(
-            at: sessionsDir,
-            includingPropertiesForKeys: nil
-        ) else { return }
-        
-        for case let fileURL as URL in enumerator {
-            guard fileURL.pathExtension == "json" else { continue }
-            
-            do {
-                let data = try Data(contentsOf: fileURL)
-                guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
-                
-                // 检查 session_id 匹配
-                let fileSessionId = json["session_id"] as? String
-                let filePid = json["pid"] as? Int
-                
-                let matches: Bool
-                if let fsId = fileSessionId {
-                    matches = fsId == sessionId || fsId.contains(sessionId)
-                } else if let pid = filePid {
-                    let opencodeId = "opencode-\(pid)"
-                    matches = String(pid) == sessionId || sessionId.hasPrefix("opencode-") && opencodeId == sessionId
-                } else {
-                    matches = false
-                }
-                
-                guard matches else { continue }
-                
-                // 提取 context_usage
-                if let usage = json["context_usage"] as? Double {
-                    let tokensUsed = json["context_tokens_used"] as? Int
-                    let tokensTotal = json["context_tokens_total"] as? Int
-                    let inputTokens = json["context_input_tokens"] as? Int
-                    let outputTokens = json["context_output_tokens"] as? Int
-                    let reasoningTokens = json["context_reasoning_tokens"] as? Int
-                    let toolUsageRaw = json["tool_usage"] as? [[String: Any]]
-                    let toolUsage = toolUsageRaw?.compactMap { dict -> ToolUsage? in
-                        guard let name = dict["name"] as? String, let count = dict["count"] as? Int else { return nil }
-                        return ToolUsage(name: name, count: count)
-                    }
-                    let skillUsageRaw = json["skill_usage"] as? [[String: Any]]
-                    let skillUsage = skillUsageRaw?.compactMap { dict -> ToolUsage? in
-                        guard let name = dict["name"] as? String, let count = dict["count"] as? Int else { return nil }
-                        return ToolUsage(name: name, count: count)
-                    }
-                    
-                    setContextUsage(
-                        sessionId: sessionId,
-                        usage: usage,
-                        tokensUsed: tokensUsed,
-                        tokensTotal: tokensTotal,
-                        inputTokens: inputTokens,
-                        outputTokens: outputTokens,
-                        reasoningTokens: reasoningTokens,
-                        toolUsage: toolUsage,
-                        skillUsage: skillUsage
-                    )
-                    Self.logger.debug("从文件获取上下文 usage: \(sessionId) = \(usage)")
-                    return
-                }
-                
-                // 回退：从 notificationMessage 解析
-                if let message = json["notification_message"] as? String {
-                    if let snapshot = parseContextUsage(from: message, sessionId: sessionId) {
-                        updateSnapshot(sessionId: sessionId, snapshot: snapshot)
-                        Self.logger.debug("从 notificationMessage 解析上下文: \(sessionId) = \(snapshot.usagePercent)%")
-                        return
-                    }
-                }
-                
-            } catch {
-                continue
-            }
-        }
-    }
+        // 查找匹配的 session（通过 cwd 匹配 directory）
+        let findSessionSQL = """
+            SELECT id FROM session WHERE directory = '\(cwd.replacingOccurrences(of: "'", with: "''"))' ORDER BY time_updated DESC LIMIT 1;
+            """
 
-    /// 从单个文件解析并设置上下文数据
-    private func parseAndSetContext(from fileURL: URL, sessionId: String) {
-        guard let data = try? Data(contentsOf: fileURL),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
-        if let usage = json["context_usage"] as? Double {
-            let tokensUsed = json["context_tokens_used"] as? Int
-            let tokensTotal = json["context_tokens_total"] as? Int
-            let inputTokens = json["context_input_tokens"] as? Int
-            let outputTokens = json["context_output_tokens"] as? Int
-            let reasoningTokens = json["context_reasoning_tokens"] as? Int
-            let toolUsageRaw = json["tool_usage"] as? [[String: Any]]
-            let toolUsage = toolUsageRaw?.compactMap { dict -> ToolUsage? in
-                guard let name = dict["name"] as? String, let count = dict["count"] as? Int else { return nil }
-                return ToolUsage(name: name, count: count)
-            }
-            let skillUsageRaw = json["skill_usage"] as? [[String: Any]]
-            let skillUsage = skillUsageRaw?.compactMap { dict -> ToolUsage? in
-                guard let name = dict["name"] as? String, let count = dict["count"] as? Int else { return nil }
-                return ToolUsage(name: name, count: count)
-            }
-            setContextUsage(
-                sessionId: sessionId, usage: usage,
-                tokensUsed: tokensUsed, tokensTotal: tokensTotal,
-                inputTokens: inputTokens, outputTokens: outputTokens,
-                reasoningTokens: reasoningTokens, toolUsage: toolUsage,
-                skillUsage: skillUsage
-            )
-            return
-        }
-        if let message = json["notification_message"] as? String,
-           let snapshot = parseContextUsage(from: message, sessionId: sessionId) {
-            updateSnapshot(sessionId: sessionId, snapshot: snapshot)
-        }
-    }
+        guard let sessionIdResult = runSQL(findSessionSQL), !sessionIdResult.isEmpty else { return nil }
+        let ocSessionId = sessionIdResult.trimmingCharacters(in: .whitespacesAndNewlines)
 
-    /// 清除指定会话的上下文快照
-    func clearSnapshot(for sessionId: String) {
-        snapshots.removeValue(forKey: sessionId)
-    }
+        // 取最后一条有 token 数据的消息的 total（累计值，不是求和）
+        let tokenSQL = """
+            SELECT
+                json_extract(data, '$.tokens.total') as total,
+                json_extract(data, '$.tokens.input') as input,
+                json_extract(data, '$.tokens.output') as output,
+                json_extract(data, '$.tokens.reasoning') as reasoning
+            FROM message 
+            WHERE session_id = '\(ocSessionId)' 
+            AND json_extract(data, '$.tokens.total') > 0
+            ORDER BY time_updated DESC LIMIT 1;
+            """
 
-    /// 清除所有快照
-    func clearAll() {
-        snapshots.removeAll()
-    }
+        guard let tokenResult = runSQL(tokenSQL), !tokenResult.isEmpty else { return nil }
 
-    // MARK: 私有方法
+        let tokenLines = tokenResult.components(separatedBy: "|")
+        guard tokenLines.count >= 4,
+              let totalTokens = Int(tokenLines[0]),
+              totalTokens > 0 else { return nil }
 
-    /// 从 PreCompact 事件的 message 中解析上下文使用信息
-    private func parseContextUsage(from message: String, sessionId: String) -> ContextUsageSnapshot? {
-        guard let regex = Self.usagePattern else { return nil }
+        let inputTokens = Int(tokenLines[1]) ?? 0
+        let outputTokens = Int(tokenLines[2]) ?? 0
+        let reasoningTokens = Int(tokenLines[3]) ?? 0
 
-        let nsString = message as NSString
-        let range = NSRange(location: 0, length: nsString.length)
+        let modelLimit = getOpenCodeModelContextLimit(cwd: cwd)
+        let usage = modelLimit > 0 ? Double(totalTokens) / Double(modelLimit) : 0
 
-        guard let match = regex.firstMatch(in: message, options: [], range: range) else {
-            return nil
-        }
-
-        // 提取使用率百分比
-        guard let percentRange = Range(match.range(at: 1), in: message),
-              let percent = Double(message[percentRange])
-        else { return nil }
-
-        let usageRatio = percent / 100.0
-
-        // 提取 token 数据（如果有）
-        var tokensUsed: Int?
-        var tokensTotal: Int?
-
-        if let usedRange = Range(match.range(at: 2), in: message),
-           let used = Int(message[usedRange]) {
-            tokensUsed = used
-        }
-
-        if let totalRange = Range(match.range(at: 3), in: message),
-           let total = Int(message[totalRange]) {
-            tokensTotal = total
-        }
-
-        return ContextUsageSnapshot(
-            sessionId: sessionId,
-            usageRatio: usageRatio,
-            tokensUsed: tokensUsed,
-            tokensTotal: tokensTotal
+        return OpenCodeContextData(
+            usage: usage,
+            tokensUsed: totalTokens,
+            tokensTotal: modelLimit > 0 ? modelLimit : nil,
+            inputTokens: inputTokens,
+            outputTokens: outputTokens,
+            reasoningTokens: reasoningTokens
         )
     }
 
-    /// 更新内部快照缓存
-    private func updateSnapshot(sessionId: String, snapshot: ContextUsageSnapshot) {
-        snapshots[sessionId] = snapshot
+    /// 运行 SQL 查询并返回结果
+    private func runSQL(_ sql: String) -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
+        process.arguments = [openCodeDatabasePath.path, sql]
 
-        // 记录警告日志
-        if snapshot.isCritical {
-            Self.logger.warning(
-                "会话 \(sessionId) 上下文使用率过高: \(snapshot.usagePercent)% (危险)"
-            )
-        } else if snapshot.isWarning {
-            Self.logger.info(
-                "会话 \(sessionId) 上下文使用率较高: \(snapshot.usagePercent)% (警告)"
-            )
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            return String(data: data, encoding: .utf8)
+        } catch {
+            Self.logger.error("SQL 查询失败: \(error.localizedDescription)")
+            return nil
         }
     }
-
 }

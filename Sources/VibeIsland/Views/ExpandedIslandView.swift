@@ -13,6 +13,11 @@ struct ExpandedIslandView: View {
         sessionManager.aggregateState
     }
 
+    /// 主题管理器
+    private var themeManager: ThemeManager {
+        viewModel.settings.theme.manager
+    }
+
     /// 展开视图的标签页
     enum ExpandedTab: String, CaseIterable {
         case sessions = "会话"
@@ -42,7 +47,7 @@ struct ExpandedIslandView: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 12))
-                        .foregroundStyle(.gray.opacity(0.6))
+                        .foregroundStyle(themeManager.iconColor)
                 }
                 .buttonStyle(.plain)
                 .help("关闭")
@@ -112,41 +117,24 @@ struct ExpandedIslandView: View {
 
     private func tabForegroundStyle(for tab: ExpandedTab) -> some ShapeStyle {
         let isSelected = selectedTab == tab
-        switch viewModel.settings.theme {
-        case .pixel:
-            return isSelected ? .white : .gray.opacity(0.6)
-        case .glass:
-            return isSelected ? .white : .secondary
-        }
+        return isSelected ? themeManager.primaryText : themeManager.mutedText
     }
 
     @ViewBuilder
     private func tabBackground(for tab: ExpandedTab) -> some View {
         let isSelected = selectedTab == tab
-        switch viewModel.settings.theme {
-        case .pixel:
-            RoundedRectangle(cornerRadius: 6)
-                .fill(isSelected ? Color.blue.opacity(0.8) : Color.clear)
-        case .glass:
-            RoundedRectangle(cornerRadius: 8)
-                .fill(isSelected ? Color.blue : Color.gray.opacity(0.15))
-        }
+        RoundedRectangle(cornerRadius: themeManager.cornerRadius)
+            .fill(isSelected ? themeManager.selectedBackground : themeManager.normalBackground)
     }
 
     @ViewBuilder
     private func tabBorder(for tab: ExpandedTab) -> some View {
         let isSelected = selectedTab == tab
-        switch viewModel.settings.theme {
-        case .pixel:
-            RoundedRectangle(cornerRadius: 6)
-                .strokeBorder(
-                    isSelected ? Color.cyan.opacity(0.5) : Color.gray.opacity(0.2),
-                    lineWidth: isSelected ? 1.5 : 0.5
-                )
-        case .glass:
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(isSelected ? Color.blue.opacity(0.3) : Color.clear, lineWidth: 1)
-        }
+        RoundedRectangle(cornerRadius: themeManager.cornerRadius)
+            .strokeBorder(
+                isSelected ? themeManager.selectedBorder : themeManager.normalBorder,
+                lineWidth: isSelected ? 1.5 : 0.5
+            )
     }
 
     // MARK: - 标签内容
@@ -184,7 +172,7 @@ struct ExpandedIslandView: View {
     private var contextTab: some View {
         VStack(spacing: 8) {
             ScrollView {
-                VStack(spacing: themeSpacing) {
+                VStack(spacing: themeManager.spacing) {
                     if let session = sessionManager.trackedSession {
                         if let usage = session.contextUsage, usage > 0 {
                             let snapshot = ContextUsageSnapshot(
@@ -217,18 +205,14 @@ struct ExpandedIslandView: View {
         }
     }
 
-    private var themeSpacing: CGFloat {
-        viewModel.settings.theme == .pixel ? 6 : 8
-    }
-
     private var emptyContextView: some View {
         VStack(spacing: 8) {
             Image(systemName: "brain")
                 .font(.system(size: 24))
-                .foregroundStyle(.gray.opacity(0.6))
+                .foregroundStyle(themeManager.disabledColor)
             Text("暂无会话数据")
                 .font(.system(size: 12))
-                .foregroundStyle(.gray.opacity(0.7))
+                .foregroundStyle(themeManager.mutedText)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
@@ -244,7 +228,7 @@ struct ExpandedIslandView: View {
                     .font(.system(size: 11))
             }
             .buttonStyle(.plain)
-            .foregroundStyle(.gray.opacity(0.7))
+            .foregroundStyle(themeManager.iconColor)
 
             Spacer()
 
@@ -264,15 +248,13 @@ struct ExpandedIslandView: View {
                     .font(.system(size: 11))
             }
             .buttonStyle(.plain)
-            .foregroundStyle(.gray.opacity(0.7))
+            .foregroundStyle(themeManager.iconColor)
         }
         .padding(.top, 4)
     }
 
     @ViewBuilder
     private var backgroundView: some View {
-        let stateColor = aggregateState.color
-        // 固定灰色边框，不随状态变化
         let borderColor = Color.gray
 
         switch viewModel.settings.theme {
