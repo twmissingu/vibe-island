@@ -22,8 +22,7 @@ When coding with AI tools like Claude Code and OpenCode, you lose track of:
 - 🐱 **Pixel Pets** — 8 pet types with 5 skin tiers that react to your coding state
 - 🔔 **Smart Notifications** — Sound alerts for approvals, errors, and completions
 - 🎨 **Two Themes** — Pixel Dark (geeky) and Glass Transparent (minimal)
-- 🛠️ **Multi-Tool Support** — Claude Code, OpenCode, and Codex CLI
-- 📈 **Quota Tracking** — Monitor LLM API quotas from multiple providers
+- 🛠️ **Multi-Tool Support** — Claude Code and OpenCode
 
 ## Quick Start
 
@@ -31,7 +30,7 @@ When coding with AI tools like Claude Code and OpenCode, you lose track of:
 
 - macOS 14.0+ (Sonoma)
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen): `brew install xcodegen`
-- Claude Code, OpenCode, or Codex CLI installed
+- Claude Code or OpenCode installed
 
 ### Installation
 
@@ -108,14 +107,14 @@ This project is designed for seamless AI agent interaction:
 │  └─────────┘  └─────────────────┘  └─────────┘            │
 └─────────────────────────────────────────────────────────────┘
                            │
-           ┌───────────────┼───────────────┐
-           ▼               ▼               ▼
-    ┌──────────┐    ┌──────────┐    ┌──────────┐
-    │  Claude  │    │ OpenCode │    │  Codex   │
-    │  Code    │    │          │    │   CLI    │
-    └──────────┘    └──────────┘    └──────────┘
-           │               │               │
-           └───────────────┼───────────────┘
+           ┌───────────────┴───────────────┐
+           ▼                               ▼
+    ┌──────────┐                    ┌──────────┐
+    │  Claude  │                    │ OpenCode │
+    │  Code    │                    │          │
+    └──────────┘                    └──────────┘
+           │                               │
+           └───────────────┬───────────────┘
                            ▼
                     ┌──────────────┐
                     │   Session    │
@@ -127,16 +126,6 @@ This project is designed for seamless AI agent interaction:
                     │     View     │
                     └──────────────┘
 ```
-
-## Supported LLM Providers
-
-| Provider | Quota Tracking |
-|----------|----------------|
-| MiniMax | ✅ |
-| MiMo | ✅ |
-| Ark (Volcengine) | ✅ |
-| Kimi | ✅ |
-| Zai | ✅ |
 
 ## Contributing
 
