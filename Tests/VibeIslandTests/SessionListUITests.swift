@@ -68,21 +68,24 @@ final class SessionListUITests: XCTestCase {
         XCTAssertTrue(hasSessions, "有会话时应显示会话列表")
     }
 
-    /// 测试：会话列表按优先级排序
-    func testSessionList_sortedByPriority() {
+    /// 测试：会话列表按最后活动时间降序排列
+    func testSessionList_sortedByLastActivity() {
         let manager = SessionManager.makeForTesting()
+        let now = Date()
 
-        let idle = makeSession(id: "idle", status: .idle)
-        let coding = makeSession(id: "coding", status: .coding)
-        let error = makeSession(id: "error", status: .error)
+        let idle = makeSession(id: "idle", status: .idle, lastActivity: now.addingTimeInterval(-120))
+        let coding = makeSession(id: "coding", status: .coding, lastActivity: now.addingTimeInterval(-60))
+        let error = makeSession(id: "error", status: .error, lastActivity: now)
 
         manager.injectSessionForTesting(idle)
         manager.injectSessionForTesting(coding)
         manager.injectSessionForTesting(error)
 
         let sorted = manager.sortedSessions
-        // error 优先级最高，应排在最前
-        XCTAssertEqual(sorted.first?.status, .error, "error 会话应排在最前")
+        // 按 lastActivity 降序，最近活跃的排在最前
+        XCTAssertEqual(sorted[0].sessionId, "error")
+        XCTAssertEqual(sorted[1].sessionId, "coding")
+        XCTAssertEqual(sorted[2].sessionId, "idle")
     }
 
     // MARK: - 模式切换测试

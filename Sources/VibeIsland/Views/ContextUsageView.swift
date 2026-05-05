@@ -150,7 +150,7 @@ struct ContextUsageCard: View {
                         .foregroundStyle(statusColor)
                 }
             }
-            .frame(height: themeManager.cornerRadius)
+            .frame(height: themeManager.progressBarHeight)
 
             // Token 统计表格（两行三列对齐）
             Grid(alignment: .center, horizontalSpacing: 8, verticalSpacing: themeManager.spacing) {
@@ -499,7 +499,7 @@ struct OpenCodeNoContextCard: View {
                         .frame(width: 0)
                 }
             }
-            .frame(height: themeManager.cornerRadius)
+            .frame(height: themeManager.progressBarHeight)
 
             // Token 统计占位（与 ContextUsageCard 同布局）
             Grid(alignment: .center, horizontalSpacing: 8, verticalSpacing: themeManager.spacing) {

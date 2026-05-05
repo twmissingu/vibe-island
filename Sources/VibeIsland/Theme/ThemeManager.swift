@@ -179,6 +179,14 @@ struct ThemeManager {
         }
     }
 
+    /// 进度条高度
+    var progressBarHeight: CGFloat {
+        switch theme {
+        case .pixel: return 6
+        case .glass: return 8
+        }
+    }
+
     /// 根据主题返回相应的间距
     var spacing: CGFloat {
         switch theme {

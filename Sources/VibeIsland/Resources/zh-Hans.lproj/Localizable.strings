@@ -159,7 +159,7 @@
 "onboarding.completion.instruction" = "点击「开始使用」进入主界面";
 "onboarding.button.previous" = "上一步";
 "onboarding.button.next" = "下一步";
-"onboarding.button.getStart" = "开始使用";
+"onboarding.button.getStarted" = "开始使用";
 "onboarding.button.skip" = "跳过";
 "onboarding.button.skipOnboarding" = "跳过引导";
 
@@ -265,6 +265,26 @@
 
 "button.ok" = "确定";
 "button.cancel" = "取消";
+"button.quit" = "退出应用";
+
+// MARK: - Onboarding 插件配置步骤
+
+"onboarding.step.plugins" = "配置插件";
+"onboarding.plugin.claude" = "Claude Code Hook";
+"onboarding.plugin.opencode" = "OpenCode 插件";
+"onboarding.plugin.install" = "安装";
+"onboarding.plugin.installed" = "已安装";
+"onboarding.plugin.skip" = "跳过";
+"onboarding.plugin.notDetected" = "未检测到";
+"onboarding.plugin.claude.desc" = "实时监控 Claude Code 会话状态";
+"onboarding.plugin.opencode.desc" = "实时监控 OpenCode 会话状态";
+
+// MARK: - Onboarding 偏好设置步骤
+
+"onboarding.step.preferences" = "偏好设置";
+"onboarding.pref.launchAtLogin" = "开机自启";
+"onboarding.pref.sound" = "声音提醒";
+"onboarding.pref.pet" = "显示宠物";
 
 // MARK: - Error Messages
 
@@ -347,28 +367,6 @@
 // MARK: - Circular Gauge
 
 "gauge.percent" = "%";
-
-// MARK: - Onboarding (Additional)
-
-"onboarding.welcome.title" = "欢迎使用 Vibe Island";
-"onboarding.welcome.subtitle" = "你的 AI 编码助手状态监控平台\n实时监控 Claude Code、OpenCode 的运行状态";
-"onboarding.select.platforms" = "选择要监控的平台";
-"onboarding.modify.anytime" = "你可以随时在设置中修改";
-"onboarding.configure.hook" = "配置 Claude Code Hook";
-"onboarding.hook.install.success" = "Hook 已成功安装\n重启 Claude Code 后生效";
-"onboarding.hook.tip" = "提示：你也可以稍后在设置中安装";
-"onboarding.completion.title" = "设置完成！";
-"onboarding.completion.platforms" = "已选择 %d 个平台";
-"onboarding.completion.hookInstalled" = "Hook 已安装";
-"onboarding.completion.hookNotInstalled" = "Hook 未安装（可在设置中安装）";
-"onboarding.completion.petEnabled" = "宠物已启用";
-"onboarding.completion.soundEnabled" = "声音提醒已启用";
-"onboarding.completion.instruction" = "点击「开始使用」进入主界面";
-"onboarding.button.previous" = "上一步";
-"onboarding.button.next" = "下一步";
-"onboarding.button.getStart" = "开始使用";
-"onboarding.button.skip" = "跳过";
-"onboarding.button.skipOnboarding" = "跳过引导";
 
 // MARK: - Coding Goals
 

@@ -144,7 +144,7 @@ final class ContextMonitor {
     }
 
     /// 获取 OpenCode 模型的上下文窗口大小
-    private func getOpenCodeModelContextLimit(cwd: String) -> Int {
+    nonisolated private func getOpenCodeModelContextLimit(cwd: String) async -> Int {
         let configPath = NSHomeDirectory() + "/.config/opencode/opencode.json"
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: configPath)),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -152,26 +152,26 @@ final class ContextMonitor {
 
         // 从数据库获取当前使用的 provider 和 model
         let findSessionSQL = """
-            SELECT id FROM session WHERE directory = '\(cwd.replacingOccurrences(of: "'", with: "''"))' ORDER BY time_updated DESC LIMIT 1;
+            SELECT id FROM session WHERE directory = '\(Self.escapeSQL(cwd))' ORDER BY time_updated DESC LIMIT 1;
             """
-        guard let sessionIdResult = runSQL(findSessionSQL), !sessionIdResult.isEmpty else {
+        guard let sessionIdResult = await Self.runSQL(findSessionSQL), !sessionIdResult.isEmpty else {
             return getDefaultContextLimit(provider: provider)
         }
         let ocSessionId = sessionIdResult.trimmingCharacters(in: .whitespacesAndNewlines)
-        
+
         let modelSQL = """
             SELECT json_extract(data, '$.providerID'), json_extract(data, '$.modelID')
-            FROM message WHERE session_id = '\(ocSessionId)'
+            FROM message WHERE session_id = '\(Self.escapeSQL(ocSessionId))'
             AND json_extract(data, '$.providerID') IS NOT NULL
             ORDER BY time_updated DESC LIMIT 1;
             """
-        
-        if let modelResult = runSQL(modelSQL), !modelResult.isEmpty {
+
+        if let modelResult = await Self.runSQL(modelSQL), !modelResult.isEmpty {
             let parts = modelResult.components(separatedBy: "|")
             if parts.count >= 2 {
                 let providerID = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
                 let modelID = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
-                
+
                 // 查找匹配的 provider 和 model
                 if let providerDict = provider[providerID] as? [String: Any],
                    let models = providerDict["models"] as? [String: Any],
@@ -182,12 +182,12 @@ final class ContextMonitor {
                 }
             }
         }
-        
+
         return getDefaultContextLimit(provider: provider)
     }
-    
+
     /// 获取默认的上下文窗口大小（遍历所有 provider 找到第一个有效的）
-    private func getDefaultContextLimit(provider: [String: Any]) -> Int {
+    nonisolated private func getDefaultContextLimit(provider: [String: Any]) -> Int {
         for (_, providerConfig) in provider {
             guard let providerDict = providerConfig as? [String: Any],
                   let models = providerDict["models"] as? [String: Any] else { continue }
@@ -209,12 +209,12 @@ final class ContextMonitor {
         let sql = """
             SELECT m.time_created, m.data FROM message m
             JOIN session s ON m.session_id = s.id
-            WHERE s.directory = '\(cwd.replacingOccurrences(of: "'", with: "''"))'
+            WHERE s.directory = '\(Self.escapeSQL(cwd))'
             AND json_extract(m.data, '$.mode') = 'compaction'
             ORDER BY m.time_updated DESC LIMIT 1;
             """
 
-        guard let result = runSQL(sql), !result.isEmpty else { return }
+        guard let result = await Self.runSQL(sql), !result.isEmpty else { return }
 
         // 解析时间戳
         let lines = result.components(separatedBy: "|")
@@ -233,15 +233,15 @@ final class ContextMonitor {
 
     /// 从 OpenCode 数据库读取会话的 token 使用量
     /// - Returns: 解析出的上下文数据，无数据时返回 nil
-    func fetchContextUsageFromOpenCodeDB(cwd: String) -> OpenCodeContextData? {
+    nonisolated func fetchContextUsageFromOpenCodeDB(cwd: String) async -> OpenCodeContextData? {
         guard FileManager.default.fileExists(atPath: openCodeDatabasePath.path) else { return nil }
 
         // 查找匹配的 session（通过 cwd 匹配 directory）
         let findSessionSQL = """
-            SELECT id FROM session WHERE directory = '\(cwd.replacingOccurrences(of: "'", with: "''"))' ORDER BY time_updated DESC LIMIT 1;
+            SELECT id FROM session WHERE directory = '\(Self.escapeSQL(cwd))' ORDER BY time_updated DESC LIMIT 1;
             """
 
-        guard let sessionIdResult = runSQL(findSessionSQL), !sessionIdResult.isEmpty else { return nil }
+        guard let sessionIdResult = await Self.runSQL(findSessionSQL), !sessionIdResult.isEmpty else { return nil }
         let ocSessionId = sessionIdResult.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // 取最后一条有 token 数据的消息的 total（累计值，不是求和）
@@ -251,13 +251,13 @@ final class ContextMonitor {
                 json_extract(data, '$.tokens.input') as input,
                 json_extract(data, '$.tokens.output') as output,
                 json_extract(data, '$.tokens.reasoning') as reasoning
-            FROM message 
-            WHERE session_id = '\(ocSessionId)' 
+            FROM message
+            WHERE session_id = '\(Self.escapeSQL(ocSessionId))'
             AND json_extract(data, '$.tokens.total') > 0
             ORDER BY time_updated DESC LIMIT 1;
             """
 
-        guard let tokenResult = runSQL(tokenSQL), !tokenResult.isEmpty else { return nil }
+        guard let tokenResult = await Self.runSQL(tokenSQL), !tokenResult.isEmpty else { return nil }
 
         let tokenLines = tokenResult.components(separatedBy: "|")
         guard tokenLines.count >= 4,
@@ -268,7 +268,7 @@ final class ContextMonitor {
         let outputTokens = Int(tokenLines[2]) ?? 0
         let reasoningTokens = Int(tokenLines[3]) ?? 0
 
-        let modelLimit = getOpenCodeModelContextLimit(cwd: cwd)
+        let modelLimit = await getOpenCodeModelContextLimit(cwd: cwd)
         let usage = modelLimit > 0 ? Double(totalTokens) / Double(modelLimit) : 0
 
         return OpenCodeContextData(
@@ -281,25 +281,36 @@ final class ContextMonitor {
         )
     }
 
-    /// 运行 SQL 查询并返回结果
-    private func runSQL(_ sql: String) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
-        process.arguments = [openCodeDatabasePath.path, sql]
+    // MARK: - SQL 工具方法
 
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
+    /// 转义 SQLite 字符串中的特殊字符
+    nonisolated private static func escapeSQL(_ string: String) -> String {
+        string
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "''")
+            .replacingOccurrences(of: "\"", with: "\"\"")
+    }
 
-        do {
-            try process.run()
-            process.waitUntilExit()
+    /// 运行 SQL 查询并返回结果（在后台线程执行，不阻塞主线程）
+    nonisolated private static func runSQL(_ sql: String) async -> String? {
+        await Task.detached {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
+            process.arguments = [openCodeDatabasePath.path, sql]
 
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            return String(data: data, encoding: .utf8)
-        } catch {
-            Self.logger.error("SQL 查询失败: \(error.localizedDescription)")
-            return nil
-        }
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = FileHandle.nullDevice
+
+            do {
+                try process.run()
+                process.waitUntilExit()
+
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                return String(data: data, encoding: .utf8)
+            } catch {
+                return nil
+            }
+        }.value
     }
 }

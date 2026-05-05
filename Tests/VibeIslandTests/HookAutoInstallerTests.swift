@@ -204,13 +204,13 @@ final class HookAutoInstallerTests: XCTestCase {
 
     /// 测试：Claude 设置路径常量
     func testClaudeSettingsPath() {
-        let expectedPath = NSString("~/").expandingTildeInPath + ".claude/settings.json"
+        let expectedPath = NSString("~/.claude/settings.json").expandingTildeInPath
         XCTAssertEqual(HookAutoInstaller.claudeSettingsPath, expectedPath)
     }
 
     /// 测试：备份目录路径常量
     func testBackupDirectoryPath() {
-        let expectedPath = NSString("~/").expandingTildeInPath + ".claude/vibe-island-backups"
+        let expectedPath = NSString("~/.claude/vibe-island-backups").expandingTildeInPath
         XCTAssertEqual(HookAutoInstaller.backupDirectory, expectedPath)
     }
 

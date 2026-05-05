@@ -123,8 +123,8 @@ final class SessionManager: SessionAggregatable {
         // 设置文件监听回调
         fileWatcher.onSessionUpdated { [weak self] sessionId, session in
             Task { @MainActor in
-                self?.updateSession(sessionId, session)
-                
+                await self?.updateSession(sessionId, session)
+
                 // 检查 OpenCode 压缩状态（通过数据库）
                 if session.source == "opencode" {
                     await self?.contextMonitor.checkOpenCodeCompaction(sessionId: sessionId, cwd: session.cwd)
@@ -188,36 +188,36 @@ final class SessionManager: SessionAggregatable {
     // MARK: 会话更新
 
     /// 带冷却的 OpenCode DB 查询：避免每次文件变化都 fork sqlite3 进程
-    private func fetchOpenCodeContextIfNeeded(cwd: String) -> ContextMonitor.OpenCodeContextData? {
+    private func fetchOpenCodeContextIfNeeded(cwd: String) async -> ContextMonitor.OpenCodeContextData? {
         let now = Date()
         if let lastTime = lastOpenCodeQueryTime[cwd],
            now.timeIntervalSince(lastTime) < Self.openCodeQueryCooldown {
             return nil
         }
         lastOpenCodeQueryTime[cwd] = now
-        return contextMonitor.fetchContextUsageFromOpenCodeDB(cwd: cwd)
+        return await contextMonitor.fetchContextUsageFromOpenCodeDB(cwd: cwd)
     }
 
     /// 处理 OpenCode 压缩完成事件
     func handleOpenCodeCompaction(sessionId: String, compactionTime: Int64) {
         guard let session = sessions[sessionId] else { return }
-        
+
         // 如果会话之前不是压缩状态，切换到压缩状态
         if session.status != .compacting {
             Self.logger.info("检测到 OpenCode 压缩: \(sessionId)")
-            
+
             var updated = session
             updated.status = .compacting
-            
+
             // 写回 session 文件
             try? updated.writeToFile()
-            
+
             sessions[sessionId] = updated
             recomputeSortedSessions()
-            
+
             let oldState = aggregateState
             onAggregateStateChanged?(oldState, aggregateState)
-            
+
             // 延迟刷新 token 数据（压缩完成后 context 已重置）
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(2))
@@ -227,7 +227,7 @@ final class SessionManager: SessionAggregatable {
 
                 // 压缩完成后恢复到 coding 状态，并从 OpenCode DB 刷新 token 数据
                 if var updated = self.sessions[sessionId] {
-                    if let data = self.contextMonitor.fetchContextUsageFromOpenCodeDB(cwd: session.cwd) {
+                    if let data = await self.contextMonitor.fetchContextUsageFromOpenCodeDB(cwd: session.cwd) {
                         updated.contextUsage = data.usage
                         updated.contextTokensUsed = data.tokensUsed
                         updated.contextTokensTotal = data.tokensTotal
@@ -251,13 +251,13 @@ final class SessionManager: SessionAggregatable {
     }
 
     /// 更新单个会话状态（文件回调入口）
-    private func updateSession(_ sessionId: String, _ session: Session) {
+    private func updateSession(_ sessionId: String, _ session: Session) async {
         let oldState = aggregateState
         var session = session
 
         // OpenCode 会话：从 SQLite DB 读取最新的 token 使用量（带冷却避免频繁 fork）
         if session.source == "opencode" {
-            if let data = fetchOpenCodeContextIfNeeded(cwd: session.cwd) {
+            if let data = await fetchOpenCodeContextIfNeeded(cwd: session.cwd) {
                 session.contextUsage = data.usage
                 session.contextTokensUsed = data.tokensUsed
                 session.contextTokensTotal = data.tokensTotal
@@ -273,9 +273,7 @@ final class SessionManager: SessionAggregatable {
         CodingTimeTracker.shared.handleSessionStateChange(sessionId: sessionId, state: session.status)
 
         // 同步到宠物进度管理器
-        Task { @MainActor in
-            PetProgressManager.shared.addCodingMinutes(CodingTimeTracker.shared.todayCodingMinutes)
-        }
+        PetProgressManager.shared.addCodingMinutes(CodingTimeTracker.shared.todayCodingMinutes)
 
         // 检测聚合状态变化，触发回调（播放提示音）
         let newState = aggregateState
@@ -286,13 +284,13 @@ final class SessionManager: SessionAggregatable {
 
     /// 注册外部工具的会话（OpenCode 等）
     /// - Parameter session: 外部工具会话（sessionId 已由调用方加前缀，如 "opencode_xxx"）
-    func registerExternalSession(_ session: Session) {
+    func registerExternalSession(_ session: Session) async {
         let oldState = aggregateState
         var session = session
 
         // 从 OpenCode 数据库读取最新的 token 使用量（带冷却避免频繁 fork）
         if session.source == "opencode" {
-            if let data = fetchOpenCodeContextIfNeeded(cwd: session.cwd) {
+            if let data = await fetchOpenCodeContextIfNeeded(cwd: session.cwd) {
                 session.contextUsage = data.usage
                 session.contextTokensUsed = data.tokensUsed
                 session.contextTokensTotal = data.tokensTotal

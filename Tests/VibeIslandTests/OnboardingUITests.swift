@@ -13,12 +13,12 @@ final class OnboardingUITests: XCTestCase {
 
     // MARK: - 引导页面结构测试
 
-    /// 测试：引导视图应包含 3 个步骤（平台选择步骤已移除）
-    func testOnboarding_hasThreeSteps() {
+    /// 测试：引导视图应包含 4 个步骤
+    func testOnboarding_hasFourSteps() {
         let view = OnboardingView()
-        // OnboardingView 的 totalSteps 为 3
-        // Step 0: Welcome, Step 1: HookSetup, Step 2: Completion
-        XCTAssertEqual(3, 3, "引导流程应包含 3 个步骤")
+        // OnboardingView 的 totalSteps 为 4
+        // Step 0: Welcome, Step 1: PluginSetup, Step 2: Preferences, Step 3: Completion
+        XCTAssertEqual(view.totalSteps, 4, "引导流程应包含 4 个步骤")
     }
 
     /// 测试：欢迎步骤应包含标题和功能列表
@@ -28,39 +28,48 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertNotNil(step, "WelcomeStep 应成功初始化")
     }
 
-    /// 测试：Hook 配置步骤应显示安装按钮
-    func testHookSetupStep_showsInstallButton() {
-        let view = HookSetupStep(installed: .constant(false), stateManager: StateManager())
-        XCTAssertNotNil(view, "HookSetupStep 应成功初始化")
+    /// 测试：插件配置步骤应显示安装按钮
+    func testPluginSetupStep_showsInstallButton() {
+        let view = PluginSetupStep(
+            claudeInstalled: .constant(false),
+            openCodeInstalled: .constant(false),
+            openCodeDetected: true,
+            stateManager: StateManager()
+        )
+        XCTAssertNotNil(view, "PluginSetupStep 应成功初始化")
     }
 
-/// 测试：完成步骤应显示配置摘要
+    /// 测试：完成步骤应显示配置摘要
     func testCompletionStep_showsSummary() {
-        let hookInstalled = true
-        let view = CompletionStep(hookInstalled: hookInstalled)
+        let view = CompletionStep(
+            claudeHookInstalled: true,
+            openCodePluginInstalled: false,
+            soundEnabled: true,
+            petEnabled: true
+        )
         XCTAssertNotNil(view, "CompletionStep 应成功初始化")
     }
 
     // MARK: - Hook 安装测试
 
-    /// 测试：Hook 未安装时按钮文本应为"安装 Hook"
-
-    /// 测试：Hook 未安装时按钮文本应为"安装 Hook"
-    func testHookSetup_notInstalled_buttonText() {
+    /// 测试：插件未安装时按钮文本应为"安装"
+    func testPluginSetup_notInstalled_buttonText() {
         let installed = false
-        let buttonText = installed ? "✅ 已安装" : "安装 Hook"
-        XCTAssertEqual(buttonText, "安装 Hook", "未安装时应显示安装 Hook")
+        let buttonText = installed
+            ? NSLocalizedString("onboarding.plugin.installed", comment: "")
+            : NSLocalizedString("onboarding.plugin.install", comment: "")
+        XCTAssertEqual(buttonText, "安装", "未安装时应显示安装")
     }
 
-    /// 测试：Hook 已安装时按钮应禁用
-    func testHookSetup_installed_buttonDisabled() {
+    /// 测试：插件已安装时按钮应禁用
+    func testPluginSetup_installed_buttonDisabled() {
         let installed = true
         let buttonDisabled = installed
         XCTAssertTrue(buttonDisabled, "已安装时按钮应禁用")
     }
 
-    /// 测试：Hook 安装成功后应更新状态
-    func testHookSetup_installSuccess_updatesState() {
+    /// 测试：插件安装成功后应更新状态
+    func testPluginSetup_installSuccess_updatesState() {
         var installed = false
         // 模拟安装成功
         installed = true
@@ -71,8 +80,8 @@ final class OnboardingUITests: XCTestCase {
 
     /// 测试：Hook 未安装时应显示提示信息
     func testCompletionStep_hookNotInstalled_showsInfo() {
-        let hookInstalled = false
-        let showInfo = !hookInstalled
+        let claudeHookInstalled = false
+        let showInfo = !claudeHookInstalled
         XCTAssertTrue(showInfo, "Hook 未安装时应显示提示信息")
     }
 

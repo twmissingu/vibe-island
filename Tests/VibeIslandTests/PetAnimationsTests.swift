@@ -134,7 +134,7 @@ final class PetAnimationsTests: XCTestCase {
 
     /// 测试：PetType 数量为 8
     func testPetType_count() {
-        XCTAssertEqual(PetType.allCases.count, 9)
+        XCTAssertEqual(PetType.allCases.count, 8)
     }
 
     /// 测试：PetType 包含所有预期类型

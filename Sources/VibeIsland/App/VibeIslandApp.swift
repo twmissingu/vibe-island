@@ -1,6 +1,8 @@
 import SwiftUI
+import OSLog
 
-// 通知名称：灵动岛状态变化
+private let logger = Logger(subsystem: "com.twmissingu.VibeIsland", category: "CLIInstaller")
+
 extension Notification.Name {
     static let islandStateDidChange = Notification.Name("islandStateDidChange")
     static let toggleIslandState = Notification.Name("toggleIslandState")
@@ -20,6 +22,7 @@ struct VibeIslandApp: App {
                     setupPanel()
                     stateManager.startMonitoring()
                     checkOnboardingStatus()
+                    installCLIIfNeeded()
                     
                     // 监听点击切换
                     NotificationCenter.default.addObserver(
@@ -70,22 +73,106 @@ struct VibeIslandApp: App {
         let arguments = CommandLine.arguments
 
         if arguments.contains("--onboarding") {
-            // 强制显示引导
             showOnboarding = true
             return
         }
 
         if arguments.contains("--skip-onboarding") {
-            // 强制跳过引导
             showOnboarding = false
             return
         }
 
-        // 默认逻辑：首次启动显示引导
         let hasShownOnboarding = UserDefaults.standard.bool(forKey: "hasShownOnboarding")
         if !hasShownOnboarding {
             showOnboarding = true
             UserDefaults.standard.set(true, forKey: "hasShownOnboarding")
+        }
+    }
+
+    private func installCLIIfNeeded() {
+        guard let bundlePath = Bundle.main.path(forResource: "vibe-island", ofType: nil) else {
+            logger.warning("CLI not found in app bundle")
+            return
+        }
+
+        let cliDestination: URL
+        let binDir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin")
+
+        if FileManager.default.fileExists(atPath: "/usr/local/bin/vibe-island") {
+            cliDestination = URL(fileURLWithPath: "/usr/local/bin/vibe-island")
+        } else if FileManager.default.fileExists(atPath: "\(binDir.path)/vibe-island") {
+            cliDestination = binDir.appendingPathComponent("vibe-island")
+        } else {
+            do {
+                try FileManager.default.createDirectory(at: binDir, withIntermediateDirectories: true)
+                cliDestination = binDir.appendingPathComponent("vibe-island")
+            } catch {
+                logger.error("Failed to create bin directory: \(error.localizedDescription)")
+                return
+            }
+        }
+
+        let currentVersion = getInstalledCLIVersion()
+        let newVersion = getCLIVersion(from: bundlePath)
+
+        if currentVersion == nil || currentVersion != newVersion {
+            logger.info("Installing CLI to: \(cliDestination.path)")
+            do {
+                let cliURL = URL(fileURLWithPath: bundlePath)
+                let destURL = cliDestination
+
+                if FileManager.default.fileExists(atPath: destURL.path) {
+                    try FileManager.default.removeItem(at: destURL)
+                }
+                try FileManager.default.copyItem(at: cliURL, to: destURL)
+                try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: destURL.path)
+
+                logger.info("CLI installed successfully")
+            } catch {
+                logger.error("Failed to install CLI: \(error.localizedDescription)")
+            }
+        } else {
+            logger.info("CLI up to date, skipping install")
+        }
+    }
+
+    private func getInstalledCLIVersion() -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["vibe-island", "--version"]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        } catch {
+            return nil
+        }
+    }
+
+    private func getCLIVersion(from path: String) -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["\(path)", "--version"]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        } catch {
+            return nil
         }
     }
 }

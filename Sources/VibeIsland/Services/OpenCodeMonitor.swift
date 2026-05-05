@@ -154,7 +154,7 @@ final class OpenCodeMonitor: SessionAggregatable {
         watcher.onSessionsChanged = { [weak self] sessions in
             Task { @MainActor in
                 self?.sessions = sessions
-                self?.syncToSessionManager(sessions)
+                await self?.syncToSessionManager(sessions)
             }
         }
         watcher.startWatching()
@@ -220,7 +220,7 @@ final class OpenCodeMonitor: SessionAggregatable {
     }
 
     /// 将 OpenCode 会话同步注册到 SessionManager
-    private func syncToSessionManager(_ openCodeSessions: [OpenCodeSession]) {
+    private func syncToSessionManager(_ openCodeSessions: [OpenCodeSession]) async {
         let sm = SessionManager.shared
 
         for session in openCodeSessions {
@@ -237,7 +237,7 @@ final class OpenCodeMonitor: SessionAggregatable {
                 sessionData.contextReasoningTokens = contextData.reasoningTokens
             }
 
-            sm.registerExternalSession(sessionData)
+            await sm.registerExternalSession(sessionData)
         }
 
         // 清理不再存在的会话
@@ -250,7 +250,9 @@ final class OpenCodeMonitor: SessionAggregatable {
 
     /// 停止时清理 SessionManager 中所有 OpenCode 会话
     private func cleanupSessionManagerSessions() {
-        syncToSessionManager([])
+        Task { @MainActor in
+            await syncToSessionManager([])
+        }
     }
 
     /// 手动刷新

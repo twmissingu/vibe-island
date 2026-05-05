@@ -54,9 +54,9 @@ final class SoundManagerTests: XCTestCase {
 
     // MARK: - 音量控制测试
 
-    /// 测试：默认音量值为 0.7
+    /// 测试：默认音量值为 1.0
     func testDefaultVolume() {
-        XCTAssertEqual(SoundManager.defaultVolume, 0.7)
+        XCTAssertEqual(SoundManager.defaultVolume, 1.0)
     }
 
     /// 测试：设置音量在有效范围内

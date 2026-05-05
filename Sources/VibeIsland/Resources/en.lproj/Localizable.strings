@@ -159,7 +159,7 @@
 "onboarding.completion.instruction" = "Click \"Get Started\" to enter the main interface";
 "onboarding.button.previous" = "Previous";
 "onboarding.button.next" = "Next";
-"onboarding.button.getStart" = "Get Started";
+"onboarding.button.getStarted" = "Get Started";
 "onboarding.button.skip" = "Skip";
 "onboarding.button.skipOnboarding" = "Skip Onboarding";
 
@@ -265,6 +265,26 @@
 
 "button.ok" = "OK";
 "button.cancel" = "Cancel";
+"button.quit" = "Quit App";
+
+// MARK: - Onboarding Plugin Step
+
+"onboarding.step.plugins" = "Configure Plugins";
+"onboarding.plugin.claude" = "Claude Code Hook";
+"onboarding.plugin.opencode" = "OpenCode Plugin";
+"onboarding.plugin.install" = "Install";
+"onboarding.plugin.installed" = "Installed";
+"onboarding.plugin.skip" = "Skip";
+"onboarding.plugin.notDetected" = "Not detected";
+"onboarding.plugin.claude.desc" = "Real-time Claude Code session monitoring";
+"onboarding.plugin.opencode.desc" = "Real-time OpenCode session monitoring";
+
+// MARK: - Onboarding Preferences Step
+
+"onboarding.step.preferences" = "Preferences";
+"onboarding.pref.launchAtLogin" = "Launch at Login";
+"onboarding.pref.sound" = "Sound Alerts";
+"onboarding.pref.pet" = "Show Pixel Pet";
 
 // MARK: - Error Messages
 
@@ -347,28 +367,6 @@
 // MARK: - Circular Gauge
 
 "gauge.percent" = "%";
-
-// MARK: - Onboarding (Additional)
-
-"onboarding.welcome.title" = "Welcome to Vibe Island";
-"onboarding.welcome.subtitle" = "Your AI Coding Assistant Status Monitor\nReal-time monitoring of Claude Code, OpenCode";
-"onboarding.select.platforms" = "Select Platforms to Monitor";
-"onboarding.modify.anytime" = "You can modify this in settings at any time";
-"onboarding.configure.hook" = "Configure Claude Code Hook";
-"onboarding.hook.install.success" = "Hook installed successfully\nRestart Claude Code to take effect";
-"onboarding.hook.tip" = "Tip: You can also install it later in settings";
-"onboarding.completion.title" = "Setup Complete!";
-"onboarding.completion.platforms" = "Selected %d platforms";
-"onboarding.completion.hookInstalled" = "Hook installed";
-"onboarding.completion.hookNotInstalled" = "Hook not installed (can be installed in settings)";
-"onboarding.completion.petEnabled" = "Pixel pet enabled";
-"onboarding.completion.soundEnabled" = "Sound alerts enabled";
-"onboarding.completion.instruction" = "Click \"Get Started\" to enter the main interface";
-"onboarding.button.previous" = "Previous";
-"onboarding.button.next" = "Next";
-"onboarding.button.getStart" = "Get Started";
-"onboarding.button.skip" = "Skip";
-"onboarding.button.skipOnboarding" = "Skip Onboarding";
 
 // MARK: - Coding Goals
 

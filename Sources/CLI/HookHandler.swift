@@ -715,11 +715,17 @@ enum HookHandler {
 
     private static let openCodeDatabasePath = NSHomeDirectory() + "/.local/share/opencode/opencode.db"
 
+    private static func escapeSQL(_ string: String) -> String {
+        string
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "''")
+            .replacingOccurrences(of: "\"", with: "\"\"")
+    }
+
     private static func parseOpenCodeContextFromDB(cwd: String) -> ParsedContextData? {
         guard FileManager.default.fileExists(atPath: openCodeDatabasePath) else { return nil }
 
-        let escapedCwd = cwd.replacingOccurrences(of: "'", with: "''")
-        let findSessionSQL = "SELECT id FROM session WHERE directory = '\(escapedCwd)' ORDER BY time_updated DESC LIMIT 1;"
+        let findSessionSQL = "SELECT id FROM session WHERE directory = '\(escapeSQL(cwd))' ORDER BY time_updated DESC LIMIT 1;"
 
         guard let sessionIdResult = runSQL(findSessionSQL), !sessionIdResult.isEmpty else { return nil }
         let ocSessionId = sessionIdResult.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -731,8 +737,8 @@ enum HookHandler {
                 json_extract(data, '$.tokens.input') as input,
                 json_extract(data, '$.tokens.output') as output,
                 json_extract(data, '$.tokens.reasoning') as reasoning
-            FROM message 
-            WHERE session_id = '\(ocSessionId)' 
+            FROM message
+            WHERE session_id = '\(escapeSQL(ocSessionId))'
             AND json_extract(data, '$.tokens.total') > 0
             ORDER BY time_updated DESC LIMIT 1;
             """
@@ -768,13 +774,12 @@ enum HookHandler {
               let provider = json["provider"] as? [String: Any] else { return 200000 }
 
         // 从数据库获取当前使用的 provider 和 model
-        let escapedCwd = cwd.replacingOccurrences(of: "'", with: "''")
-        let findSessionSQL = "SELECT id FROM session WHERE directory = '\(escapedCwd)' ORDER BY time_updated DESC LIMIT 1;"
+        let findSessionSQL = "SELECT id FROM session WHERE directory = '\(escapeSQL(cwd))' ORDER BY time_updated DESC LIMIT 1;"
         if let sessionIdResult = runSQL(findSessionSQL), !sessionIdResult.isEmpty {
             let ocSessionId = sessionIdResult.trimmingCharacters(in: .whitespacesAndNewlines)
             let modelSQL = """
                 SELECT json_extract(data, '$.providerID'), json_extract(data, '$.modelID')
-                FROM message WHERE session_id = '\(ocSessionId)'
+                FROM message WHERE session_id = '\(escapeSQL(ocSessionId))'
                 AND json_extract(data, '$.providerID') IS NOT NULL
                 ORDER BY time_updated DESC LIMIT 1;
                 """

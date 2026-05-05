@@ -186,7 +186,7 @@ final class OpenCodeMonitorTests: XCTestCase {
 
         let converted = session.toSession()
 
-        XCTAssertEqual(converted.sessionId, "opencode_conv-test")
+        XCTAssertEqual(converted.sessionId, "opencode-conv-test")
         XCTAssertEqual(converted.cwd, "/Users/test/myproject")
         XCTAssertEqual(converted.status, .coding)
         XCTAssertEqual(converted.source, "opencode")

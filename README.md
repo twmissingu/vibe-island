@@ -20,26 +20,98 @@ When coding with AI tools like Claude Code and OpenCode, you lose track of:
 - 🏝️ **Dynamic Island UI** — Seamlessly integrated into the macOS menu bar notch
 - 📊 **Context Monitoring** — Real-time token usage tracking with visual progress bars
 - 🐱 **Pixel Pets** — 8 pet types with 5 skin tiers that react to your coding state
-- 🔔 **Smart Notifications** — Sound alerts for approvals, errors, and completions
+- 🔊 **Smart Notifications** — Sound alerts for approvals, errors, and completions
 - 🎨 **Two Themes** — Pixel Dark (geeky) and Glass Transparent (minimal)
 - 🛠️ **Multi-Tool Support** — Claude Code and OpenCode
 
-## Quick Start
+---
+
+## For Users
+
+### System Requirements
+
+- **macOS 14.0+** (Sonoma)
+- Apple Silicon (M1/M2/M3/M4) or Intel Mac
+- Claude Code or OpenCode installed (optional, for full features)
+
+### Installation
+
+#### 1. Download
+
+Go to [GitHub Releases](https://github.com/twzhan/vibe-island/releases) and download the latest `VibeIsland.dmg`.
+
+#### 2. Install
+
+Double-click the DMG file, then **drag VibeIsland.app to your Applications folder**.
+
+#### 3. First Launch (macOS Gatekeeper)
+
+Because Vibe Island is not distributed through the Mac App Store, macOS may show a security warning on first launch:
+
+> **"VibeIsland.app" cannot be opened because the developer cannot be verified.**
+
+**To open the app:**
+
+- **Option 1:** Right-click (or Control-click) on VibeIsland.app → **Open** → click **"Open"** in the dialog.
+- **Option 2:** Run this command in Terminal:
+  ```bash
+  xattr -cr /Applications/VibeIsland.app
+  ```
+  Then double-click the app normally.
+
+#### 4. First-Run Setup
+
+On first launch, Vibe Island will show an onboarding guide:
+
+1. **Welcome** — Overview of features
+2. **Configure Plugins** — Install Claude Code Hook and/or OpenCode Plugin for real-time status
+3. **Preferences** — Choose startup, sound, and pet settings
+4. **Done** — Start using Vibe Island
+
+You can also configure these later in **Settings** (gear icon in the expanded panel).
+
+### Configure Claude Code Hook
+
+For real-time Claude Code session monitoring, install the hook:
+
+```bash
+# Option A: Via Settings UI (recommended)
+# Open Vibe Island → Settings → Plugin → Click "Install" next to Claude Code
+
+# Option B: Via command line
+./scripts/install-claude-hook.sh
+```
+
+### Configure OpenCode Plugin
+
+For real-time OpenCode session monitoring:
+
+```bash
+# Option A: Via Settings UI (recommended)
+# Open Vibe Island → Settings → Plugin → Click "Install" next to OpenCode
+
+# Option B: Via command line
+./scripts/install-opencode-plugin.sh
+```
+
+---
+
+## For Developers
 
 ### Prerequisites
 
 - macOS 14.0+ (Sonoma)
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen): `brew install xcodegen`
-- Claude Code or OpenCode installed
+- Claude Code or OpenCode installed (optional)
 
-### Installation
+### Clone and Build
 
 ```bash
 # Clone the repository
 git clone https://github.com/twzhan/vibe-island.git
 cd vibe-island
 
-# First-time setup
+# First-time setup (installs XcodeGen, generates project, type-checks CLI)
 ./scripts/dev-setup.sh
 
 # Build and run
@@ -48,52 +120,40 @@ open VibeIsland.xcodeproj
 # Press Cmd+R in Xcode
 ```
 
-### Configure Claude Code Hook
+### Build Release DMG
 
 ```bash
-# Install the hook for Claude Code
-./scripts/install-claude-hook.sh
+./scripts/build-release.sh
+# Output: build/VibeIsland.dmg
 ```
 
-### Configure OpenCode Plugin
+### Run Tests
 
 ```bash
-# Install the plugin for OpenCode
-./scripts/install-opencode-plugin.sh
+./scripts/run-tests.sh
 ```
 
-## For AI Agents
+### Project Structure
 
-This project is designed for seamless AI agent interaction:
+```
+Sources/VibeIsland/      — Main app code (SwiftUI + AppKit)
+Sources/CLI/             — CLI tool for hook integration
+Packages/LLMQuotaKit/    — LLM quota monitoring framework
+project.yml              — XcodeGen configuration
+scripts/                 — Build and setup scripts
+```
 
-1. **Clone and Setup**
-   ```bash
-   git clone https://github.com/twzhan/vibe-island.git
-   cd vibe-island
-   ./scripts/dev-setup.sh
-   ```
+### Key Files
 
-2. **Build**
-   ```bash
-   xcodegen generate
-   xcodebuild -scheme VibeIsland -destination 'platform=macOS' build
-   ```
+| File | Description |
+|------|-------------|
+| `Sources/VibeIsland/App/VibeIslandApp.swift` | App entry point |
+| `Sources/CLI/vibe-island.swift` | CLI entry point |
+| `Sources/VibeIsland/Views/IslandView.swift` | Main UI |
+| `Sources/VibeIsland/Views/OnboardingView.swift` | First-run onboarding |
+| `Sources/VibeIsland/Views/SettingsView.swift` | Settings panel |
 
-3. **Run Tests**
-   ```bash
-   ./scripts/run-tests.sh
-   ```
-
-4. **Project Structure**
-   - `Sources/VibeIsland/` — Main app code (SwiftUI + AppKit)
-   - `Sources/CLI/` — CLI tool for hook integration
-   - `Packages/LLMQuotaKit/` — LLM quota monitoring framework
-   - `project.yml` — XcodeGen configuration
-
-5. **Key Files**
-   - `Sources/VibeIsland/App/VibeIslandApp.swift` — App entry point
-   - `Sources/CLI/vibe-island.swift` — CLI entry point
-   - `Sources/VibeIsland/Views/IslandView.swift` — Main UI
+---
 
 ## Architecture
 

@@ -178,6 +178,15 @@ struct SettingsView: View {
                     ))
                     .toggleStyle(SwitchToggleStyle(tint: .blue))
                 }
+
+                // MARK: - 退出
+                Section {
+                    Button(NSLocalizedString("button.quit", comment: "Quit App")) {
+                        NSApp.terminate(nil)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .foregroundStyle(.red)
+                }
             }
             .formStyle(.grouped)
             .frame(width: 450, height: 400)
