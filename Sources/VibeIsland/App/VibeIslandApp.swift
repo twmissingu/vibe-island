@@ -6,13 +6,13 @@ private let logger = Logger(subsystem: "com.twmissingu.VibeIsland", category: "C
 extension Notification.Name {
     static let islandStateDidChange = Notification.Name("islandStateDidChange")
     static let toggleIslandState = Notification.Name("toggleIslandState")
+    static let openFullSettings = Notification.Name("openFullSettings")
 }
 
 @main
 struct VibeIslandApp: App {
     @State private var stateManager = StateManager()
     @State private var panel: DynamicIslandPanel?
-    @State private var showOnboarding = false
 
     var body: some Scene {
         WindowGroup {
@@ -21,7 +21,6 @@ struct VibeIslandApp: App {
                 .onAppear {
                     setupPanel()
                     stateManager.startMonitoring()
-                    checkOnboardingStatus()
                     installCLIIfNeeded()
                     
                     // 监听点击切换
@@ -44,10 +43,16 @@ struct VibeIslandApp: App {
                         let isExpanded = notification.userInfo?["isExpanded"] as? Bool ?? false
                         panel?.updateContentFrame(isExpanded: isExpanded)
                     }
-                }
-                .sheet(isPresented: $showOnboarding) {
-                    OnboardingView()
-                        .environment(stateManager)
+
+                    // 从 MiniSettingsView 打开完整设置
+                    NotificationCenter.default.addObserver(
+                        forName: .openFullSettings,
+                        object: nil,
+                        queue: .main
+                    ) { _ in
+                        // 从 WindowGroup 的根视图发送，避免 panel 非 key 的问题
+                        stateManager.openFullSettings()
+                    }
                 }
         }
         .windowStyle(.hiddenTitleBar)
@@ -66,27 +71,6 @@ struct VibeIslandApp: App {
         let newPanel = DynamicIslandPanel(contentView: islandView)
         newPanel.orderFront(nil)
         self.panel = newPanel
-    }
-
-    private func checkOnboardingStatus() {
-        // 检查启动参数 (使用 CommandLine)
-        let arguments = CommandLine.arguments
-
-        if arguments.contains("--onboarding") {
-            showOnboarding = true
-            return
-        }
-
-        if arguments.contains("--skip-onboarding") {
-            showOnboarding = false
-            return
-        }
-
-        let hasShownOnboarding = UserDefaults.standard.bool(forKey: "hasShownOnboarding")
-        if !hasShownOnboarding {
-            showOnboarding = true
-            UserDefaults.standard.set(true, forKey: "hasShownOnboarding")
-        }
     }
 
     private func installCLIIfNeeded() {

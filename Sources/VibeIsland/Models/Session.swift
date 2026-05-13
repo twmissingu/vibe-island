@@ -345,7 +345,7 @@ extension Session {
         case .preToolUse:
             lastTool = event.toolName
             if let input = event.toolInput {
-                lastToolDetail = String(data: try! JSONEncoder().encode(input), encoding: .utf8)
+                lastToolDetail = (try? JSONEncoder().encode(input)).flatMap { String(data: $0, encoding: .utf8) }
             }
 
         case .postToolUse:

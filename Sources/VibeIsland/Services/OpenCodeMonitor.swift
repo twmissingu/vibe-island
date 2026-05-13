@@ -322,7 +322,7 @@ final class OpenCodeMonitor: SessionAggregatable {
 // MARK: - 插件 Session 文件格式
 
 /// 插件写入的 session 文件格式（参考 cctop 格式）
-struct PluginSessionFile: Codable {
+struct PluginSessionFile: Codable, Sendable {
     let sessionID: String
     let cwd: String
     let status: String

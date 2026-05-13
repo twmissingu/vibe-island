@@ -196,7 +196,7 @@ struct PluginSetupStep: View {
                         .foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(NSLocalizedString("onboarding.plugin.opencode", comment: "OpenCode Plugin"))
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.islandHeading.weight(.medium))
                         Text(NSLocalizedString("onboarding.plugin.notDetected", comment: "Not detected"))
                             .font(.caption)
                             .foregroundStyle(.tertiary)
@@ -226,7 +226,7 @@ struct PluginSetupStep: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.islandHeading.weight(.medium))
                 Text(description)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -239,12 +239,12 @@ struct PluginSetupStep: View {
                     NSLocalizedString("onboarding.plugin.installed", comment: "Installed"),
                     systemImage: "checkmark.circle.fill"
                 )
-                .font(.system(size: 12))
+                .font(.islandBody)
                 .foregroundStyle(.green)
             } else {
                 Button(action: installAction) {
                     Text(NSLocalizedString("onboarding.plugin.install", comment: "Install"))
-                        .font(.system(size: 12))
+                        .font(.islandBody)
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)

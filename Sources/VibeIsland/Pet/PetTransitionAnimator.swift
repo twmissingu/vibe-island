@@ -70,70 +70,13 @@ struct PetTransitionModifier: ViewModifier {
     
     func body(content: Content) -> some View {
         content
+            .offset(x: shakeOffset)
+            .rotationEffect(.degrees(rotation))
             .onAppear {
                 withDelay(config.delay) {
                     performAnimation()
                 }
             }
-    }
-    
-    @ViewBuilder
-    private func applyTransition() -> some View {
-        switch config.type {
-        case .fade:
-            applyFade()
-        case .scale:
-            applyScale()
-        case .slide:
-            applySlide()
-        case .shake:
-            applyShake()
-        case .bounce:
-            applyBounce()
-        case .pulse:
-            applyPulse()
-        case .spin:
-            applySpin()
-        case .flip:
-            applyFlip()
-        }
-    }
-    
-    // MARK: - 各种过渡效果
-    
-    private func applyFade() -> some View {
-        EmptyView()
-    }
-    
-    private func applyScale() -> some View {
-        EmptyView()
-    }
-    
-    private func applySlide() -> some View {
-        EmptyView()
-    }
-    
-    // 抖动效果 - 通过 offset 应用
-    private func applyShake() -> some View {
-        EmptyView()
-    }
-    
-    // 弹跳效果
-    private func applyBounce() -> some View {
-        EmptyView()
-    }
-    
-    // 脉冲效果
-    private func applyPulse() -> some View {
-        EmptyView()
-    }
-    
-    private func applySpin() -> some View {
-        EmptyView()
-    }
-    
-    private func applyFlip() -> some View {
-        EmptyView()
     }
     
     // MARK: - 动画执行

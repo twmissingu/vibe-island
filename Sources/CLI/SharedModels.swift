@@ -185,6 +185,8 @@ public struct SessionEvent: Codable, Sendable {
     public let transcriptPath: String?
     public let permissionMode: String?
     public let isInterrupt: Bool?
+    public let pid: UInt32?
+    public let pidStartTime: TimeInterval?
     public let contextUsage: Double?
     public let contextTokensUsed: Int?
     public let contextTokensTotal: Int?
@@ -213,6 +215,8 @@ public struct SessionEvent: Codable, Sendable {
         transcriptPath: String? = nil,
         permissionMode: String? = nil,
         isInterrupt: Bool? = nil,
+        pid: UInt32? = nil,
+        pidStartTime: TimeInterval? = nil,
         contextUsage: Double? = nil,
         contextTokensUsed: Int? = nil,
         contextTokensTotal: Int? = nil,
@@ -240,6 +244,8 @@ public struct SessionEvent: Codable, Sendable {
         self.transcriptPath = transcriptPath
         self.permissionMode = permissionMode
         self.isInterrupt = isInterrupt
+        self.pid = pid
+        self.pidStartTime = pidStartTime
         self.contextUsage = contextUsage
         self.contextTokensUsed = contextTokensUsed
         self.contextTokensTotal = contextTokensTotal
@@ -269,6 +275,8 @@ public struct SessionEvent: Codable, Sendable {
         case transcriptPath = "transcript_path"
         case permissionMode = "permission_mode"
         case isInterrupt = "is_interrupt"
+        case pid
+        case pidStartTime = "pid_start_time"
         case contextUsage = "context_usage"
         case contextTokensUsed = "context_tokens_used"
         case contextTokensTotal = "context_tokens_total"
@@ -298,6 +306,8 @@ public struct SessionEvent: Codable, Sendable {
         transcriptPath = try container.decodeIfPresent(String.self, forKey: .transcriptPath)
         permissionMode = try container.decodeIfPresent(String.self, forKey: .permissionMode)
         isInterrupt = try container.decodeIfPresent(Bool.self, forKey: .isInterrupt)
+        pid = try container.decodeIfPresent(UInt32.self, forKey: .pid)
+        pidStartTime = try container.decodeIfPresent(TimeInterval.self, forKey: .pidStartTime)
         contextUsage = try container.decodeIfPresent(Double.self, forKey: .contextUsage)
         contextTokensUsed = try container.decodeIfPresent(Int.self, forKey: .contextTokensUsed)
         contextTokensTotal = try container.decodeIfPresent(Int.self, forKey: .contextTokensTotal)

@@ -1,28 +1,34 @@
 # Vibe Island
 
-> Your AI coding companion lives in the notch — monitoring sessions, tracking context, and cheering you on with pixel pets.
+> Your AI coding partner lives in the notch — monitoring sessions, tracking context, cheering you on with pixel pets.
 
 [![macOS](https://img.shields.io/badge/macOS-14.0+-blue.svg)](https://www.apple.com/macos/sonoma/)
 [![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
+---
+
 ## Why Vibe Island?
 
-When coding with AI tools like Claude Code and OpenCode, you lose track of:
-- Which sessions are active
-- How much context you've used
-- When you need to approve actions
+When coding with AI tools like Claude Code and OpenCode, critical information gets buried:
 
-**Vibe Island** solves this by placing a Dynamic Island-style monitor in your macOS menu bar — right where your MacBook's notch already draws attention.
+- **Which sessions are active?** — You have 3 terminals open, 2 VS Code windows — which ones are doing work?
+- **How much context is left?** — AI context windows fill up silently. When you hit the limit, work gets lost.
+- **When does AI need you?** — Permission requests, errors, completions — without notifications, you miss them.
+
+**Vibe Island** places a Dynamic Island-style monitor in your MacBook's notch. At a glance: active sessions, context usage, tool counts, and a pixel pet that reacts to everything.
+
+---
 
 ## Features
 
-- 🏝️ **Dynamic Island UI** — Seamlessly integrated into the macOS menu bar notch
-- 📊 **Context Monitoring** — Real-time token usage tracking with visual progress bars
-- 🐱 **Pixel Pets** — 8 pet types with 5 skin tiers that react to your coding state
-- 🔊 **Smart Notifications** — Sound alerts for approvals, errors, and completions
-- 🎨 **Two Themes** — Pixel Dark (geeky) and Glass Transparent (minimal)
-- 🛠️ **Multi-Tool Support** — Claude Code and OpenCode
+- 🏝️ **Dynamic Island UI** — Sits in the macOS notch. Compact when idle, expands on click with 3 tabs: sessions, context usage, and daily stats.
+- 📊 **Session Monitoring** — Tracks Claude Code and OpenCode sessions in real time. Shows tool usage counts, context percentage, and active subagents.
+- 🐱 **Pixel Pets** — 8 pets × 5 skin tiers. Unlock by coding. Each pet reacts to your AI's state — shakes on errors, celebrates on completion, glows on compression.
+- 🎯 **Daily Stats** — Today's coding time, top tools ranked by usage, daily goal progress. All in the expanded panel.
+- 🔊 **Smart Notifications** — Sound alerts only for critical events (permission requests, errors). Cooldown prevents notification fatigue.
+- 🎨 **Two Themes** — Pixel Dark (geeky, monospaced, ASCII dividers) and Glass Transparent (vibrant blur, session-colored glow).
+- 🛠️ **Multi-Tool Support** — Claude Code and OpenCode, side by side.
 
 ---
 
@@ -31,67 +37,41 @@ When coding with AI tools like Claude Code and OpenCode, you lose track of:
 ### System Requirements
 
 - **macOS 14.0+** (Sonoma)
-- Apple Silicon (M1/M2/M3/M4) or Intel Mac
-- Claude Code or OpenCode installed (optional, for full features)
+- Apple Silicon (M1/M2/M3/M4) or Intel Mac with a notch (recommended) or standard menu bar
+- Claude Code and/or OpenCode (optional — Vibe Island works as a standalone pet island too)
 
-### Installation
+### Quick Start
 
-#### 1. Download
+#### 1. Download & Install
 
-Go to [GitHub Releases](https://github.com/twzhan/vibe-island/releases) and download the latest `VibeIsland.dmg`.
+1. Go to [GitHub Releases](https://github.com/twzhan/vibe-island/releases) and download `VibeIsland.dmg`.
+2. Double-click the DMG, then **drag VibeIsland.app to Applications**.
+3. First launch? macOS Gatekeeper may show:
+   > **"VibeIsland.app" cannot be opened because the developer cannot be verified.**
+   
+   Right-click → **Open** → click **"Open"**. Run once, and it'll work normally after.
 
-#### 2. Install
+#### 2. First Launch
 
-Double-click the DMG file, then **drag VibeIsland.app to your Applications folder**.
+Launch Vibe Island. You'll see `( ^_^ )` in your notch — a pixel pet sleeping. Click it to expand.
 
-#### 3. First Launch (macOS Gatekeeper)
+**If Claude Code or OpenCode is running**, Vibe Island detects it and prompts you to install the hook/plugin right in the panel — no settings hunting.
 
-Because Vibe Island is not distributed through the Mac App Store, macOS may show a security warning on first launch:
+**If no AI tools are detected**, Vibe Island shows a welcome card with instructions. Or just keep it open — the pet is cute.
 
-> **"VibeIsland.app" cannot be opened because the developer cannot be verified.**
+#### 3. Configure Hooks (for real-time session data)
 
-**To open the app:**
+Click the gear icon in the expanded panel → **Plugin** section:
+- **Claude Code**: Click "Install" next to Claude Code → authorize `~/.claude` access
+- **OpenCode**: Click "Install" next to OpenCode
 
-- **Option 1:** Right-click (or Control-click) on VibeIsland.app → **Open** → click **"Open"** in the dialog.
-- **Option 2:** Run this command in Terminal:
-  ```bash
-  xattr -cr /Applications/VibeIsland.app
-  ```
-  Then double-click the app normally.
+That's it. Session data appears in the island immediately.
 
-#### 4. First-Run Setup
-
-On first launch, Vibe Island will show an onboarding guide:
-
-1. **Welcome** — Overview of features
-2. **Configure Plugins** — Install Claude Code Hook and/or OpenCode Plugin for real-time status
-3. **Preferences** — Choose startup, sound, and pet settings
-4. **Done** — Start using Vibe Island
-
-You can also configure these later in **Settings** (gear icon in the expanded panel).
-
-### Configure Claude Code Hook
-
-For real-time Claude Code session monitoring, install the hook:
+### Debugging
 
 ```bash
-# Option A: Via Settings UI (recommended)
-# Open Vibe Island → Settings → Plugin → Click "Install" next to Claude Code
-
-# Option B: Via command line
-./scripts/install-claude-hook.sh
-```
-
-### Configure OpenCode Plugin
-
-For real-time OpenCode session monitoring:
-
-```bash
-# Option A: Via Settings UI (recommended)
-# Open Vibe Island → Settings → Plugin → Click "Install" next to OpenCode
-
-# Option B: Via command line
-./scripts/install-opencode-plugin.sh
+VIBE_ISLAND_DEBUG=1 open /Applications/VibeIsland.app
+# Logs → ~/.vibe-island/hook-debug.log
 ```
 
 ---
@@ -100,24 +80,23 @@ For real-time OpenCode session monitoring:
 
 ### Prerequisites
 
-- macOS 14.0+ (Sonoma)
+- macOS 14.0+
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen): `brew install xcodegen`
-- Claude Code or OpenCode installed (optional)
+- Claude Code / OpenCode (optional, for testing hook integration)
 
-### Clone and Build
+### Build
 
 ```bash
-# Clone the repository
 git clone https://github.com/twzhan/vibe-island.git
 cd vibe-island
 
-# First-time setup (installs XcodeGen, generates project, type-checks CLI)
+# First-time setup (checks deps, generates Xcode project, type-checks CLI)
 ./scripts/dev-setup.sh
 
-# Build and run
+# Generate Xcode project (required after any change to project.yml)
 xcodegen generate
 open VibeIsland.xcodeproj
-# Press Cmd+R in Xcode
+# Press Cmd+R
 ```
 
 ### Build Release DMG
@@ -133,76 +112,107 @@ open VibeIsland.xcodeproj
 ./scripts/run-tests.sh
 ```
 
+### CLI Typecheck (no Xcode needed)
+
+```bash
+cd Sources/CLI && swiftc -typecheck -target arm64-apple-macosx14.0 \
+  vibe-island.swift HookHandler.swift SharedModels.swift
+```
+
 ### Project Structure
 
 ```
-Sources/VibeIsland/      — Main app code (SwiftUI + AppKit)
-Sources/CLI/             — CLI tool for hook integration
+Sources/VibeIsland/      — Main app (SwiftUI + AppKit)
+Sources/CLI/             — CLI tool (hook integration, session file writer)
 Packages/LLMQuotaKit/    — LLM quota monitoring framework
-project.yml              — XcodeGen configuration
-scripts/                 — Build and setup scripts
+project.yml              — XcodeGen project spec
+scripts/                 — Build, release, and setup scripts
+Tests/                   — Unit + UI tests
 ```
 
-### Key Files
+---
 
-| File | Description |
-|------|-------------|
-| `Sources/VibeIsland/App/VibeIslandApp.swift` | App entry point |
-| `Sources/CLI/vibe-island.swift` | CLI entry point |
-| `Sources/VibeIsland/Views/IslandView.swift` | Main UI |
-| `Sources/VibeIsland/Views/OnboardingView.swift` | First-run onboarding |
-| `Sources/VibeIsland/Views/SettingsView.swift` | Settings panel |
+## For AI Agents
+
+This project is designed for seamless AI agent interaction:
+
+1. **Clone & setup**
+   ```bash
+   git clone https://github.com/twzhan/vibe-island.git
+   cd vibe-island
+   brew install xcodegen
+   ./scripts/dev-setup.sh
+   ```
+
+2. **Key files to understand**
+   - `Sources/VibeIsland/App/VibeIslandApp.swift` — App entry point, panel creation
+   - `Sources/CLI/vibe-island.swift` — CLI entry point, `hook <EventType>` stdin JSON handler
+   - `Sources/CLI/SharedModels.swift` — Session/SessionEvent/SessionState models (duplicated in App target)
+   - `Sources/VibeIsland/Views/IslandView.swift` — Main Dynamic Island UI (compact + expanded)
+
+3. **Conventions**
+   - Swift 6 strict concurrency, all singletons `@MainActor`
+   - MVVM + `@Observable`, dependency injection via `.environment`
+   - All session file I/O uses `flock` locking
+   - JSON writes never use `.atomic` (changes inode, breaks DispatchSource)
+   - CLI and App models are duplicated — `SessionState.transition()` and `isBlinking` must stay in sync
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    macOS Menu Bar (Notch)                    │
-├─────────────────────────────────────────────────────────────┤
-│  ┌─────────┐  ┌─────────────────┐  ┌─────────┐            │
-│  │   (     │  │   🐱 42%        │  │    )    │            │
-│  │  State  │  │   Context       │  │  State  │            │
-│  └─────────┘  └─────────────────┘  └─────────┘            │
-└─────────────────────────────────────────────────────────────┘
-                           │
-           ┌───────────────┴───────────────┐
-           ▼                               ▼
-    ┌──────────┐                    ┌──────────┐
-    │  Claude  │                    │ OpenCode │
-    │  Code    │                    │          │
-    └──────────┘                    └──────────┘
-           │                               │
-           └───────────────┬───────────────┘
-                           ▼
-                    ┌──────────────┐
-                    │   Session    │
-                    │   Manager   │
-                    └──────────────┘
-                           │
-                    ┌──────────────┐
-                    │    Island    │
-                    │     View     │
-                    └──────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                     macOS Menu Bar (Notch)                    │
+├──────────────────────────────────────────────────────────────┤
+│  ┌──────┐  ┌──────────────┐         ┌──────┐               │
+│  │  (   │  │  🐱 42%      │         │   )  │               │
+│  │ state│  │  context      │  notch  │ state│               │
+│  └──────┘  └──────────────┘         └──────┘               │
+└──────────────────────────────────────────────────────────────┘
+         │                              │
+         ▼                              ▼
+  ┌─────────────┐              ┌──────────────┐
+  │ Claude Code │              │   OpenCode   │
+  │   (hook)    │              │  (plugin)    │
+  └──────┬──────┘              └──────┬───────┘
+         │                            │
+         └──────────┬─────────────────┘
+                    ▼
+           ┌────────────────┐
+           │  SessionManager │  ← aggregates all sessions
+           │  + FileWatcher  │  ← DispatchSource on JSON files
+           └────────┬───────┘
+                    │
+         ┌──────────┴──────────┐
+         ▼                     ▼
+  ┌────────────┐       ┌──────────────┐
+  │ IslandView │       │ ExpandedPanel │
+  │ (compact)  │       │ 3 tabs + pet  │
+  └────────────┘       └──────────────┘
 ```
+
+**Data flow:** Claude Code hook writes JSON → CLI writes `~/.vibe-island/sessions/<pid>.json` → `SessionFileWatcher` (DispatchSource) detects changes → `SessionManager` updates → `IslandView` re-renders.
+
+---
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. All contributions welcome — bug fixes, features, pixel art, sound effects.
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+- Fork → feature branch → PR
+- `xcodegen generate` after project.yml changes
+- Run tests with `./scripts/run-tests.sh`
+- Keep CLI ↔ App models in sync
+
+---
 
 ## License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+MIT © 2026 twzhan — see [LICENSE](LICENSE)
 
 ## Acknowledgments
 
 - Inspired by Apple's Dynamic Island design
-- Built with SwiftUI and AppKit
-- Pixel art created with love for the retro gaming aesthetic
+- Built with SwiftUI + AppKit
+- 16×16 pixel art by the project contributors

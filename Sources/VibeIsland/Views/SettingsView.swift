@@ -19,10 +19,6 @@ struct SettingsView: View {
     @State private var soundVolume: Float = 1.0
     @State private var showPluginInfo = false
 
-    // 宠物解锁/升级通知
-    @State private var showPetNotification = false
-    @State private var pendingNotification: PetUnlockNotification?
-
     // 多工具监控
     @State private var detectedTools: [ToolSource] = []
 
@@ -52,16 +48,25 @@ struct SettingsView: View {
             Form {
                 // MARK: - 外观
                 Section(NSLocalizedString("settings.appearance", comment: "Appearance")) {
-                    Picker(NSLocalizedString("settings.hud.style", comment: "Style"), selection: Binding(
-                        get: { viewModel.settings.theme },
-                        set: { viewModel.settings.theme = $0; saveSettings() }
-                    )) {
-                        ForEach(AppTheme.allCases, id: \.self) { theme in
-                            Text(theme.displayName).tag(theme)
+                    HStack(spacing: 12) {
+                        themeButton(
+                            title: "极客暗黑",
+                            icon: "square.grid.3x3.fill",
+                            isSelected: viewModel.settings.theme == .pixel
+                        ) {
+                            viewModel.settings.theme = .pixel
+                            saveSettings()
+                        }
+
+                        themeButton(
+                            title: "极简透明",
+                            icon: "circle.hexagongrid.fill",
+                            isSelected: viewModel.settings.theme == .glass
+                        ) {
+                            viewModel.settings.theme = .glass
+                            saveSettings()
                         }
                     }
-                    .pickerStyle(.segmented)
-                    .tint(.white)
                 }
 
                 // MARK: - 声音设置
@@ -84,7 +89,7 @@ struct SettingsView: View {
                         }
                         .tint(.blue)
                         Text("\(Int(soundVolume * 100))%")
-                            .font(.system(size: 12))
+                            .font(.islandBody)
                             .frame(width: 40)
                     }
 
@@ -123,9 +128,9 @@ struct SettingsView: View {
                         HStack {
                             Image(systemName: "lock.shield")
                                 .foregroundStyle(.orange)
-                                .font(.system(size: 11))
+                                .font(.islandCaption)
                             Text("需安装插件")
-                                .font(.system(size: 11))
+                                .font(.islandCaption)
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -142,9 +147,9 @@ struct SettingsView: View {
                     }
                     if let msg = hookMessage {
                         HStack {
-                            Text(msg)
-                                .font(.system(size: 10))
-                                .foregroundStyle(msg.hasPrefix("失败") || msg.hasPrefix("错误") ? .red : .green)
+                        Text(msg)
+                            .font(.islandBody)
+                            .foregroundStyle(msg.hasPrefix("失败") || msg.hasPrefix("错误") ? .red : .green)
                             Spacer()
                         }
                     }
@@ -158,7 +163,7 @@ struct SettingsView: View {
                     if let msg = openCodePluginMessage {
                         HStack {
                             Text(msg)
-                                .font(.system(size: 10))
+                                .font(.islandBody)
                                 .foregroundStyle(openCodePluginMessageIsError ? .red : .green)
                             Spacer()
                         }
@@ -197,7 +202,6 @@ struct SettingsView: View {
             .onAppear {
                 loadSoundSettings()
                 detectRunningTools()
-                setupPetNotificationObserver()
             }
             .navigationTitle(NSLocalizedString("settings.title", comment: "Settings"))
             .toolbar {
@@ -212,9 +216,6 @@ struct SettingsView: View {
                 await refreshOpenCodePluginStatus()
             }
         }
-        .sheet(isPresented: $showPetNotification) {
-            petNotificationSheet
-        }
     }
 
     // MARK: - Hook 管理
@@ -226,17 +227,26 @@ struct SettingsView: View {
             Group {
                 switch hookStatus {
                 case .installed:
-                    Label(NSLocalizedString("settings.hook.installed", comment: "Installed"), systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                        Text(NSLocalizedString("settings.hook.installed", comment: "Installed"))
+                            .foregroundStyle(.green)
+                    }
+                    .font(.islandCaption)
                 case .notInstalled:
-                    Label(NSLocalizedString("settings.hook.notInstalled", comment: "Not Installed"), systemImage: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                        Text(NSLocalizedString("settings.hook.notInstalled", comment: "Not Installed"))
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(.islandCaption)
                 case .unknown:
                     ProgressView()
                         .scaleEffect(0.7)
                 }
             }
-            .font(.system(size: 12))
         }
     }
 
@@ -298,17 +308,26 @@ struct SettingsView: View {
             Group {
                 switch openCodePluginStatus {
                 case .installed:
-                    Label(NSLocalizedString("settings.hook.installed", comment: "Installed"), systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                        Text(NSLocalizedString("settings.hook.installed", comment: "Installed"))
+                            .foregroundStyle(.green)
+                    }
+                    .font(.islandCaption)
                 case .notInstalled:
-                    Label(NSLocalizedString("settings.hook.notInstalled", comment: "Not Installed"), systemImage: "xmark.circle.fill")
-                        .foregroundStyle(.red)
+                    HStack(spacing: 4) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.red)
+                        Text(NSLocalizedString("settings.hook.notInstalled", comment: "Not Installed"))
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(.islandCaption)
                 case .unknown:
                     ProgressView()
                         .scaleEffect(0.7)
                 }
             }
-            .font(.system(size: 12))
         }
     }
 
@@ -358,7 +377,7 @@ struct SettingsView: View {
     private var testSoundButtons: some View {
         HStack {
             Text(NSLocalizedString("settings.soundTest", comment: "Test Sound"))
-                .font(.system(size: 12))
+                .font(.islandBody)
                 .foregroundStyle(.secondary)
             Spacer()
             HStack(spacing: 8) {
@@ -380,14 +399,42 @@ struct SettingsView: View {
         .controlSize(.small)
     }
 
+    private func themeButton(title: String, icon: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 24))
+                    .foregroundStyle(isSelected ? .white : .gray)
+
+                Text(title)
+                    .font(.islandBody.weight(.medium))
+                    .foregroundStyle(isSelected ? .white : .gray)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 70)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isSelected ? Color.accentColor.opacity(0.15) : Color.gray.opacity(0.1))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(
+                        isSelected ? Color.accentColor : Color.gray.opacity(0.3),
+                        lineWidth: isSelected ? 2.5 : 0.5
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
     private func pluginButton(isInstalled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 4) {
                 Image(systemName: isInstalled ? "minus.circle.fill" : "plus.circle.fill")
-                    .font(.system(size: 12))
+                    .font(.islandBody)
                     .foregroundStyle(isInstalled ? .red : .blue)
                 Text(isInstalled ? NSLocalizedString("settings.plugin.uninstall", comment: "Uninstall") : NSLocalizedString("settings.plugin.install", comment: "Install"))
-                    .font(.system(size: 11))
+                    .font(.islandCaption)
                     .foregroundStyle(isInstalled ? .red : .blue)
             }
         }
@@ -400,22 +447,22 @@ struct SettingsView: View {
             showPluginInfo = true
         } label: {
             Image(systemName: "questionmark.circle")
-                .font(.system(size: 12))
+                .font(.islandBody)
                 .foregroundStyle(.secondary)
         }
         .buttonStyle(.plain)
         .popover(isPresented: $showPluginInfo, arrowEdge: .top) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(NSLocalizedString("settings.plugin.purpose", comment: "Purpose"))
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.islandBody.weight(.semibold))
                 Text(NSLocalizedString("settings.plugin.purpose.desc", comment: "Monitor AI coding tool status"))
-                    .font(.system(size: 11))
+                    .font(.islandCaption)
                     .foregroundStyle(.secondary)
                 Divider()
                 Text(NSLocalizedString("settings.plugin.security", comment: "Data Security"))
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.islandBody.weight(.semibold))
                 Text(NSLocalizedString("settings.plugin.security.desc", comment: "Security description"))
-                    .font(.system(size: 11))
+                    .font(.islandCaption)
                     .foregroundStyle(.secondary)
             }
             .padding()
@@ -489,7 +536,7 @@ struct SettingsView: View {
             // 皮肤等级选择
             VStack(alignment: .leading, spacing: 6) {
                 Text("皮肤等级")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.islandBody.weight(.medium))
                     .foregroundStyle(.secondary)
 
                 // 皮肤等级网格
@@ -529,7 +576,7 @@ struct SettingsView: View {
                 }
 
                 Text(level.displayName)
-                    .font(.system(size: 10))
+                    .font(.islandBody)
                     .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
             }
         }
@@ -548,12 +595,12 @@ struct SettingsView: View {
 
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text("\(level.displayName) 进度")
-                    .font(.system(size: 11))
+            Text("\(level.displayName) 进度")
+                .font(.islandCaption)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Text("\(Int(progressValue * 100))%")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.islandCaption.weight(.medium))
                     .foregroundStyle(.secondary)
             }
 
@@ -562,7 +609,7 @@ struct SettingsView: View {
 
             if let remaining = progress.minutesToNextLevel(for: selectedPet), remaining > 0 {
                 Text("还需 \(remaining) 分钟升级")
-                    .font(.system(size: 10))
+                    .font(.islandBody)
                     .foregroundStyle(.tertiary)
             }
         }
@@ -588,28 +635,6 @@ struct SettingsView: View {
         PetProgressManager.shared.selectedPet = PetType(rawValue: viewModel.settings.selectedPetID) ?? .cat
     }
 
-    private func setupPetNotificationObserver() {
-        PetUnlockNotificationManager.shared.onNewNotification = { [self] notification in
-            DispatchQueue.main.async {
-                self.pendingNotification = notification
-                self.showPetNotification = true
-            }
-        }
-    }
-}
-
-// MARK: - 宠物通知弹窗
-
-extension SettingsView {
-    private var petNotificationSheet: some View {
-        PetUnlockView(
-            notification: pendingNotification ?? PetUnlockNotification(type: .unlock, pet: .cat, unlockTime: Date()),
-            onDismiss: {
-                showPetNotification = false
-                PetUnlockNotificationManager.shared.clearLatestNotification()
-            }
-        )
-    }
 }
 
 // MARK: - 宠物目录

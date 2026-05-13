@@ -160,17 +160,12 @@ class PetParticleSystem: ObservableObject {
     // MARK: - 辅助方法
     
     private func randomEmissionPosition() -> CGPoint {
-        // 在宠物周围随机位置发射
-        let centerX: CGFloat = 32  // 16x16 像素的中心
-        let centerY: CGFloat = 32
         let radius: CGFloat = 20
-        
         let angle = Double.random(in: 0...(2 * .pi))
         let distance = Double.random(in: 0...1) * radius
-        
         return CGPoint(
-            x: centerX + CGFloat(cos(angle) * distance),
-            y: centerY + CGFloat(sin(angle) * distance)
+            x: CGFloat(cos(angle) * distance),
+            y: CGFloat(sin(angle) * distance)
         )
     }
     

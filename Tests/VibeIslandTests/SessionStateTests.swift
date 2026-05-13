@@ -55,8 +55,8 @@ final class SessionStateTests: XCTestCase {
     func testIsBlinking_approvalStates() {
         XCTAssertTrue(SessionState.waitingPermission.isBlinking)
         XCTAssertTrue(SessionState.compacting.isBlinking)
-        XCTAssertTrue(SessionState.completed.isBlinking)
-        XCTAssertTrue(SessionState.error.isBlinking)
+        XCTAssertFalse(SessionState.completed.isBlinking)
+        XCTAssertFalse(SessionState.error.isBlinking)
     }
 
     func testIsBlinking_nonBlinkingStates() {
@@ -87,31 +87,53 @@ final class SessionStateTests: XCTestCase {
 
     // MARK: - 状态转换
 
-    func testTransition_sessionStart_goesToIdle() {
+    func testTransition_sessionStart_goesToThinking() {
         XCTAssertEqual(
             SessionState.transition(from: .coding, event: .sessionStart),
-            .idle
+            .thinking
         )
     }
 
-    func testTransition_userPromptSubmit_goesToCoding() {
+    func testTransition_userPromptSubmit_goesToThinking() {
         XCTAssertEqual(
             SessionState.transition(from: .idle, event: .userPromptSubmit),
+            .thinking
+        )
+    }
+
+    func testTransition_preToolUse_fromThinking_goesToCoding() {
+        XCTAssertEqual(
+            SessionState.transition(from: .thinking, event: .preToolUse),
             .coding
         )
     }
 
-    func testTransition_preToolUse_goesToWaiting() {
+    func testTransition_preToolUse_fromNonThinking_keepsCurrent() {
         XCTAssertEqual(
             SessionState.transition(from: .coding, event: .preToolUse),
-            .waiting
+            .coding
+        )
+        XCTAssertEqual(
+            SessionState.transition(from: .completed, event: .preToolUse),
+            .completed
         )
     }
 
-    func testTransition_postToolUse_goesToCoding() {
+    func testTransition_postToolUse_fromCoding_goesToThinking() {
+        XCTAssertEqual(
+            SessionState.transition(from: .coding, event: .postToolUse),
+            .thinking
+        )
+    }
+
+    func testTransition_postToolUse_fromNonCoding_keepsCurrent() {
         XCTAssertEqual(
             SessionState.transition(from: .waiting, event: .postToolUse),
-            .coding
+            .waiting
+        )
+        XCTAssertEqual(
+            SessionState.transition(from: .thinking, event: .postToolUse),
+            .thinking
         )
     }
 

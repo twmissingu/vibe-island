@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 // MARK: - 编码时长统计面板
 

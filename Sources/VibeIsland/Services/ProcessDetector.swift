@@ -165,7 +165,7 @@ struct ProcessDetector {
 // MARK: - 进程信息
 
 /// 进程信息结构
-struct ProcessInfo: Identifiable, Equatable {
+struct ProcessInfo: Identifiable, Equatable, Sendable {
     /// 进程 ID
     let pid: Int
     /// 进程名称

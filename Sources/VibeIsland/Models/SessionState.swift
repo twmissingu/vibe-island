@@ -47,7 +47,7 @@ public enum SessionState: String, Codable, Equatable, Sendable, CaseIterable {
     /// 是否需要闪烁指示
     public var isBlinking: Bool {
         switch self {
-        case .waitingPermission, .compacting, .completed, .error: return true
+        case .waitingPermission, .compacting: return true
         default: return false
         }
     }
@@ -56,12 +56,16 @@ public enum SessionState: String, Codable, Equatable, Sendable, CaseIterable {
 
     public static func transition(from current: SessionState, event: SessionEventName) -> SessionState {
         switch event {
-        case .sessionStart: return .idle
-        case .userPromptSubmit: return .coding
+        case .sessionStart: return .thinking
+        case .userPromptSubmit: return .thinking
         case .preToolUse:
-            return .waiting
+            if current == .thinking || current == .waiting || current == .waitingPermission {
+                return .coding
+            }
+            return current
         case .postToolUse:
-            return .coding
+            if current == .coding { return .thinking }
+            return current
         case .postToolUseFailure: return .error
         case .stop: return .completed
         case .notification: return current
@@ -69,7 +73,8 @@ public enum SessionState: String, Codable, Equatable, Sendable, CaseIterable {
         case .subagentStart, .subagentStop: return current
         case .preCompact: return .compacting
         case .postCompact:
-            return .completed
+            if current == .compacting { return .thinking }
+            return current
         case .sessionError: return .error
         case .sessionEnd: return .completed
         case .refreshContext: return .coding
@@ -93,9 +98,9 @@ public enum SessionState: String, Codable, Equatable, Sendable, CaseIterable {
     
     // MARK: 渐变色
 
-    /// 渐变颜色数组（用于边框 - 默认灰色，不随状态变化）
+    /// 渐变颜色数组（用于边框 - 随状态颜色变化）
     public var gradientColors: [Color] {
-        return [.gray.opacity(0.5), .gray.opacity(0.3)]
+        [self.color, self.color.opacity(0.3)]
     }
 }
 

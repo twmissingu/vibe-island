@@ -174,7 +174,7 @@ struct ClickRipple: ViewModifier {
 // MARK: - Preference Key
 
 struct RipplePreferenceKey: PreferenceKey {
-    static nonisolated(unsafe) var defaultValue: CGPoint = .zero
+    static let defaultValue: CGPoint = .zero
     
     static func reduce(value: inout CGPoint, nextValue: () -> CGPoint) {
         value = nextValue()

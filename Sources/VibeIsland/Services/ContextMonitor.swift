@@ -110,7 +110,7 @@ final class ContextMonitor {
     private var processedCompactions: [String: Int64] = [:]
 
     private static let logger = Logger(
-        subsystem: Bundle.main.bundleIdentifier ?? "com.twissingu.VibeIsland",
+        subsystem: Bundle.main.bundleIdentifier ?? "com.twmissingu.VibeIsland",
         category: "ContextMonitor"
     )
 

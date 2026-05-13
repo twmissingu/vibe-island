@@ -17,7 +17,7 @@ final class ErrorPresenter {
     // MARK: - 日志
 
     private static let logger = Logger(
-        subsystem: Bundle.main.bundleIdentifier ?? "com.twissingu.VibeIsland",
+        subsystem: Bundle.main.bundleIdentifier ?? "com.twmissingu.VibeIsland",
         category: "ErrorPresenter"
     )
 

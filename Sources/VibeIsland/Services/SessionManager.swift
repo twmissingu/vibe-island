@@ -165,6 +165,9 @@ final class SessionManager: SessionAggregatable {
     @ObservationIgnored private var lastOpenCodeQueryTime: [String: Date] = [:]
     private static let openCodeQueryCooldown: TimeInterval = 5.0
 
+    /// 上次同步到 PetProgressManager 的累计总编码分钟数（定时器用，updateSession 不再重复同步）
+    @ObservationIgnored private var lastSyncedTotalMinutes: Int = 0
+
     private func startCodingTimeTicker() {
         codingTimeTicker?.cancel()
         codingTimeTicker = Task {
@@ -174,7 +177,11 @@ final class SessionManager: SessionAggregatable {
                 await MainActor.run {
                     CodingTimeTracker.shared.tick()
                     let totalMinutes = CodingTimeTracker.shared.totalCodingMinutes
-                    PetProgressManager.shared.addCodingMinutes(totalMinutes)
+                    let delta = totalMinutes - lastSyncedTotalMinutes
+                    if delta > 0 {
+                        PetProgressManager.shared.addCodingMinutes(delta)
+                        lastSyncedTotalMinutes = totalMinutes
+                    }
                 }
             }
         }
@@ -272,8 +279,8 @@ final class SessionManager: SessionAggregatable {
 
         CodingTimeTracker.shared.handleSessionStateChange(sessionId: sessionId, state: session.status)
 
-        // 同步到宠物进度管理器
-        PetProgressManager.shared.addCodingMinutes(CodingTimeTracker.shared.todayCodingMinutes)
+        // 编码时长同步由 startCodingTimeTicker 每 30 秒统一处理（避免双重复计）
+        // 此处不再重复调用 PetProgressManager.shared.addCodingMinutes
 
         // 检测聚合状态变化，触发回调（播放提示音）
         let newState = aggregateState
