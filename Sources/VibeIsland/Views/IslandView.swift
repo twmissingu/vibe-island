@@ -145,6 +145,46 @@ struct CompactIslandView: View {
     /// 括号动画服务
     @State private var bracketAnimation = BracketAnimationService()
 
+    // MARK: - Glow Intensity
+
+    /// 根据不同会话状态定义括号发光强度
+    private struct GlowIntensity {
+        let blur: CGFloat
+        let shadowRadius: CGFloat
+        let shadowOpacity: Double
+    }
+
+    private var glowIntensity: GlowIntensity {
+        switch aggregateState {
+        case .waitingPermission, .error:
+            return GlowIntensity(blur: 5, shadowRadius: 5, shadowOpacity: 0.9)
+        case .compacting:
+            return GlowIntensity(blur: 4, shadowRadius: 4, shadowOpacity: 0.7)
+        default:
+            return GlowIntensity(blur: 3, shadowRadius: 3, shadowOpacity: 0.6)
+        }
+    }
+
+    // MARK: - Bracket View
+
+    /// 统一括号视图，带动态发光强度
+    private func bracketView(text: String, offset: CGFloat, color: Color, intensity: GlowIntensity, uiScale: CGFloat) -> some View {
+        ZStack {
+            Text(text)
+                .foregroundColor(color.opacity(0.4))
+                .font(.system(size: 24 * uiScale, weight: .bold, design: .monospaced))
+                .baselineOffset(2 * uiScale)
+                .blur(radius: intensity.blur * uiScale)
+
+            Text(text)
+                .foregroundColor(color)
+                .font(.system(size: 24 * uiScale, weight: .bold, design: .monospaced))
+                .baselineOffset(2 * uiScale)
+                .shadow(color: color.opacity(intensity.shadowOpacity), radius: intensity.shadowRadius * uiScale)
+        }
+        .offset(x: offset)
+    }
+
     var body: some View {
         // 获取菜单栏高度和刘海宽度
         let barHeight = ScreenParameters.shared.menuBarHeight
@@ -157,21 +197,14 @@ struct CompactIslandView: View {
         let uiScale = barHeight / 44.0
 
         HStack(spacing: 8 * uiScale) {
-            // Left parenthesis with glow (blur + shadow)
-            ZStack {
-                Text("(")
-                    .foregroundColor(aggregateState.color.opacity(0.4))
-                    .font(.system(size: 24 * uiScale, weight: .bold, design: .monospaced))
-                    .baselineOffset(2 * uiScale)
-                    .blur(radius: 3 * uiScale)
-                
-                Text("(")
-                    .foregroundColor(aggregateState.color)
-                    .font(.system(size: 24 * uiScale, weight: .bold, design: .monospaced))
-                    .baselineOffset(2 * uiScale)
-                    .shadow(color: aggregateState.color.opacity(0.6), radius: 3 * uiScale)
-            }
-            .offset(x: bracketAnimation.isExpanded ? -4.0 * uiScale : 0)
+            // Left parenthesis with dynamic glow
+            bracketView(
+                text: "(",
+                offset: bracketAnimation.isExpanded ? -4.0 * uiScale : 0,
+                color: aggregateState.color,
+                intensity: glowIntensity,
+                uiScale: uiScale
+            )
 
             // Session indicator dot
             sessionIndicatorDot
@@ -193,31 +226,25 @@ struct CompactIslandView: View {
             }
             .frame(width: indicatorWidth, height: barHeight)
 
-            // Right parenthesis with glow (blur + shadow)
-            ZStack {
-                Text(")")
-                    .foregroundColor(aggregateState.color.opacity(0.4))
-                    .font(.system(size: 24 * uiScale, weight: .bold, design: .monospaced))
-                    .baselineOffset(2 * uiScale)
-                    .blur(radius: 3 * uiScale)
-                
-                Text(")")
-                    .foregroundColor(aggregateState.color)
-                    .font(.system(size: 24 * uiScale, weight: .bold, design: .monospaced))
-                    .baselineOffset(2 * uiScale)
-                    .shadow(color: aggregateState.color.opacity(0.6), radius: 3 * uiScale)
-            }
-            .offset(x: bracketAnimation.isExpanded ? 4.0 * uiScale : 0)
+            // Right parenthesis with dynamic glow
+            bracketView(
+                text: ")",
+                offset: bracketAnimation.isExpanded ? 4.0 * uiScale : 0,
+                color: aggregateState.color,
+                intensity: glowIntensity,
+                uiScale: uiScale
+            )
         }
         .padding(.horizontal, 16 * uiScale)
         .padding(.vertical, 10 * uiScale)
         .frame(height: barHeight) // 与菜单栏高度一致
-        .background(backgroundView)
-        .clipShape(Capsule())
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: aggregateState)
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: topSession?.sessionId)
-
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: viewModel.settings.petEnabled)
+        .background(
+            RoundedRectangle(cornerRadius: barHeight / 2)
+                .fill(Color.black)
+        )
+        .animation(.spring(IslandAnimation.colorChange), value: aggregateState)
+        .animation(.spring(IslandAnimation.colorChange), value: topSession?.sessionId)
+        .animation(.spring(IslandAnimation.colorChange), value: viewModel.settings.petEnabled)
         .animation(.easeInOut(duration: 1.0), value: bracketAnimation.isExpanded)
         .onChange(of: aggregateState) { _, _ in
             if shouldAnimateBrackets {
@@ -252,17 +279,17 @@ struct CompactIslandView: View {
             // 状态图标 + 名称
             HStack(spacing: 3) {
                 Image(systemName: sessionStateIcon)
-                    .font(.system(size: 10))
+                    .font(.islandBody)
                     .foregroundStyle(aggregateState.color)
                 Text(aggregateState.displayName)
-                    .font(.system(size: 10))
+                    .font(.islandBody)
                     .foregroundStyle(aggregateState.color)
             }
             .frame(width: 72, alignment: .leading)
 
             // 会话名
             Text(session.sessionName ?? (session.cwd as NSString).lastPathComponent)
-                .font(.system(size: 10, weight: .medium))
+                .font(.islandBody.weight(.medium))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -300,12 +327,6 @@ struct CompactIslandView: View {
             .modifier(SessionPetEffect(state: aggregateState))
     }
 
-    // MARK: - Background
-
-    @ViewBuilder
-    private var backgroundView: some View {
-        Color.black
-    }
     // MARK: - 上下文使用率指示器（替代圆点）
 
     @ViewBuilder

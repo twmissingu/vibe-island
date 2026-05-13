@@ -1,12 +1,11 @@
 import AppKit
 import SwiftUI
-import CoreGraphics
 
 final class DynamicIslandPanel: NSPanel {
     private var currentScreen: NSScreen?
     
     init<Content: View>(contentView: Content) where Content: View {
-        let screen = NSScreen.main ?? NSScreen.screens.first!
+        let screen = NSScreen.main ?? NSScreen.screens.first ?? NSScreen()
         let nh = screen.safeAreaInsets.top > 24 ? screen.safeAreaInsets.top : (screen.auxiliaryTopLeftArea != nil ? 38 : 0)
         let totalHeight = max(nh + 280, 400)
         let screenFrame = screen.frame
@@ -99,7 +98,7 @@ final class DynamicIslandPanel: NSPanel {
     /// - 580pt: 16" MacBook Pro (notch ~238pt)
     /// - 420pt: 非刘海 Mac
     static func calculateNotchAwareWidth() -> CGFloat {
-        let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 24 }) ?? NSScreen.main ?? NSScreen.screens.first!
+        let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 24 }) ?? NSScreen.main ?? NSScreen.screens.first ?? NSScreen()
         let screenWidth = screen.frame.width
         let hasNotch = screen.safeAreaInsets.top > 24
         guard hasNotch else { return 420 }
@@ -143,13 +142,13 @@ struct DynamicIslandPanelContent: View {
                 contentView
                     .environment(\.isExpandedMode, true)
                     .frame(width: compactWidth > 0 ? compactWidth : DynamicIslandPanel.calculateNotchAwareWidth())
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .transition(.scale(scale: 0.85, anchor: .top).combined(with: .opacity))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onReceive(NotificationCenter.default.publisher(for: .panelExpandedStateChanged)) { notification in
             let expanded = notification.userInfo?["isExpanded"] as? Bool ?? false
-            withAnimation(.easeInOut(duration: 0.25)) {
+            withAnimation(.spring(IslandAnimation.expand)) {
                 isExpanded = expanded
             }
         }

@@ -1,11 +1,25 @@
 import SwiftUI
 
+// MARK: - 标签页位置偏好
+
+private struct TabFrameKey: PreferenceKey {
+    static let defaultValue: [ExpandedIslandView.ExpandedTab: CGRect] = [:]
+    static func reduce(value: inout [ExpandedIslandView.ExpandedTab: CGRect], nextValue: () -> [ExpandedIslandView.ExpandedTab: CGRect]) {
+        value.merge(nextValue()) { $1 }
+    }
+}
+
 // MARK: - 展开的灵动岛视图
 
 struct ExpandedIslandView: View {
     @Environment(StateManager.self) private var viewModel
     @State private var selectedTab: ExpandedTab = .sessions
+    @State private var tabFrames: [ExpandedTab: CGRect] = [:]
+    @State private var tabDirection = 0
     @State private var showSettings = false
+    @State private var showSetup = false
+    @State private var borderRotation: Double = 0
+    @State private var isRefreshing = false
     private var sessionManager: SessionManager { .shared }
 
     /// 聚合状态用于渐变边框
@@ -22,54 +36,54 @@ struct ExpandedIslandView: View {
     enum ExpandedTab: String, CaseIterable {
         case sessions = "会话"
         case context = "上下文"
+        case stats = "统计"
 
         var icon: String {
             switch self {
             case .sessions: return "terminal"
             case .context: return "brain.fill"
+            case .stats: return "chart.bar.fill"
             }
         }
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            // 标签页切换 + 关闭按钮
-            HStack(spacing: 4) {
-                ForEach(ExpandedTab.allCases, id: \.self) { tab in
-                    tabButton(tab)
-                }
-                
-                Spacer()
-                
-                // 关闭按钮
-                Button {
-                    closeExpanded()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(themeManager.iconColor)
-                }
-                .buttonStyle(.plain)
-                .help("关闭")
+            if viewModel.setupState != .completed && showSetup {
+                setupContainer
+                    .frame(height: 280)
+            } else {
+                tabBarSection
+                dividerSection
+                // 内容区（固定高度），settings 与 tab 共享同一 frame
+                contentArea
+                    .frame(height: 280)
+                    .clipped()
             }
-            .padding(.bottom, 8)
-
-            Divider()
-                .opacity(0.2)
-
-            // 标签内容（固定高度，不因内容变化）
-            tabContent
-                .frame(height: 280)
         }
         .padding(12)
-        // No fixed width - let DynamicIslandPanel control width
         .background(backgroundView)
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: sessionManager.sortedSessions.first?.sessionId)
-        .popover(isPresented: $showSettings, arrowEdge: .top) {
-            SettingsView()
-                .environment(viewModel)
-                .frame(width: 450)
+        .animation(.spring(IslandAnimation.expand), value: showSettings)
+        .animation(.spring(IslandAnimation.colorChange), value: sessionManager.sortedSessions.first?.sessionId)
+        .animation(.spring(IslandAnimation.colorChange), value: viewModel.settings.theme)
+        .overlay(alignment: .top) {
+            if let notification = viewModel.petNotification {
+                petUnlockBanner(notification)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(IslandAnimation.settingsSlide), value: viewModel.petNotification != nil)
+        .onAppear {
+            viewModel.evaluateSetupState()
+            showSetup = viewModel.setupState != .completed
+            startBorderRotation()
+        }
+        .onChange(of: viewModel.settings.theme) { _, newTheme in
+            if newTheme == .glass {
+                borderRotation = 0
+                startBorderRotation()
+            }
         }
     }
 
@@ -79,38 +93,172 @@ struct ExpandedIslandView: View {
         NotificationCenter.default.post(name: .toggleIslandState, object: nil)
     }
 
-    // MARK: - 标签栏
+    // MARK: - 边框旋转动画
 
-    private var tabBar: some View {
-        HStack(spacing: 4) {
-            ForEach(ExpandedTab.allCases, id: \.self) { tab in
-                tabButton(tab)
+    private func startBorderRotation() {
+        guard viewModel.settings.theme == .glass else { return }
+        withAnimation(.linear(duration: 6).repeatForever(autoreverses: false)) {
+            borderRotation = 360
+        }
+    }
+
+    // MARK: - 宠物解锁通知横幅
+
+    @ViewBuilder
+    private func petUnlockBanner(_ notification: PetUnlockNotification) -> some View {
+        HStack(spacing: 8) {
+            PetView(petId: notification.pet.rawValue, level: notification.newLevel ?? .basic, scale: 1.5)
+                .frame(width: 24, height: 24)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(notification.type == .unlock ? "🎉 解锁新宠物" : "⭐ 皮肤升级")
+                    .font(.islandBody.weight(.semibold))
+                    .foregroundStyle(themeManager.primaryText)
+                Text(notification.type == .unlock
+                    ? "\(notification.pet.displayName) 加入你的岛！"
+                    : "\(notification.pet.displayName) 升至 \(notification.newLevel?.displayName ?? "")")
+                    .font(.islandCompact)
+                    .foregroundStyle(themeManager.secondaryText)
+            }
+
+            Spacer()
+
+            Button {
+                viewModel.petNotification = nil
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.islandCaption)
+                    .foregroundStyle(themeManager.iconColor)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(themeManager.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(themeManager.selectedBorder, lineWidth: 1)
+        )
+        .padding(.horizontal, 8)
+        .padding(.top, 8)
+        .onTapGesture {
+            viewModel.petNotification = nil
+        }
+    }
+
+    // MARK: - Tab Bar Section
+
+    private var tabBarSection: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 4) {
+                ForEach(ExpandedTab.allCases, id: \.self) { tab in
+                    tabButton(tab)
+                }
+
+                Spacer()
+
+                Button {
+                    closeExpanded()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.islandBody)
+                        .foregroundStyle(themeManager.iconColor)
+                }
+                .buttonStyle(.plain)
+                .help("关闭")
+            }
+            .coordinateSpace(name: "tabBar")
+            .onPreferenceChange(TabFrameKey.self) { tabFrames = $0 }
+
+            if let frame = tabFrames[selectedTab] {
+                Capsule()
+                    .fill(themeManager.selectedBorder)
+                    .frame(width: frame.width * 0.7, height: 2)
+                    .offset(x: frame.minX + frame.width * 0.15)
+                    .animation(.spring(IslandAnimation.tabIndicator), value: selectedTab)
             }
         }
         .padding(.bottom, 8)
     }
 
+    // MARK: - Divider Section
+
+    @ViewBuilder
+    private var dividerSection: some View {
+        if viewModel.settings.theme == .pixel {
+            Text("- - - - - - - - - - - - - - - - -")
+                .font(.system(size: 8, design: .monospaced))
+                .foregroundStyle(themeManager.normalBorder)
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, 4)
+        } else {
+            Divider()
+                .opacity(0.2)
+        }
+    }
+
+    // MARK: - Content Area（Settings 与 Tab 共享同一空间）
+
+    @ViewBuilder
+    private var contentArea: some View {
+        if showSettings {
+            MiniSettingsView(onDismiss: { showSettings = false })
+                .environment(viewModel)
+                .transition(.asymmetric(
+                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                    removal: .move(edge: .bottom).combined(with: .opacity)
+                ))
+        } else {
+            tabContent
+                .transition(.asymmetric(
+                    insertion: .move(edge: .top).combined(with: .opacity),
+                    removal: .move(edge: .top).combined(with: .opacity)
+                ))
+        }
+    }
+
+    // MARK: - Tab Selection
+
+    private func selectTab(_ tab: ExpandedTab) {
+        guard tab != selectedTab else { return }
+        let tabs = ExpandedTab.allCases
+        guard let fromIndex = tabs.firstIndex(of: selectedTab),
+              let toIndex = tabs.firstIndex(of: tab) else { return }
+        tabDirection = toIndex > fromIndex ? 1 : -1
+        withAnimation(.spring(IslandAnimation.tabSwitch)) {
+            selectedTab = tab
+        }
+    }
+
+    // MARK: - 标签按钮
+
     private func tabButton(_ tab: ExpandedTab) -> some View {
         Button {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                selectedTab = tab
-            }
+            selectTab(tab)
         } label: {
-            HStack(spacing: 6) {
+            VStack(spacing: 2) {
                 Image(systemName: tab.icon)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.islandHeading.weight(.medium))
                 Text(tab.rawValue)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.islandCompact)
             }
             .foregroundStyle(tabForegroundStyle(for: tab))
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background(tabBackground(for: tab))
-            .overlay(tabBorder(for: tab))
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(tab.rawValue)
-        .contentShape(Rectangle())
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .preference(key: TabFrameKey.self,
+                        value: [tab: geo.frame(in: .named("tabBar"))])
+            }
+        )
     }
 
     // MARK: - 主题感知的标签样式
@@ -120,33 +268,22 @@ struct ExpandedIslandView: View {
         return isSelected ? themeManager.primaryText : themeManager.mutedText
     }
 
-    @ViewBuilder
-    private func tabBackground(for tab: ExpandedTab) -> some View {
-        let isSelected = selectedTab == tab
-        RoundedRectangle(cornerRadius: themeManager.cornerRadius)
-            .fill(isSelected ? themeManager.selectedBackground : themeManager.normalBackground)
-    }
-
-    @ViewBuilder
-    private func tabBorder(for tab: ExpandedTab) -> some View {
-        let isSelected = selectedTab == tab
-        RoundedRectangle(cornerRadius: themeManager.cornerRadius)
-            .strokeBorder(
-                isSelected ? themeManager.selectedBorder : themeManager.normalBorder,
-                lineWidth: isSelected ? 1.5 : 0.5
-            )
-    }
-
-    // MARK: - 标签内容
+    // MARK: - 标签内容（带方向感知的滑入过渡）
 
     @ViewBuilder
     private var tabContent: some View {
-        switch selectedTab {
-        case .sessions:
-            sessionsTab
-        case .context:
-            contextTab
+        Group {
+            switch selectedTab {
+            case .sessions: sessionsTab
+            case .context: contextTab
+            case .stats: statsTab
+            }
         }
+        .transition(.asymmetric(
+            insertion: .move(edge: tabDirection >= 0 ? .trailing : .leading).combined(with: .opacity),
+            removal: .move(edge: tabDirection >= 0 ? .leading : .trailing).combined(with: .opacity)
+        ))
+        .id(selectedTab)
     }
 
     // MARK: - 会话标签
@@ -205,13 +342,28 @@ struct ExpandedIslandView: View {
         }
     }
 
+    // MARK: - 统计标签
+
+    @ViewBuilder
+    private var statsTab: some View {
+        VStack(spacing: 8) {
+            ScrollView {
+                StatsView()
+                    .environment(viewModel)
+            }
+            .frame(maxHeight: .infinity)
+
+            footer
+        }
+    }
+
     private var emptyContextView: some View {
         VStack(spacing: 8) {
             Image(systemName: "brain")
                 .font(.system(size: 24))
                 .foregroundStyle(themeManager.disabledColor)
             Text("暂无会话数据")
-                .font(.system(size: 12))
+                .font(.islandBody)
                 .foregroundStyle(themeManager.mutedText)
         }
         .frame(maxWidth: .infinity)
@@ -225,7 +377,7 @@ struct ExpandedIslandView: View {
                 showSettings = true
             } label: {
                 Image(systemName: "gearshape.fill")
-                    .font(.system(size: 11))
+                    .font(.islandCaption)
             }
             .buttonStyle(.plain)
             .foregroundStyle(themeManager.iconColor)
@@ -234,18 +386,16 @@ struct ExpandedIslandView: View {
 
             // 右下角刷新按钮
             Button {
-                Task {
-                    switch selectedTab {
-                    case .sessions:
-                        sessionManager.refresh()
-                    case .context:
-                        // 上下文数据随会话更新自动同步，刷新会话即可
-                        sessionManager.refresh()
-                    }
+                isRefreshing = true
+                sessionManager.refresh()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    isRefreshing = false
                 }
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 11))
+                    .font(.islandCaption)
+                    .rotationEffect(.degrees(isRefreshing ? 360 : 0))
+                    .animation(isRefreshing ? .linear(duration: 0.5).repeatForever(autoreverses: false) : .default, value: isRefreshing)
             }
             .buttonStyle(.plain)
             .foregroundStyle(themeManager.iconColor)
@@ -255,47 +405,157 @@ struct ExpandedIslandView: View {
 
     @ViewBuilder
     private var backgroundView: some View {
-        let borderColor = Color.gray
-
-        switch viewModel.settings.theme {
-        case .glass:
+        ZStack {
+            // Glass 主题 — 毛玻璃 + 旋转渐变边框
             ZStack {
-                // 毛玻璃背景
                 VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
                     .opacity(0.7)
-
-                // 固定灰色渐变边框
                 RoundedRectangle(cornerRadius: 16)
                     .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                borderColor.opacity(0.5),
-                                borderColor.opacity(0.3),
-                                borderColor.opacity(0.5)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                        AngularGradient(
+                            gradient: Gradient(colors: [
+                                aggregateState.color,
+                                aggregateState.color.opacity(0.3),
+                                aggregateState.color.opacity(0.7),
+                                aggregateState.color
+                            ]),
+                            center: .center,
+                            startAngle: .degrees(borderRotation),
+                            endAngle: .degrees(borderRotation + 360)
                         ),
                         lineWidth: 2.5
                     )
             }
-        case .pixel:
+            .opacity(viewModel.settings.theme == .glass ? 1 : 0)
+
+            // Pixel 主题 — 纯色背景 + 纯色边框
             ZStack {
                 Color(white: 0.1)
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                borderColor.opacity(0.5),
-                                borderColor.opacity(0.3),
-                                borderColor.opacity(0.5)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 2.5
-                    )
+                RoundedRectangle(cornerRadius: 4)
+                    .strokeBorder(aggregateState.color, lineWidth: 2)
             }
+            .opacity(viewModel.settings.theme == .pixel ? 1 : 0)
+        }
+        .animation(.easeInOut(duration: IslandAnimation.themeChange), value: viewModel.settings.theme)
+    }
+
+    // MARK: - 引导设置卡片
+
+    /// 引导设置容器 — 替代标签页内容区域
+    @ViewBuilder
+    private var setupContainer: some View {
+        VStack(spacing: 16) {
+            // 右上角关闭按钮
+            HStack {
+                Spacer()
+                Button {
+                    closeExpanded()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.islandBody)
+                        .foregroundStyle(themeManager.iconColor)
+                }
+                .buttonStyle(.plain)
+                .help("关闭")
+            }
+
+            Spacer()
+
+            // 打瞌睡的宠物 — 比 SF Symbol 更有温度
+            PetView(petId: "cat", level: .basic, scale: 3.0, initialState: .sleeping)
+                .frame(width: 48, height: 48)
+
+            // 基于状态的标题
+            Text(setupTitle)
+                .font(.islandHeading)
+                .foregroundStyle(themeManager.primaryText)
+
+            Text(setupDescription)
+                .font(.islandBody)
+                .foregroundStyle(themeManager.secondaryText)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 20)
+
+            // 基于状态的操作按钮
+            if viewModel.setupState == .claudeDetected || viewModel.setupState == .opencodeDetected {
+                Button(action: {
+                    Task { await performSetupAction() }
+                }) {
+                    Text(setupButtonTitle)
+                        .font(.islandBody.weight(.medium))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 10)
+                        .background(
+                            LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .controlSize(.large)
+            }
+
+            // 跳过按钮始终可见
+            Button("稍后再说") {
+                viewModel.setupState = .completed
+                showSetup = false
+            }
+            .buttonStyle(.plain)
+            .font(.islandCompact)
+            .foregroundStyle(themeManager.mutedText)
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - 引导设置文本
+
+    private var setupTitle: String {
+        switch viewModel.setupState {
+        case .notStarted: return "欢迎使用 Vibe Island"
+        case .claudeDetected: return "检测到 Claude Code"
+        case .opencodeDetected: return "检测到 OpenCode"
+        case .completed: return ""
+        }
+    }
+
+    private var setupDescription: String {
+        switch viewModel.setupState {
+        case .notStarted: return "你的 AI 编程伙伴住在刘海里。安装 Claude Code 或 OpenCode 后，我会自动开始工作。"
+        case .claudeDetected: return "安装 Hook 来实时监控 Claude Code 会话状态。"
+        case .opencodeDetected: return "安装插件来实时监控 OpenCode 会话状态。"
+        case .completed: return ""
+        }
+    }
+
+    private var setupButtonTitle: String {
+        switch viewModel.setupState {
+        case .claudeDetected: return "🔌 安装 Hook"
+        case .opencodeDetected: return "🔌 安装插件"
+        default: return ""
+        }
+    }
+
+    // MARK: - 引导操作
+
+    private func performSetupAction() async {
+        switch viewModel.setupState {
+        case .claudeDetected:
+            let result = await viewModel.installHooks()
+            if case .success = result {
+                viewModel.evaluateSetupState()
+            }
+        case .opencodeDetected:
+            let result = await viewModel.installOpenCodePlugin()
+            if case .success = result {
+                viewModel.evaluateSetupState()
+            }
+        default: break
         }
     }
 }

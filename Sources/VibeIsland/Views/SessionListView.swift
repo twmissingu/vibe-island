@@ -14,6 +14,8 @@ struct SessionListView: View {
         let onSelect: () -> Void
         let theme: AppTheme
 
+        @State private var isHovering = false
+
         private var themeManager: ThemeManager {
             theme.manager
         }
@@ -23,7 +25,7 @@ struct SessionListView: View {
                 HStack(spacing: 4) {
                     // 会话名
                     Text(session.sessionName ?? session.cwd.shortenedCwd())
-                        .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
+                        .font(.islandBody.weight(isSelected ? .semibold : .medium))
                         .foregroundStyle(themeManager.primaryText)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -50,18 +52,31 @@ struct SessionListView: View {
                 .padding(.horizontal, 8)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
+                .onHover { isHovering = $0 }
                 .background(rowBackground)
                 .overlay(rowBorder)
                 .shadow(color: shadowColor, radius: theme == .pixel ? 0 : 2, y: theme == .pixel ? 0 : 1)
+                .animation(.easeInOut(duration: 0.15), value: isHovering)
             }
             .buttonStyle(.plain)
+            .overlay(
+                Rectangle()
+                    .fill(isSelected ? session.status.color : .clear)
+                    .frame(width: 3)
+                    .cornerRadius(1.5),
+                alignment: .leading
+            )
         }
 
         // MARK: - 主题感知的颜色
 
         private var rowBackground: some View {
             RoundedRectangle(cornerRadius: themeManager.cornerRadius)
-                .fill(isSelected ? themeManager.selectedBackground : themeManager.normalBackground)
+        .fill(isSelected 
+            ? themeManager.selectedBackground 
+            : isHovering 
+                ? themeManager.highlightBorder.opacity(0.15) 
+                : themeManager.normalBackground)
         }
 
         private var rowBorder: some View {
@@ -135,7 +150,7 @@ struct SessionListView: View {
                 .font(.system(size: 16))
                 .foregroundStyle(themeManager.disabledColor)
             Text("No active sessions")
-                .font(.system(size: 10))
+                .font(.islandBody)
                 .foregroundStyle(themeManager.mutedText)
         }
         .frame(maxWidth: .infinity)

@@ -2,6 +2,20 @@ import Foundation
 import SwiftUI
 import OSLog
 
+// MARK: - 设置状态
+
+/// 引导设置状态机
+enum SetupState: String, Codable, Sendable {
+    /// 首次启动 — 无任何 AI 工具检测到
+    case notStarted
+    /// 检测到 Claude Code 在运行但未安装 hook
+    case claudeDetected
+    /// 检测到 OpenCode 项目但未安装插件
+    case opencodeDetected
+    /// 全部配置完成
+    case completed
+}
+
 @MainActor
 @Observable
 final class StateManager {
@@ -10,11 +24,16 @@ final class StateManager {
 
     // MARK: - 新服务集成
 
-    let sessionWatcher = SessionFileWatcher.shared
     let soundManager = SoundManager.shared
     let hookInstaller = HookAutoInstaller.shared
     let processDetector = ProcessDetector.shared
     let contextMonitor = ContextMonitor.shared
+
+    /// 宠物解锁通知（由 PetUnlockNotificationManager 回调设置）
+    var petNotification: PetUnlockNotification?
+
+    /// 当前引导设置状态
+    var setupState: SetupState = .completed
 
     private static let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "com.twmissingu.VibeIsland",
@@ -37,14 +56,22 @@ final class StateManager {
         // 启动 OpenCode 监控（会话自动注册到 SessionManager）
         OpenCodeMonitor.shared.start()
 
-        // 启动会话文件监听
-        sessionWatcher.startWatching()
-
         // 启动上下文监控
         contextMonitor.start()
 
         // 启动状态变化监听
         startStateObservation()
+
+        // 评估引导状态
+        evaluateSetupState()
+
+        // 订阅宠物解锁通知（替换 SettingsView 中的订阅）
+        PetUnlockNotificationManager.shared.onNewNotification = { [weak self] notification in
+            Task { @MainActor in
+                self?.petNotification = notification
+                self?.handlePetNotification(notification)
+            }
+        }
 
         Self.logger.info("StateManager 已启动所有监控服务")
     }
@@ -62,10 +89,29 @@ final class StateManager {
         // 停止上下文监控
         contextMonitor.stop()
 
-        // 停止会话监听
-        sessionWatcher.stopWatching()
-
         Self.logger.info("StateManager 已停止所有监控服务")
+    }
+
+    /// 评估当前设置状态（应在 startMonitoring 和工具检测后调用）
+    func evaluateSetupState() {
+        let hasClaude = isClaudeCodeRunning()
+        let hasOpenCode = isOpenCodeInstalled()
+        let claudeHookInstalled = hookInstaller.isHookInstalled
+        let opencodePluginInstalled = isOpenCodePluginInstalled()
+
+        // 优先检查 hook/plugin 安装状态：已配置 = completed
+        if claudeHookInstalled || opencodePluginInstalled {
+            setupState = .completed
+        } else if hasClaude && !claudeHookInstalled {
+            setupState = .claudeDetected
+        } else if hasOpenCode && !opencodePluginInstalled {
+            setupState = .opencodeDetected
+        } else if hasClaude || hasOpenCode {
+            // 工具有在运行但状态未匹配到上述分支（理论不应到达）
+            setupState = .notStarted
+        } else {
+            setupState = .notStarted
+        }
     }
 
     // MARK: - 状态变化监听
@@ -82,30 +128,28 @@ final class StateManager {
 
     private func handleStateChange(from oldState: SessionState, to newState: SessionState) async {
         switch newState {
-        case .idle:
-            _ = await soundManager.play(.idle)
-            Self.logger.debug("状态变化: \(oldState.rawValue) → \(newState.rawValue)")
-        case .thinking:
-            _ = await soundManager.play(.thinking)
-            Self.logger.debug("状态变化: \(oldState.rawValue) → \(newState.rawValue)")
-        case .coding:
-            _ = await soundManager.play(.coding)
-            Self.logger.debug("状态变化: \(oldState.rawValue) → \(newState.rawValue)")
-        case .waiting:
-            _ = await soundManager.play(.waiting)
-            Self.logger.debug("状态变化: \(oldState.rawValue) → \(newState.rawValue)")
         case .waitingPermission:
-            _ = await soundManager.play(.permissionRequest)
+            _ = await soundManager.play(.permissionRequest, force: true)
             Self.logger.debug("状态变化: \(oldState.rawValue) → \(newState.rawValue)，播放权限提示音")
-        case .completed:
-            _ = await soundManager.play(.completed)
-            Self.logger.debug("状态变化: \(oldState.rawValue) → \(newState.rawValue)，播放完成提示音")
         case .error:
-            _ = await soundManager.play(.error)
+            _ = await soundManager.play(.error, force: true)
             Self.logger.debug("状态变化: \(oldState.rawValue) → \(newState.rawValue)，播放错误提示音")
-        case .compacting:
-            _ = await soundManager.play(.compacting)
-            Self.logger.debug("状态变化: \(oldState.rawValue) → \(newState.rawValue)，播放压缩提示音")
+        default:
+            Self.logger.debug("状态变化: \(oldState.rawValue) → \(newState.rawValue)")
+        }
+    }
+
+    // MARK: - 宠物通知处理
+
+    private func handlePetNotification(_ notification: PetUnlockNotification) {
+        // 打印日志 — 后续可扩展为岛内动画或声音
+        Self.logger.info("🎉 宠物通知: \(notification.type.rawValue) - \(notification.pet.displayName)")
+        // 3秒后自动清除
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(3))
+            if self.petNotification?.id == notification.id {
+                self.petNotification = nil
+            }
         }
     }
 
@@ -216,13 +260,52 @@ final class StateManager {
         }
     }
 
+    // MARK: - 完整设置窗口
+
+    private var settingsWindowController: NSWindowController?
+
+    func openFullSettings() {
+        if let controller = settingsWindowController {
+            controller.showWindow(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let hostingView = NSHostingView(
+            rootView: SettingsView()
+                .environment(self)
+                .frame(width: 480, height: 440)
+        )
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 480, height: 440),
+            styleMask: [.titled, .closable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = NSLocalizedString("settings.title", comment: "Settings")
+        window.contentView = hostingView
+        window.center()
+        window.isReleasedWhenClosed = false
+        window.level = .screenSaver + 1
+        // 窗口关闭时清理引用
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            self?.settingsWindowController = nil
+        }
+        let controller = NSWindowController(window: window)
+        controller.showWindow(nil)
+        settingsWindowController = controller
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     // MARK: - Toggle State
 
     func toggleIslandState() {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            islandState = islandState == .compact ? .expanded : .compact
-        }
-        // 通知 panel 更新大小
+        islandState = islandState == .compact ? .expanded : .compact
+        // 通知 panel 更新内容（实际动画在 DynamicIslandPanelContent 中执行）
         let isExpanded = islandState == .expanded
         NotificationCenter.default.post(
             name: .islandStateDidChange,
@@ -231,3 +314,5 @@ final class StateManager {
         )
     }
 }
+
+

@@ -133,7 +133,7 @@ final class ChallengeManager {
 
         if shouldRefreshDaily {
             generateDailyChallenges()
-            defaults.set(now.timeIntervalSince1970, forKey: "\(lastRefreshKey)-daily")
+            defaults.set(now, forKey: "\(lastRefreshKey)-daily")
             Self.logger.info("每日挑战已刷新")
         }
 
@@ -149,7 +149,7 @@ final class ChallengeManager {
 
         if shouldRefreshWeekly {
             generateWeeklyChallenges()
-            defaults.set(now.timeIntervalSince1970, forKey: "\(lastRefreshKey)-weekly")
+            defaults.set(now, forKey: "\(lastRefreshKey)-weekly")
             Self.logger.info("每周挑战已刷新")
         }
 
@@ -248,11 +248,10 @@ final class ChallengeManager {
         updatedProgress.claimedAt = Date()
         progressMap[challengeId] = updatedProgress
 
-        // 计算 XP 奖励
+        // 计算 XP 奖励（不累加编码时长，仅作记录）
         let baseXP = 50
         let bonusXP = Int(Double(baseXP) * challenge.xpMultiplier)
-
-        PetProgressManager.shared.addCodingMinutes(bonusXP)
+        ChallengeManager.logger.info("💰 挑战奖励: \(bonusXP) XP (未计入编码时长)")
 
         saveProgress()
 

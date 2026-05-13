@@ -81,7 +81,7 @@ final class SoundManager: Sendable {
     // MARK: - 日志
 
     private static let logger = Logger(
-        subsystem: Bundle.main.bundleIdentifier ?? "com.twissingu.VibeIsland",
+        subsystem: Bundle.main.bundleIdentifier ?? "com.twmissingu.VibeIsland",
         category: "SoundManager"
     )
 
@@ -99,6 +99,12 @@ final class SoundManager: Sendable {
     /// AVAudioPlayer 实例（宠物音效）
     private var audioPlayers: [String: AVAudioPlayer] = [:]
 
+    /// 每种声音的最后播放时间
+    private var lastPlayedAt: [SoundType: Date] = [:]
+
+    /// 冷却间隔（秒），同种声音在此时间内不会重复播放
+    private let cooldownInterval: TimeInterval = 30
+
     /// 声音文件目录 URL
     private var soundsDirectoryURL: URL? {
         Bundle.main.resourceURL?.appendingPathComponent(Self.soundsDirectoryName)
@@ -114,21 +120,27 @@ final class SoundManager: Sendable {
     // MARK: - 公开方法
 
     /// 播放指定类型的提示音
-    /// - Parameter type: 声音类型
+    /// - Parameters:
+    ///   - type: 声音类型
+    ///   - force: 是否强制播放（忽略冷却）
     /// - Returns: 是否成功开始播放
     @MainActor
-    func play(_ type: SoundType) async -> Bool {
+    func play(_ type: SoundType, force: Bool = false) async -> Bool {
         guard isEnabled else {
             Self.logger.debug("声音已禁用，跳过播放: \(type.rawValue)")
             return false
         }
 
-        // 优先尝试播放自定义声音
-        if playCustomSound(type) {
-            return true
+        // 冷却检查
+        if !force, let lastDate = lastPlayedAt[type], Date().timeIntervalSince(lastDate) < cooldownInterval {
+            Self.logger.debug("声音冷却中，跳过播放: \(type.rawValue)")
+            return false
         }
 
-        // 回退到系统声音
+        // 更新播放时间（在播放之前设置，防止并发竞态）
+        lastPlayedAt[type] = Date()
+
+        // 播放系统声音
         return await playSystemSound(type)
     }
 
@@ -303,41 +315,6 @@ final class SoundManager: Sendable {
         return success
     }
 
-    // MARK: - 自定义声音
-
-    /// 播放自定义声音文件
-    /// - Parameter type: 声音类型
-    /// - Returns: 是否成功播放
-    @MainActor
-    private func playCustomSound(_ type: SoundType) -> Bool {
-        guard let fileName = type.customSoundFileName else {
-            return false
-        }
-
-        guard let url = soundsDirectoryURL?.appendingPathComponent(fileName) else {
-            return false
-        }
-
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            return false
-        }
-
-        do {
-            let player = try AVAudioPlayer(contentsOf: url)
-            player.volume = volume
-            player.prepareToPlay()
-            let success = player.play()
-
-            if success {
-                Self.logger.debug("正在播放自定义声音: \(fileName)")
-            } else {
-                Self.logger.error("自定义声音播放失败: \(fileName)")
-            }
-
-            return success
-        } catch {
-            Self.logger.warning("加载自定义声音失败: \(fileName), 错误: \(error.localizedDescription)")
-            return false
-        }
-    }
 }
+
+

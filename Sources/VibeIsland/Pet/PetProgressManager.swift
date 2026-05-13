@@ -457,14 +457,24 @@ final class PetProgressManager {
 
     /// 检查今天是否已达成某类型目标
     private func isGoalAchievedToday(type: CodingGoalType) -> Bool {
-        guard let date = lastDailyGoalDate else { return false }
+        let date: Date?
+        switch type {
+        case .daily: date = lastDailyGoalDate
+        case .weekly: date = lastWeeklyGoalDate
+        }
+        guard let date else { return false }
         let calendar = Calendar.current
         return calendar.isDate(date, inSameDayAs: Date())
     }
 
     /// 检查本周是否已达成某类型目标
     private func isGoalAchievedThisWeek(type: CodingGoalType) -> Bool {
-        guard let date = lastWeeklyGoalDate else { return false }
+        let date: Date?
+        switch type {
+        case .daily: date = lastDailyGoalDate
+        case .weekly: date = lastWeeklyGoalDate
+        }
+        guard let date else { return false }
         let calendar = Calendar.current
         let thisWeek = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date())
         let goalWeek = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
@@ -568,8 +578,8 @@ final class PetProgressManager {
     private let lastWeeklyGoalDateKey = "vibe-island.last-weekly-goal-date"
 
     private func loadGoalSettings() {
-        dailyGoal = defaults.integer(forKey: dailyGoalKey) ?? 30
-        weeklyGoal = defaults.integer(forKey: weeklyGoalKey) ?? 180
+        dailyGoal = (defaults.object(forKey: dailyGoalKey) as? Int) ?? 30
+        weeklyGoal = (defaults.object(forKey: weeklyGoalKey) as? Int) ?? 180
         if let date = defaults.object(forKey: lastDailyGoalDateKey) as? Date {
             lastDailyGoalDate = date
         }

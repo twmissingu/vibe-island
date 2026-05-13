@@ -50,7 +50,10 @@ final class CodingTimeTracker {
     private var todayMarker: Date = Calendar.current.startOfDay(for: Date())
     
     /// 本周一日期标记（用于判断是否跨周）
-    private var weekMarker: Date = Calendar.current.startOfDay(for: Calendar.current.date(from: Calendar.current.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date()))!)
+    private var weekMarker: Date = {
+        let components = Calendar.current.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date())
+        return Calendar.current.startOfDay(for: Calendar.current.date(from: components) ?? Date())
+    }()
     
     private static let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "com.twmissingu.VibeIsland",
@@ -145,7 +148,8 @@ final class CodingTimeTracker {
         }
         
         let components = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now)
-        let newWeek = calendar.startOfDay(for: calendar.date(from: components)!)
+        guard let weekDate = calendar.date(from: components) else { return }
+        let newWeek = calendar.startOfDay(for: weekDate)
         if newWeek > weekMarker {
             // 跨周了，重置本周计数
             Self.logger.info("跨周检测：重置本周计数")

@@ -25,3 +25,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Session list row spacing inconsistency between themes
+
+## Bugfix Patch - 2026-05-13
+
+### Fixed (Critical)
+- **State machine divergence**: `SessionState.transition()` differed between CLI and App targets for 6 event types (sessionStart, userPromptSubmit, preToolUse, postToolUse, postCompact) — synced both implementations
+- **Cumulative total overcounting**: `PetProgressManager.addCodingMinutes()` received cumulative totals instead of deltas, causing massive minute inflation — added `lastSyncedTodayMinutes`/`lastSyncedTotalMinutes` delta tracking
+- **isBlinking mismatch**: App version incorrectly included `completed` and `error` in blinking states — aligned with CLI (only `waitingPermission`, `compacting`)
+
+### Fixed (High)
+- **Force unwrap crash in Session.applyEvent()**: `try! JSONEncoder().encode()` replaced with `try?` + `flatMap`
+- **Force unwrap in CodingTimeTracker**: Two `!` operators in Calendar date math replaced with `guard let` / `?? Date()`
+- **XP conflated with coding minutes**: `ChallengeManager.claimReward()` called `addCodingMinutes(bonusXP)` — changed to logging only
+- **Challenge refresh never persisted**: `Date` stored as `TimeInterval` (Double), read as `Date` — always nil, causing daily/weekly refresh every launch — stored as `Date` directly
+- **Global mutable state in PreferenceKey**: `nonisolated(unsafe) static var defaultValue` in `RippleEffect.swift` — changed to `let`
+- **Missing Sendable conformances**: `ProcessInfo`, `PluginSessionFile` — added `Sendable`
+
+### Fixed (Medium)
+- **Bundle ID typo**: `com.twissingu.VibeIsland` → `com.twmissingu.VibeIsland` (2 files)
+- **Dead `??` operator**: `defaults.integer(forKey:)` returns non-optional, `??` never triggered — replaced with `as? Int`
+- **Unused `type` parameter**: `isGoalAchievedToday(type:)` always checked `lastDailyGoalDate` regardless of type — now dispatches on type
+- **Dead code in PetTransitionAnimator**: All 8 `apply*` methods returned `EmptyView()`; `applyTransition()` never called — removed
+- **Unused import**: `CoreGraphics` in DynamicIslandPanel, `AppKit` in CodingTimeStatsView — removed
+- **Redundant watcher**: `SessionFileWatcher.shared.startWatching()` called without callback in `StateManager` — removed
+
+### Fixed (Low)
+- **`var` should be `let`**: `HookHandler.swift` `var toolUsage = session.toolUsage` never mutated
+- **Hardcoded particle emission center**: Absolute (32,32) instead of relative to view bounds — removed
+- **`AchievementProgress.progress` always 1.0**: Formula `currentValue / max(1, currentValue)` — added `targetValue` field with real division

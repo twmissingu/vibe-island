@@ -84,13 +84,14 @@ enum AchievementRarity: String, Codable {
 
 struct AchievementProgress: Codable, Sendable {
     let achievementId: String
+    let targetValue: Int
     var currentValue: Int
     var isUnlocked: Bool
     var unlockedAt: Date?
 
     var progress: Double {
-        // 需要从外部 Achievement 查 targetValue，这里简化处理
-        return min(1.0, Double(currentValue) / Double(max(1, currentValue)))
+        guard targetValue > 0 else { return 0 }
+        return min(1.0, Double(currentValue) / Double(targetValue))
     }
 }
 
@@ -176,6 +177,7 @@ final class AchievementManager {
 
         var currentProgress = progress[achievementId] ?? AchievementProgress(
             achievementId: achievementId,
+            targetValue: achievement.targetValue,
             currentValue: 0,
             isUnlocked: false
         )

@@ -28,7 +28,7 @@ struct ContextUsageView: View {
         HStack(spacing: 6) {
             // 上下文图标
             Image(systemName: contextIcon)
-                .font(.system(size: 10))
+                .font(.islandBody)
                 .foregroundStyle(warningColor)
                 .opacity(isWarning ? flashOpacity : 1.0)
 
@@ -47,7 +47,7 @@ struct ContextUsageView: View {
 
             // 百分比文本
             Text("\(snapshot.usagePercent)%")
-                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .font(.islandCompact.monospaced())
                 .foregroundStyle(isWarning ? warningColor : .secondary)
 
             // 剩余 token
@@ -122,7 +122,7 @@ struct ContextUsageCard: View {
             // 标题行：会话名 + 持续时间
             HStack {
                 Text(session.sessionName ?? session.cwd.shortenedCwd())
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.islandBody.weight(.semibold))
                     .foregroundStyle(themeManager.primaryText)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -130,7 +130,7 @@ struct ContextUsageCard: View {
                 Spacer()
 
                 Text(session.formattedDuration)
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(.islandCaptionMono)
                     .foregroundStyle(themeManager.mutedText)
             }
 
@@ -146,7 +146,7 @@ struct ContextUsageCard: View {
                 }
                 .overlay(alignment: .trailing) {
                     Text("\(snapshot.usagePercent)%")
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .font(.islandCompact.monospaced())
                         .foregroundStyle(statusColor)
                 }
             }
@@ -181,24 +181,24 @@ struct ContextUsageCard: View {
             if let tools = snapshot.toolUsage, !tools.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("TOOL USAGE")
-                        .font(.system(size: 9, weight: .medium))
+                        .font(.system(size: 9, weight: .medium))  // 9pt — 无对应 token
                         .foregroundStyle(themeManager.tertiaryText)
 
                     ForEach(tools, id: \.name) { tool in
                         HStack(spacing: 6) {
                             Image(systemName: toolIcon(for: tool.name))
-                                .font(.system(size: 10))
+                                .font(.islandBody)
                                 .foregroundStyle(themeManager.secondaryText)
                                 .frame(width: 14)
 
                             Text(tool.name.uppercased())
-                                .font(.system(size: 10, weight: .medium))
+                                .font(.islandCompact)
                                 .foregroundStyle(themeManager.secondaryText)
 
                             Spacer()
 
                             Text("\(tool.count)")
-                                .font(.system(size: 10, design: .monospaced))
+                                .font(.islandBody.monospaced())
                                 .foregroundStyle(themeManager.secondaryText)
 
                             Text("(\(toolPercent(tool))%)")
@@ -217,19 +217,19 @@ struct ContextUsageCard: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("SKILL USAGE")
-                        .font(.system(size: 9, weight: .medium))
+                        .font(.system(size: 9, weight: .medium))  // 9pt — 无对应 token
                         .foregroundStyle(themeManager.tertiaryText)
 
                     ForEach(skills, id: \.name) { skill in
                         HStack {
                             Text(skill.name.uppercased())
-                                .font(.system(size: 10))
+                                .font(.islandBody)
                                 .foregroundStyle(themeManager.secondaryText)
 
                             Spacer()
 
                             Text("\(skill.count)")
-                                .font(.system(size: 10, design: .monospaced))
+                                .font(.islandBody.monospaced())
                                 .foregroundStyle(themeManager.secondaryText)
 
                             Text("(\(skillPercent(skill))%)")
@@ -340,16 +340,16 @@ struct ContextUsageCard: View {
 
     private func tokenCell(_ label: String, value: Int?, showIfZero: Bool = true) -> some View {
         VStack(spacing: 2) {
-            Text(label)
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(tokenLabelColor(value: value, showIfZero: showIfZero))
+                Text(label)
+                    .font(.system(size: 9, weight: .medium))  // 9pt — 无对应 token
+                    .foregroundStyle(tokenLabelColor(value: value, showIfZero: showIfZero))
             if let val = value, (val > 0 || showIfZero) {
                 Text(formatTokenCount(val))
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .font(.islandCaption.weight(.medium).monospaced())
                     .foregroundStyle(tokenValueColor)
             } else {
                 Text("--")
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .font(.islandCaption.weight(.medium).monospaced())
                     .foregroundStyle(theme == .pixel ? .gray.opacity(0.5) : .gray.opacity(0.5))
             }
         }
@@ -388,7 +388,7 @@ struct SessionInfoCard: View {
             // 标题行：会话名 + 状态
             HStack {
                 Text(session.sessionName ?? session.cwd.shortenedCwd())
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.islandBody.weight(.semibold))
                     .foregroundStyle(themeManager.primaryText)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -397,10 +397,10 @@ struct SessionInfoCard: View {
 
                 HStack(spacing: 4) {
                     Image(systemName: session.status.icon)
-                        .font(.system(size: 9))
+                        .font(.system(size: 9))  // 9pt — 无对应 token
                         .foregroundStyle(session.status.color)
                     Text(session.status.statusName)
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(.islandBody.monospaced())
                         .foregroundStyle(session.status.color)
                 }
             }
@@ -411,13 +411,13 @@ struct SessionInfoCard: View {
                     session.toolDisplayName,
                     systemImage: session.toolSourceIcon
                 )
-                .font(.system(size: 10))
+                .font(.islandBody)
                 .foregroundStyle(themeManager.secondaryText)
 
                 Spacer()
 
                 Text(session.cwd.shortenedCwd())
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.islandBody.monospaced())
                     .foregroundStyle(themeManager.mutedText)
                     .lineLimit(1)
             }
@@ -427,10 +427,10 @@ struct SessionInfoCard: View {
             // 等待数据提示
             HStack(spacing: 6) {
                 Image(systemName: "arrow.trianglehead.2.clockwise")
-                    .font(.system(size: 10))
+                    .font(.islandBody)
                     .foregroundStyle(themeManager.tertiaryText)
                 Text("上下文数据将在会话运行后自动更新")
-                    .font(.system(size: 10))
+                    .font(.islandBody)
                     .foregroundStyle(themeManager.tertiaryText)
             }
         }
@@ -467,24 +467,22 @@ struct OpenCodeNoContextCard: View {
             // 标题行：会话名 + 来源标签 + 持续时间
             HStack {
                 Text(session.sessionName ?? session.cwd.shortenedCwd())
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.islandBody.weight(.semibold))
                     .foregroundStyle(themeManager.primaryText)
                     .lineLimit(1)
                     .truncationMode(.tail)
 
                 Text("OpenCode")
-                    .font(.system(size: 8, weight: .medium))
+                    .font(.system(size: 8, weight: .medium))  // 8pt — 无对应 token
                     .foregroundStyle(.orange.opacity(0.9))
                     .padding(.horizontal, 4)
                     .padding(.vertical, 1)
-                    .background(
-                        Capsule().fill(.orange.opacity(0.2))
-                    )
+                    .background(Capsule().fill(.orange.opacity(0.2)))
 
                 Spacer()
 
                 Text(session.formattedDuration)
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(.islandCaptionMono)
                     .foregroundStyle(themeManager.mutedText)
             }
 
@@ -513,10 +511,10 @@ struct OpenCodeNoContextCard: View {
             // 等待数据提示
             HStack(spacing: 6) {
                 Image(systemName: "arrow.trianglehead.2.clockwise")
-                    .font(.system(size: 10))
+                    .font(.islandBody)
                     .foregroundStyle(themeManager.tertiaryText)
                 Text("上下文数据将在会话运行后自动更新")
-                    .font(.system(size: 10))
+                    .font(.islandBody)
                     .foregroundStyle(themeManager.tertiaryText)
             }
         }
@@ -538,10 +536,10 @@ struct OpenCodeNoContextCard: View {
     private func tokenCell(_ label: String, value: Int?) -> some View {
         VStack(spacing: 2) {
             Text(label)
-                .font(.system(size: 9, weight: .medium))
+                .font(.system(size: 9, weight: .medium))  // 9pt — 无对应 token
                 .foregroundStyle(themeManager.mutedText)
             Text("--")
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .font(.islandCaption.weight(.medium).monospaced())
                 .foregroundStyle(themeManager.mutedText)
         }
         .frame(maxWidth: .infinity)

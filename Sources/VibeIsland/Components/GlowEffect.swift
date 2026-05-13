@@ -52,7 +52,6 @@ struct PulsingGlow: ViewModifier {
                 Circle()
                     .fill(color.opacity(0.3 * opacity))
                     .frame(width: currentRadius * 2, height: currentRadius * 2)
-                    .scaleEffect(currentRadius / baseRadius)
             )
             .shadow(color: color.opacity(opacity * 0.8), radius: currentRadius, x: 0, y: 0)
             .onAppear {

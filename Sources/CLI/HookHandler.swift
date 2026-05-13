@@ -170,7 +170,7 @@ enum HookHandler {
             }
 
             // FINALLY: Sort tool usage once after all updates
-            if var toolUsage = session.toolUsage {
+            if let toolUsage = session.toolUsage {
                 session.toolUsage = sortedToolUsage(toolUsage)
             }
 
