@@ -16,16 +16,17 @@ case "$ARCH" in
     *) echo "❌ 不支持的架构: $ARCH"; exit 1 ;;
 esac
 
-# GitHub 下载地址
+# 从 GitHub API 获取最新 release 的下载地址
 REPO="twmissingu/vibe-island"
-VERSION="v1.0.1"
-TAR_URL="https://github.com/$REPO/releases/download/$VERSION/VibeIsland-$ARCH_NAME.tar.gz"
+echo "📡 获取最新版本..."
+LATEST=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['tag_name'])")
+TAR_URL="https://github.com/$REPO/releases/download/$LATEST/VibeIsland-$ARCH_NAME.tar.gz"
 
 # 创建临时目录
 TMP_DIR=$(mktemp -d)
 cd "$TMP_DIR"
 
-echo "📥 下载 VibeIsland..."
+echo "📥 下载 VibeIsland $LATEST..."
 curl -fsSL "$TAR_URL" -o VibeIsland.tar.gz
 
 echo "📦 解压..."
