@@ -16,7 +16,7 @@ Platform: macOS 14.0+ (Sonoma). Bundle ID prefix: `com.twmissingu`. App group: `
 xcodegen generate                  # after ANY change to project.yml
 open VibeIsland.xcodeproj          # then Cmd+R
 ./scripts/dev-setup.sh             # first-time setup (checks deps, generates project, type-checks CLI)
-./scripts/build-release.sh         # clean Release build + DMG
+./scripts/build-release.sh         # clean Release build + .tar.gz
 ```
 
 ## Testing

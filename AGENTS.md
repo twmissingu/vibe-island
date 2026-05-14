@@ -8,7 +8,7 @@
 ./scripts/dev-setup.sh              # first-time setup (checks deps, generates project, type-checks CLI)
 xcodegen generate                    # after ANY change to project.yml
 ./scripts/run-tests.sh              # run all tests (hook format test + Xcode unit tests)
-./scripts/build-release.sh          # clean Release build + DMG
+./scripts/build-release.sh          # clean Release build + .tar.gz
 
 # CLI typecheck (no Xcode needed — must cd into Sources/CLI)
 cd Sources/CLI && swiftc -typecheck -target arm64-apple-macosx14.0 vibe-island.swift HookHandler.swift SharedModels.swift

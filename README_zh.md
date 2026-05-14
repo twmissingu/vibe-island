@@ -43,10 +43,24 @@ VibeIsland 把你的 macOS 菜单栏变成 LLM 编码会话的实时仪表盘，
 ### 环境要求
 
 - macOS 14.0+ (Sonoma)
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen): `brew install xcodegen`
 - Claude Code 和/或 OpenCode（可选，用于会话追踪）
 
 ### 安装
+
+#### 下载预编译版本
+
+```bash
+# 一键安装（推荐）
+curl -fsSL https://github.com/twmissingu/vibe-island/releases/latest/download/install.sh | bash
+
+# 或手动安装：从 Releases 页面下载 VibeIsland-<arch>.tar.gz
+tar xzf VibeIsland-*.tar.gz
+cp -r VibeIsland.app /Applications/
+xattr -cr /Applications/VibeIsland.app
+open /Applications/VibeIsland.app
+```
+
+#### 从源码构建
 
 ```bash
 git clone https://github.com/twzhan/vibe-island.git

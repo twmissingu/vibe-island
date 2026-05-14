@@ -43,10 +43,24 @@ VibeIsland transforms your macOS menu bar into a live dashboard for all your LLM
 ### Prerequisites
 
 - macOS 14.0+ (Sonoma)
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen): `brew install xcodegen`
 - Claude Code and/or OpenCode (optional, for session tracking)
 
 ### Installation
+
+#### Download (pre-built)
+
+```bash
+# One-line install (recommended)
+curl -fsSL https://github.com/twmissingu/vibe-island/releases/latest/download/install.sh | bash
+
+# Or manual: download VibeIsland-<arch>.tar.gz from Releases page
+tar xzf VibeIsland-*.tar.gz
+cp -r VibeIsland.app /Applications/
+xattr -cr /Applications/VibeIsland.app
+open /Applications/VibeIsland.app
+```
+
+#### Build from source
 
 ```bash
 git clone https://github.com/twzhan/vibe-island.git
