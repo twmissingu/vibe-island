@@ -26,6 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Session list row spacing inconsistency between themes
 
+## [1.0.1] - 2026-05-14
+
+### Fixed
+- **`totalTokensConsumed` double-counting on contextUsage event**: `event.contextTokensUsed` is a snapshot, not a delta — accumulation caused exponential inflation. Changed to no longer derive `totalTokensConsumed` from hook events (transcript/DB paths handle it correctly).
+- **`totalTokensConsumed` undercounting in transcript parser**: Only the last message's tokens per 512KB chunk were accumulated; middle messages in large chunks were lost. Now accumulates ALL messages' tokens in each chunk.
+- **`totalTokensConsumed` unified strategy**: All paths now consistently treat it as cumulative total. transcript parser accumulates per-chunk message sums; OpenCode DB uses direct assignment from cumulative DB value; contextUsage events no longer touch it.
+- **`Session.applyEvent()` missing `totalTokensConsumed`**: App-side event replay now also syncs `totalTokensConsumed` from `contextTokensUsed`.
+
 ## Bugfix Patch - 2026-05-13
 
 ### Fixed (Critical)

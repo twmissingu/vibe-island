@@ -19,7 +19,6 @@ struct ExpandedIslandView: View {
     @State private var showSettings = false
     @State private var showSetup = false
     @State private var borderRotation: Double = 0
-    @State private var isRefreshing = false
     private var sessionManager: SessionManager { .shared }
 
     /// 聚合状态用于渐变边框
@@ -159,26 +158,17 @@ struct ExpandedIslandView: View {
                 }
 
                 Spacer()
-
-                Button {
-                    closeExpanded()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.islandBody)
-                        .foregroundStyle(themeManager.iconColor)
-                }
-                .buttonStyle(.plain)
-                .help("关闭")
             }
             .coordinateSpace(name: "tabBar")
             .onPreferenceChange(TabFrameKey.self) { tabFrames = $0 }
-
-            if let frame = tabFrames[selectedTab] {
-                Capsule()
-                    .fill(themeManager.selectedBorder)
-                    .frame(width: frame.width * 0.7, height: 2)
-                    .offset(x: frame.minX + frame.width * 0.15)
-                    .animation(.spring(IslandAnimation.tabIndicator), value: selectedTab)
+            .overlay(alignment: .bottomLeading) {
+                if let frame = tabFrames[selectedTab] {
+                    Capsule()
+                        .fill(themeManager.selectedBorder)
+                        .frame(width: frame.width * 0.7, height: 2)
+                        .offset(x: frame.minX + frame.width * 0.15)
+                        .animation(.spring(IslandAnimation.tabIndicator), value: selectedTab)
+                }
             }
         }
         .padding(.bottom, 8)
@@ -384,21 +374,16 @@ struct ExpandedIslandView: View {
 
             Spacer()
 
-            // 右下角刷新按钮
+            // 右下角关闭按钮
             Button {
-                isRefreshing = true
-                sessionManager.refresh()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    isRefreshing = false
-                }
+                closeExpanded()
             } label: {
-                Image(systemName: "arrow.clockwise")
+                Image(systemName: "xmark.circle.fill")
                     .font(.islandCaption)
-                    .rotationEffect(.degrees(isRefreshing ? 360 : 0))
-                    .animation(isRefreshing ? .linear(duration: 0.5).repeatForever(autoreverses: false) : .default, value: isRefreshing)
+                    .foregroundStyle(themeManager.iconColor)
             }
             .buttonStyle(.plain)
-            .foregroundStyle(themeManager.iconColor)
+            .help("关闭")
         }
         .padding(.top, 4)
     }

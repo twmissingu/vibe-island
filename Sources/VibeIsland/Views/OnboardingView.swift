@@ -9,7 +9,14 @@ struct OnboardingView: View {
     @Environment(StateManager.self) private var stateManager
 
     @State private var currentStep = 0
-    let totalSteps = 4
+    let totalSteps: Int
+
+    init() {
+        // 如果 hooks 已自动安装，跳过插件配置步骤
+        let hooksInstalled = HookAutoInstaller.shared.isHookInstalled
+        let openCodeInstalled = HookAutoInstaller.shared.isOpenCodePluginInstalled
+        self.totalSteps = (hooksInstalled && openCodeInstalled) ? 3 : 4
+    }
 
     // 插件安装状态
     @State private var claudeHookInstalled = false
@@ -36,26 +43,45 @@ struct OnboardingView: View {
 
             // 内容区域
             Group {
-                switch currentStep {
-                case 0: WelcomeStep()
-                case 1: PluginSetupStep(
-                    claudeInstalled: $claudeHookInstalled,
-                    openCodeInstalled: $openCodePluginInstalled,
-                    openCodeDetected: openCodeDetected,
-                    stateManager: stateManager
-                )
-                case 2: PreferencesStep(
-                    soundEnabled: $soundEnabled,
-                    petEnabled: $petEnabled,
-                    stateManager: stateManager
-                )
-                case 3: CompletionStep(
-                    claudeHookInstalled: claudeHookInstalled,
-                    openCodePluginInstalled: openCodePluginInstalled,
-                    soundEnabled: soundEnabled,
-                    petEnabled: petEnabled
-                )
-                default: EmptyView()
+                if totalSteps == 3 {
+                    // hooks 已自动安装，跳过插件配置
+                    switch currentStep {
+                    case 0: WelcomeStep()
+                    case 1: PreferencesStep(
+                        soundEnabled: $soundEnabled,
+                        petEnabled: $petEnabled,
+                        stateManager: stateManager
+                    )
+                    case 2: CompletionStep(
+                        claudeHookInstalled: true,
+                        openCodePluginInstalled: openCodeDetected,
+                        soundEnabled: soundEnabled,
+                        petEnabled: petEnabled
+                    )
+                    default: EmptyView()
+                    }
+                } else {
+                    switch currentStep {
+                    case 0: WelcomeStep()
+                    case 1: PluginSetupStep(
+                        claudeInstalled: $claudeHookInstalled,
+                        openCodeInstalled: $openCodePluginInstalled,
+                        openCodeDetected: openCodeDetected,
+                        stateManager: stateManager
+                    )
+                    case 2: PreferencesStep(
+                        soundEnabled: $soundEnabled,
+                        petEnabled: $petEnabled,
+                        stateManager: stateManager
+                    )
+                    case 3: CompletionStep(
+                        claudeHookInstalled: claudeHookInstalled,
+                        openCodePluginInstalled: openCodePluginInstalled,
+                        soundEnabled: soundEnabled,
+                        petEnabled: petEnabled
+                    )
+                    default: EmptyView()
+                    }
                 }
             }
 

@@ -121,6 +121,7 @@ public struct Session: Codable, Equatable, Sendable {
     public var contextInputTokens: Int?
     public var contextOutputTokens: Int?
     public var contextReasoningTokens: Int?
+    public var totalTokensConsumed: Int?
     public var toolUsage: [ToolUsage]?
     public var skillUsage: [ToolUsage]?
     public var transcriptPath: String?
@@ -149,6 +150,7 @@ public struct Session: Codable, Equatable, Sendable {
         case contextInputTokens, context_input_tokens
         case contextOutputTokens, context_output_tokens
         case contextReasoningTokens, context_reasoning_tokens
+        case totalTokensConsumed, total_tokens_consumed
         case toolUsage, tool_usage
         case skillUsage, skill_usage
         case transcriptPath, transcript_path
@@ -177,6 +179,7 @@ public struct Session: Codable, Equatable, Sendable {
         contextInputTokens: Int? = nil,
         contextOutputTokens: Int? = nil,
         contextReasoningTokens: Int? = nil,
+        totalTokensConsumed: Int? = nil,
         toolUsage: [ToolUsage]? = nil,
         skillUsage: [ToolUsage]? = nil,
         transcriptPath: String? = nil,
@@ -204,6 +207,7 @@ public struct Session: Codable, Equatable, Sendable {
         self.contextInputTokens = contextInputTokens
         self.contextOutputTokens = contextOutputTokens
         self.contextReasoningTokens = contextReasoningTokens
+        self.totalTokensConsumed = totalTokensConsumed
         self.toolUsage = toolUsage
         self.skillUsage = skillUsage
         self.transcriptPath = transcriptPath
@@ -234,6 +238,7 @@ public struct Session: Codable, Equatable, Sendable {
         contextInputTokens = try Self.decodeFirstOptional(container, key1: .contextInputTokens, key2: .context_input_tokens) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
         contextOutputTokens = try Self.decodeFirstOptional(container, key1: .contextOutputTokens, key2: .context_output_tokens) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
         contextReasoningTokens = try Self.decodeFirstOptional(container, key1: .contextReasoningTokens, key2: .context_reasoning_tokens) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
+        totalTokensConsumed = try Self.decodeFirstOptional(container, key1: .totalTokensConsumed, key2: .total_tokens_consumed) { c, k in try c.decodeIfPresent(Int.self, forKey: k) }
         toolUsage = try Self.decodeFirstOptional(container, key1: .toolUsage, key2: .tool_usage) { c, k in try c.decodeIfPresent([ToolUsage].self, forKey: k) }
         skillUsage = try Self.decodeFirstOptional(container, key1: .skillUsage, key2: .skill_usage) { c, k in try c.decodeIfPresent([ToolUsage].self, forKey: k) }
         transcriptPath = try Self.decodeFirstOptional(container, key1: .transcriptPath, key2: .transcript_path) { c, k in try c.decodeIfPresent(String.self, forKey: k) }
@@ -274,6 +279,7 @@ public struct Session: Codable, Equatable, Sendable {
         try container.encodeIfPresent(contextInputTokens, forKey: .context_input_tokens)
         try container.encodeIfPresent(contextOutputTokens, forKey: .context_output_tokens)
         try container.encodeIfPresent(contextReasoningTokens, forKey: .context_reasoning_tokens)
+        try container.encodeIfPresent(totalTokensConsumed, forKey: .total_tokens_consumed)
         try container.encodeIfPresent(toolUsage, forKey: .tool_usage)
         try container.encodeIfPresent(skillUsage, forKey: .skill_usage)
         try container.encodeIfPresent(transcriptPath, forKey: .transcript_path)
@@ -318,6 +324,8 @@ extension Session {
         }
         if let contextTokensUsed = event.contextTokensUsed {
             self.contextTokensUsed = contextTokensUsed
+            // 事件中的 contextTokensUsed 是累计快照，同步更新总消耗
+            self.totalTokensConsumed = contextTokensUsed
         }
         if let contextTokensTotal = event.contextTokensTotal {
             self.contextTokensTotal = contextTokensTotal

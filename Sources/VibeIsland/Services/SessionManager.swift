@@ -237,6 +237,7 @@ final class SessionManager: SessionAggregatable {
                     if let data = await self.contextMonitor.fetchContextUsageFromOpenCodeDB(cwd: session.cwd) {
                         updated.contextUsage = data.usage
                         updated.contextTokensUsed = data.tokensUsed
+                        updated.totalTokensConsumed = data.tokensUsed
                         updated.contextTokensTotal = data.tokensTotal
                         updated.contextInputTokens = data.inputTokens
                         updated.contextOutputTokens = data.outputTokens
@@ -267,6 +268,7 @@ final class SessionManager: SessionAggregatable {
             if let data = await fetchOpenCodeContextIfNeeded(cwd: session.cwd) {
                 session.contextUsage = data.usage
                 session.contextTokensUsed = data.tokensUsed
+                session.totalTokensConsumed = data.tokensUsed
                 session.contextTokensTotal = data.tokensTotal
                 session.contextInputTokens = data.inputTokens
                 session.contextOutputTokens = data.outputTokens
@@ -300,6 +302,7 @@ final class SessionManager: SessionAggregatable {
             if let data = await fetchOpenCodeContextIfNeeded(cwd: session.cwd) {
                 session.contextUsage = data.usage
                 session.contextTokensUsed = data.tokensUsed
+                session.totalTokensConsumed = data.tokensUsed
                 session.contextTokensTotal = data.tokensTotal
                 session.contextInputTokens = data.inputTokens
                 session.contextOutputTokens = data.outputTokens

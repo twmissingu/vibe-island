@@ -40,15 +40,26 @@ struct MiniSettingsView: View {
                 }
             }
 
-            Spacer()
+            // 底部按钮栏：左"完整设置" + 右"退出应用"
+            HStack {
+                Button("完整设置") {
+                    NotificationCenter.default.post(name: .openFullSettings, object: nil)
+                    onDismiss?()
+                }
+                .font(.islandBody)
+                .foregroundStyle(.blue)
+                .buttonStyle(.plain)
 
-            Button("完整设置") {
-                NotificationCenter.default.post(name: .openFullSettings, object: nil)
-                onDismiss?()
+                Spacer()
+
+                Button("退出应用") {
+                    NSApp.terminate(nil)
+                }
+                .font(.islandBody)
+                .foregroundStyle(.red)
+                .buttonStyle(.plain)
             }
-            .font(.islandBody)
-            .foregroundStyle(.blue)
-            .buttonStyle(.plain)
+            .padding(.top, 8)
         }
     }
 
@@ -129,34 +140,21 @@ struct MiniSettingsView: View {
     // MARK: - Monitor
 
     private var monitorSection: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Text("监控")
-                    .font(.islandBody)
-                    .foregroundStyle(themeManager.primaryText)
-                Spacer()
-            }
+        HStack {
+            Text("监控")
+                .font(.islandBody)
+                .foregroundStyle(themeManager.primaryText)
+            Spacer()
             Toggle(isOn: Binding(
                 get: { viewModel.settings.claudeMonitorEnabled },
-                set: { viewModel.settings.claudeMonitorEnabled = $0 }
-            )) {
-                Text("Claude Code")
-                    .font(.islandBody)
-                    .foregroundStyle(themeManager.secondaryText)
-            }
+                set: {
+                    viewModel.settings.claudeMonitorEnabled = $0
+                    viewModel.settings.openCodeMonitorEnabled = $0
+                }
+            )) { EmptyView() }
             .toggleStyle(.switch)
             .scaleEffect(0.7)
-
-            Toggle(isOn: Binding(
-                get: { viewModel.settings.openCodeMonitorEnabled },
-                set: { viewModel.settings.openCodeMonitorEnabled = $0 }
-            )) {
-                Text("OpenCode")
-                    .font(.islandBody)
-                    .foregroundStyle(themeManager.secondaryText)
-            }
-            .toggleStyle(.switch)
-            .scaleEffect(0.7)
+            .labelsHidden()
         }
     }
 }

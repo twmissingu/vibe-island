@@ -132,6 +132,7 @@ enum HookHandler {
             if let usage = event.contextUsage {
                 session.contextUsage = usage
                 session.contextTokensUsed = event.contextTokensUsed
+                // contextTokensUsed 是当前快照，不是增量。totalTokensConsumed 由 transcript/DB 路径维护。
                 session.contextTokensTotal = event.contextTokensTotal
                 session.contextInputTokens = event.contextInputTokens
                 session.contextOutputTokens = event.contextOutputTokens
@@ -149,6 +150,7 @@ enum HookHandler {
                 if let parsed = parseOpenCodeContextFromDB(cwd: cwd) {
                     session.contextUsage = parsed.usage
                     session.contextTokensUsed = parsed.tokensUsed
+                    session.totalTokensConsumed = parsed.tokensUsed
                     session.contextTokensTotal = parsed.tokensTotal
                     session.contextInputTokens = parsed.inputTokens
                     session.contextOutputTokens = parsed.outputTokens
@@ -521,7 +523,9 @@ enum HookHandler {
         // 按行扫描：assistant 消息提取 token 用量，user 消息提取 skill 调用，custom-title 提取会话名
         var lastInput = 0
         var lastOutput = 0
-        var lastCacheRead = 0
+        // 本 chunk 中所有消息的 token 总和（用于累计 totalTokensConsumed）
+        var chunkSumInput = 0
+        var chunkSumOutput = 0
         var found = false
         var foundSkills: [String] = []
         var lastCustomTitle: String?
@@ -546,7 +550,9 @@ enum HookHandler {
                                 if input > 0 || output > 0 {
                                     lastInput = input
                                     lastOutput = output
-                                    lastCacheRead = usage["cache_read_input_tokens"] as? Int ?? 0
+                                    // 累计本 chunk 所有消息的 token，避免每 512KB 块只取最后一条
+                                    chunkSumInput += input
+                                    chunkSumOutput += output
                                     found = true
                                 }
                             } else if type == "user",
@@ -586,10 +592,13 @@ enum HookHandler {
 
         // 更新 token 统计
         if found {
-            let totalUsed = lastInput + lastCacheRead
+            let totalUsed = lastInput + lastOutput
+            let chunkTotal = chunkSumInput + chunkSumOutput
             session.contextInputTokens = lastInput
             session.contextOutputTokens = lastOutput
             session.contextTokensUsed = totalUsed
+            // 累计本 chunk 所有消息的 token 到总消耗
+            session.totalTokensConsumed = (session.totalTokensConsumed ?? 0) + chunkTotal
 
             // 上下文上限：使用已缓存的 contextLimit，或模型默认值
             if let limit = session.contextLimit, limit > 0 {

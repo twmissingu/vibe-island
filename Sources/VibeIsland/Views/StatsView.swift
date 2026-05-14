@@ -1,17 +1,15 @@
 import SwiftUI
 
-// MARK: - 今日编码统计面板
+// MARK: - 编码统计面板
 
-/// 显示今日编码活动的统计面板
+/// 显示累计编码活动统计的面板
 /// - 编码时长 / 会话数 / Token 使用量（摘要卡片）
 /// - 工具使用排名 Top 5（柱状图卡片）
-/// - 每日目标进度（进度条卡片）
 struct StatsView: View {
     @Environment(StateManager.self) private var viewModel
 
     private var sessionManager: SessionManager { .shared }
     private var codingTimeTracker: CodingTimeTracker { .shared }
-    private var petProgressManager: PetProgressManager { .shared }
 
     private var themeManager: ThemeManager {
         viewModel.settings.theme.manager
@@ -22,7 +20,6 @@ struct StatsView: View {
             VStack(spacing: themeManager.spacing) {
                 summaryCard
                 topToolsCard
-                dailyGoalCard
             }
             .frame(maxWidth: .infinity)
         }
@@ -32,9 +29,10 @@ struct StatsView: View {
     // MARK: - 聚合计算
 
     /// 工具使用排名（按使用次数降序，取 Top 5）
+    /// 数据来源：最近活跃的 8 个会话，与会话列表保持一致
     private var toolRankings: [(name: String, count: Int)] {
         var counts: [String: Int] = [:]
-        for session in sessionManager.allSessions {
+        for session in sessionManager.sortedSessions.prefix(8) {
             for tool in session.toolUsage ?? [] {
                 counts[tool.name, default: 0] += tool.count
             }
@@ -42,51 +40,36 @@ struct StatsView: View {
         return counts.sorted { $0.value > $1.value }.prefix(5).map { ($0.key, $0.value) }
     }
 
-    /// 总工具使用次数
+    /// 总工具使用次数（这 8 个会话的全部工具）
     private var totalToolCount: Int {
-        toolRankings.reduce(0) { $0 + $1.count }
+        var total = 0
+        for session in sessionManager.sortedSessions.prefix(8) {
+            for tool in session.toolUsage ?? [] {
+                total += tool.count
+            }
+        }
+        return total
     }
 
-    /// 所有会话的 contextTokensUsed 总和
+    /// 所有会话的 totalTokensConsumed 总和
     private var totalTokens: Int {
-        sessionManager.allSessions.reduce(0) { $0 + ($1.contextTokensUsed ?? 0) }
+        sessionManager.allSessions.reduce(0) { $0 + ($1.totalTokensConsumed ?? 0) }
     }
 
-    /// 今日编码时长 → "Xh Ym" 或 "Ym"
+    /// 编码时长 → "X.Xh"
     private var formattedCodingTime: String {
-        let seconds = codingTimeTracker.todayCodingSeconds
-        let hours = seconds / 3600
-        let minutes = (seconds % 3600) / 60
-        if hours > 0 {
-            return "\(hours)h \(minutes)m"
-        }
-        return "\(minutes)m"
+        let hours = Double(codingTimeTracker.totalCodingSeconds) / 3600.0
+        return String(format: "%.1fh", hours)
     }
 
-    /// Token 总量格式化
+    /// Token 总量格式化（百万单位）
     private var formattedTokens: String {
-        if totalTokens >= 1_000_000 {
-            return String(format: "%.1fM tok", Double(totalTokens) / 1_000_000)
-        } else if totalTokens >= 1_000 {
-            return String(format: "%.0fK tok", Double(totalTokens) / 1_000)
-        }
-        return "\(totalTokens) tok"
-    }
-
-    /// 每日目标进度 (0.0 ~ 1.0)
-    private var dailyGoalProgress: Double {
-        let goal = max(petProgressManager.dailyGoal, 1)
-        return min(Double(petProgressManager.todayCodingMinutes) / Double(goal), 1.0)
-    }
-
-    /// 每日目标百分比 (0 ~ 100)
-    private var dailyGoalPercent: Int {
-        Int(dailyGoalProgress * 100)
+        String(format: "%.1fM", Double(totalTokens) / 1_000_000)
     }
 
     /// 是否有活跃数据（用于空态判断）
     private var hasData: Bool {
-        codingTimeTracker.todayCodingSeconds > 0 || !sessionManager.allSessions.isEmpty
+        codingTimeTracker.totalCodingSeconds > 0 || !sessionManager.allSessions.isEmpty
     }
 
     // MARK: - 摘要卡片
@@ -98,7 +81,7 @@ struct StatsView: View {
                 Image(systemName: "chart.bar.fill")
                     .font(.islandCaption)
                     .foregroundStyle(themeManager.secondaryText)
-                Text("Today's Coding")
+                Text("Coding Data")
                     .font(.islandHeading)
                     .foregroundStyle(themeManager.primaryText)
                 Spacer()
@@ -138,28 +121,30 @@ struct StatsView: View {
 
     @ViewBuilder
     private var topToolsCard: some View {
-        if !toolRankings.isEmpty {
-            VStack(spacing: themeManager.spacing) {
-                // 标题
-                HStack {
-                    Image(systemName: "hammer.fill")
-                        .font(.islandCaption)
-                        .foregroundStyle(themeManager.secondaryText)
-                    Text("Top Tools")
-                        .font(.islandHeading)
-                        .foregroundStyle(themeManager.primaryText)
-                    Spacer()
-                }
+        VStack(spacing: themeManager.spacing) {
+            // 标题
+            HStack {
+                Image(systemName: "hammer.fill")
+                    .font(.islandCaption)
+                    .foregroundStyle(themeManager.secondaryText)
+                Text("Top Tools")
+                    .font(.islandHeading)
+                    .foregroundStyle(themeManager.primaryText)
+                Spacer()
+            }
 
+            if !toolRankings.isEmpty {
                 VStack(spacing: 6) {
                     ForEach(Array(toolRankings.enumerated()), id: \.element.name) { _, tool in
                         toolRow(tool: tool)
                     }
                 }
+            } else {
+                toolsEmptyState
             }
-            .padding(themeManager.padding)
-            .background(cardBackground)
         }
+        .padding(themeManager.padding)
+        .background(cardBackground)
     }
 
     private func toolRow(tool: (name: String, count: Int)) -> some View {
@@ -169,10 +154,11 @@ struct StatsView: View {
 
         return HStack(spacing: 8) {
             // 工具名称
-            Text(tool.name)
+            Text(tool.name.uppercased())
                 .font(.islandCompact)
                 .foregroundStyle(themeManager.secondaryText)
-                .frame(width: 50, alignment: .leading)
+                .lineLimit(1)
+                .frame(width: 64, alignment: .leading)
 
             // 条形图（GeometryReader + Capsule，与 CompactProgressBar 一致）
             GeometryReader { geo in
@@ -180,7 +166,7 @@ struct StatsView: View {
                     Capsule()
                         .fill(themeManager.progressBackground)
                     Capsule()
-                        .fill(toolBarColor(ratio: ratio))
+                        .fill(toolBarColor(pct: pct))
                         .frame(width: geo.size.width * ratio)
                 }
             }
@@ -190,82 +176,36 @@ struct StatsView: View {
             Text("\(tool.count)")
                 .font(.islandBody.monospaced())
                 .foregroundStyle(themeManager.primaryText)
-                .frame(width: 28, alignment: .trailing)
+                .frame(minWidth: 36, alignment: .trailing)
 
             // 百分比
             Text("(\(pct)%)")
                 .font(.islandCompact)
                 .foregroundStyle(themeManager.mutedText)
-                .frame(width: 36, alignment: .trailing)
+                .frame(minWidth: 40, alignment: .trailing)
         }
     }
 
-    private func toolBarColor(ratio: Double) -> Color {
-        if ratio >= 0.8 { return .red }
-        if ratio >= 0.5 { return .orange }
+    private func toolBarColor(pct: Int) -> Color {
+        if pct >= 40 { return .red }
+        if pct >= 15 { return .orange }
         return .green
     }
 
-    // MARK: - 每日目标卡片
-
-    private var dailyGoalCard: some View {
-        VStack(spacing: themeManager.spacing) {
-            // 标题行
-            HStack {
-                Image(systemName: "target")
-                    .font(.islandCaption)
-                    .foregroundStyle(themeManager.secondaryText)
-                Text("Daily Goal")
-                    .font(.islandHeading)
-                    .foregroundStyle(themeManager.primaryText)
-                Spacer()
-                Text("\(petProgressManager.dailyGoal)m")
-                    .font(.islandCaptionMono)
-                    .foregroundStyle(themeManager.mutedText)
-            }
-
-            // 进度条（与 CompactProgressBar 一致的 Capsule 风格）
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(themeManager.progressBackground)
-                    Capsule()
-                        .fill(goalProgressColor)
-                        .frame(width: geo.size.width * dailyGoalProgress)
-                }
-            }
-            .frame(height: themeManager.progressBarHeight)
-
-            // 状态行
-            HStack {
-                if dailyGoalPercent >= 100 {
-                    Text("🎉 目标已达成！")
-                        .font(.islandCompact.weight(.semibold))
-                        .foregroundStyle(.green)
-                } else {
-                    Text("\(petProgressManager.todayCodingMinutes) / \(petProgressManager.dailyGoal) 分钟")
-                        .font(.islandCompact)
-                        .foregroundStyle(themeManager.secondaryText)
-                }
-                Spacer()
-                Text(dailyGoalPercent >= 100 ? "🎯" : "\(dailyGoalPercent)%")
-                    .font(.islandCaptionMono)
-                    .foregroundStyle(dailyGoalPercent >= 100 ? .green : goalProgressColor)
-            }
-        }
-        .padding(themeManager.padding)
-        .background(cardBackground)
-    }
-
-    private var goalProgressColor: Color {
-        let pct = dailyGoalPercent
-        if pct >= 100 { return .green }
-        if pct >= 80 { return .orange }
-        if pct >= 50 { return .yellow }
-        return themeManager.contextColor(percent: pct)
-    }
-
     // MARK: - 空状态
+
+    private var toolsEmptyState: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "hammer")
+                .font(.islandBody)
+                .foregroundStyle(themeManager.mutedText)
+            Text("暂无工具数据")
+                .font(.islandBody)
+                .foregroundStyle(themeManager.mutedText)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+    }
 
     private var emptyState: some View {
         HStack(spacing: 6) {
