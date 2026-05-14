@@ -37,13 +37,13 @@ struct SessionListView: View {
                         .foregroundStyle(themeManager.toolSourceColor)
                         .frame(width: 50, alignment: .trailing)
 
-                    // 状态图标 + 名称
+                    // 状态名称 + 图标（图标后缀）
                     HStack(spacing: 2) {
-                        Image(systemName: session.status.icon)
-                            .font(.system(size: 9))
-                            .foregroundStyle(session.status.color)
                         Text(session.status.statusName)
                             .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(session.status.color)
+                        Image(systemName: session.status.icon)
+                            .font(.system(size: 9))
                             .foregroundStyle(session.status.color)
                     }
                     .frame(width: 70, alignment: .trailing)

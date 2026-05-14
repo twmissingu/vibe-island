@@ -187,8 +187,8 @@ struct StatsView: View {
     }
 
     private func toolBarColor(pct: Int) -> Color {
-        if pct >= 40 { return .red }
-        if pct >= 15 { return .orange }
+        if pct >= 30 { return .red }
+        if pct >= 10 { return .orange }
         return .green
     }
 

@@ -26,6 +26,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Session list row spacing inconsistency between themes
 
+## [1.1.0] - 2026-05-14
+
+### Changed
+- **Session list status icon**: Moved from prefix to suffix position for better readability
+- **Top tools color thresholds**: Red at >=30%, orange at >=10%, green below 10%
+- **App icon**: Added rounded corners with transparent background (no more white corners)
+
+### Fixed
+- **macOS Gatekeeper**: Removed DMG distribution, switched to tar.gz + install.sh to avoid "app damaged" errors (no Developer ID certificate required)
+
 ## [1.0.1] - 2026-05-14
 
 ### Fixed
