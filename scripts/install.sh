@@ -1,6 +1,6 @@
 #!/bin/bash
 # VibeIsland 一键安装脚本
-# 用法: curl -fsSL https://github.com/twmissingu/vibe-island/releases/latest/download/install.sh | bash
+# 用法: curl -fsSL https://raw.githubusercontent.com/twmissingu/vibe-island/main/scripts/install.sh | bash
 #
 # 此脚本处理 macOS Gatekeeper 拦截问题（没有 Apple Developer 开发者账号的 app 需要手动移除 quarantine）
 

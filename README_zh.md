@@ -51,7 +51,7 @@ VibeIsland 把你的 macOS 菜单栏变成 LLM 编码会话的实时仪表盘，
 
 ```bash
 # 一键安装（推荐）
-curl -fsSL https://github.com/twmissingu/vibe-island/releases/latest/download/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/twmissingu/vibe-island/main/scripts/install.sh | bash
 
 # 或手动安装：从 Releases 页面下载 VibeIsland-<arch>.tar.gz
 tar xzf VibeIsland-*.tar.gz

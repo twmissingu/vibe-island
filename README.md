@@ -51,7 +51,7 @@ VibeIsland transforms your macOS menu bar into a live dashboard for all your LLM
 
 ```bash
 # One-line install (recommended)
-curl -fsSL https://github.com/twmissingu/vibe-island/releases/latest/download/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/twmissingu/vibe-island/main/scripts/install.sh | bash
 
 # Or manual: download VibeIsland-<arch>.tar.gz from Releases page
 tar xzf VibeIsland-*.tar.gz
